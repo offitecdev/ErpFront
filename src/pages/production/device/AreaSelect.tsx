@@ -1,11 +1,11 @@
 import { t } from '@/i18n/translate';
-import type { AreaShares, TaskArea } from '@/types/productionTasks';
+import type { TaskArea, TaskSection } from '@/types/productionTasks';
 
 import { AreaIcon } from '../tasks/AreaSwitch';
-import { areaLabelKey, formatPercent, TASK_AREAS } from '../tasks/taskModel';
+import { areaTone, formatPercent, sectionLabel } from '../tasks/taskModel';
 
 /**
- * ── MEKANİK / ELEKTRİK ALS AUFKLAPPMENÜ (27.09.2026, Vorgabe Samet) ─────────
+ * ── DER WEG ALS AUFKLAPPMENÜ (27.09.2026, Vorgabe Samet) ────────────────────
  *
  * «Mekanik ve elektrikte şu kısımda dropdown, tek seçim, mac os olması lazım
  *  — ikisinden biri; ek satır yapma.»
@@ -14,18 +14,21 @@ import { areaLabelKey, formatPercent, TASK_AREAS } from '../tasks/taskModel';
  * gewöhnliches <select>: in der Produktion öffnet es das gemeinsame
  * macOS-Menü (components/ui-shared/GlobalMacSelectMenu — Häkchen, blaue
  * Zeile), wie jedes Aufklappmenü des Moduls. Links im Knopf das Zeichen des
- * gewählten Weges, im Menü der Anteil an der Gesamtfertigstellung.
+ * gewählten Weges, im Menü der Anteil an der Gesamtfertigstellung. Seit dem
+ * 28.09.2026 stehen darin die Bereiche der geladenen Vorlage.
  */
 export const AreaSelect = ({
+    sections,
     value,
     onChange,
-    shares,
+    showShares,
 }: {
+    sections: readonly TaskSection[];
     value: TaskArea;
     onChange: (area: TaskArea) => void;
-    shares?: AreaShares | null;
+    showShares: boolean;
 }) => (
-    <span className={`ofi-pdev-area is-${value === 'ELECTRICAL' ? 'electrical' : 'mechanical'}`}>
+    <span className={`ofi-pdev-area ${areaTone(value)}`}>
         <span className="ofi-pdev-area__icon" aria-hidden>
             <AreaIcon area={value} size={12} />
         </span>
@@ -34,11 +37,11 @@ export const AreaSelect = ({
             value={value}
             aria-label={t('productionTasks.area.title')}
             title={t('productionTasks.area.title')}
-            onChange={(event) => onChange(event.target.value === 'ELECTRICAL' ? 'ELECTRICAL' : 'MECHANICAL')}
+            onChange={(event) => onChange(event.target.value)}
         >
-            {TASK_AREAS.map((area) => (
-                <option key={area} value={area}>
-                    {shares ? `${t(areaLabelKey(area))} · ${formatPercent(shares[area])}` : t(areaLabelKey(area))}
+            {sections.map((section) => (
+                <option key={section.key} value={section.key}>
+                    {showShares ? `${sectionLabel(section)} · ${formatPercent(section.share)}` : sectionLabel(section)}
                 </option>
             ))}
         </select>

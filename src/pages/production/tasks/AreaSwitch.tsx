@@ -1,36 +1,44 @@
 import { useRef, type KeyboardEvent } from 'react';
-import { Cog, Zap } from 'lucide-react';
+import { Cog, Layers, Zap } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
-import type { AreaShares, TaskArea } from '@/types/productionTasks';
+import type { TaskArea, TaskSection } from '@/types/productionTasks';
 
-import { areaLabelKey, formatPercent, TASK_AREAS } from './taskModel';
-
-/** Das Zeichen des Bereichs: Zahnrad für die Mekanik, Blitz für die Elektrik. */
-export const AreaIcon = ({ area, size = 14 }: { area: TaskArea; size?: number }) =>
-    area === 'ELECTRICAL'
-        ? <Zap size={size} strokeWidth={2} aria-hidden />
-        : <Cog size={size} strokeWidth={2} aria-hidden />;
+import { areaTone, formatPercent, sectionLabel } from './taskModel';
 
 /**
- * ── MEKANİK | ELEKTRİK (26.09.2026, Vorgabe Samet) ─────────────────────────
+ * Das Zeichen des Bereichs: Zahnrad für die Mekanik, Blitz für die Elektrik,
+ * Ebenen für einen eigenen Bereich einer Vorlage.
+ */
+export const AreaIcon = ({ area, size = 14 }: { area: TaskArea; size?: number }) => {
+    if (area === 'ELECTRICAL') return <Zap size={size} strokeWidth={2} aria-hidden />;
+    if (area === 'MECHANICAL') return <Cog size={size} strokeWidth={2} aria-hidden />;
+    return <Layers size={size} strokeWidth={2} aria-hidden />;
+};
+
+/**
+ * ── DIE BEREICHE ALS SEGMENTSCHALTER (26.09.2026, Vorgabe Samet) ────────────
  *
  * «Üretimde Mekanik ve Elektrik diye seçim olmalı … üretim bölümlere
  *  ayrılıyor.» Ein macOS-Segmentschalter: flache graue Rinne, der gewählte
- * Bereich als weisses Segment. Neben dem Namen auf Wunsch der Anteil an der
- * Gesamtfertigstellung (Chiller: %60 / %40) und ein oranger Punkt, wenn die
- * Gewichte des Bereichs noch nicht aufgehen. Pfeiltasten wechseln.
+ * Bereich als weisses Segment. Seit dem 28.09.2026 mit den Bereichen der
+ * Vorlage, so viele es sind (passen sie nicht, läuft die Rinne seitlich).
+ * Neben dem Namen auf Wunsch der Anteil an der Gesamtfertigstellung und ein
+ * oranger Punkt, wenn die Gewichte des Bereichs noch nicht aufgehen.
+ * Pfeiltasten wechseln.
  */
 export const AreaSwitch = ({
+    sections,
     value,
     onChange,
-    shares,
+    showShares,
     warnings,
     ariaControls,
 }: {
+    sections: readonly TaskSection[];
     value: TaskArea;
     onChange: (area: TaskArea) => void;
-    shares?: AreaShares | null;
+    showShares?: boolean;
     warnings?: Partial<Record<TaskArea, boolean>>;
     ariaControls?: string;
 }) => {
@@ -39,9 +47,10 @@ export const AreaSwitch = ({
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();
-        const index = TASK_AREAS.indexOf(value);
-        const next = TASK_AREAS[(index + (event.key === 'ArrowRight' ? 1 : TASK_AREAS.length - 1)) % TASK_AREAS.length];
-        onChange(next);
+        const index = sections.findIndex((section) => section.key === value);
+        const next = sections[(index + (event.key === 'ArrowRight' ? 1 : sections.length - 1)) % sections.length];
+        if (!next) return;
+        onChange(next.key);
         window.requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus());
     };
 
@@ -53,25 +62,25 @@ export const AreaSwitch = ({
             aria-label={t('productionTasks.area.title')}
             onKeyDown={onKeyDown}
         >
-            {TASK_AREAS.map((area) => {
-                const selected = value === area;
-                const label = t(areaLabelKey(area));
+            {sections.map((section) => {
+                const selected = value === section.key;
+                const label = sectionLabel(section);
                 return (
                     <button
-                        key={area}
+                        key={section.key}
                         type="button"
                         role="tab"
                         aria-selected={selected}
                         aria-controls={ariaControls}
                         tabIndex={selected ? 0 : -1}
-                        className="ofi-ptk-seg__btn ofi-nosize"
-                        title={shares ? t('productionTasks.area.shareHint', { area: label, share: formatPercent(shares[area]) }) : label}
-                        onClick={() => onChange(area)}
+                        className={`ofi-ptk-seg__btn ${areaTone(section.key)} ofi-nosize`}
+                        title={showShares ? t('productionTasks.area.shareHint', { area: label, share: formatPercent(section.share) }) : label}
+                        onClick={() => onChange(section.key)}
                     >
-                        <AreaIcon area={area} size={14} />
-                        <span>{label}</span>
-                        {shares && <span className="ofi-ptk-seg__share">{formatPercent(shares[area])}</span>}
-                        {warnings?.[area] && <span className="ofi-ptk-seg__warn" aria-label={t('productionTasks.check.areaOpen')} />}
+                        <AreaIcon area={section.key} size={14} />
+                        <span className="ofi-ptk-seg__label">{label}</span>
+                        {showShares && <span className="ofi-ptk-seg__share">{formatPercent(section.share)}</span>}
+                        {warnings?.[section.key] && <span className="ofi-ptk-seg__warn" aria-label={t('productionTasks.check.areaOpen')} />}
                     </button>
                 );
             })}

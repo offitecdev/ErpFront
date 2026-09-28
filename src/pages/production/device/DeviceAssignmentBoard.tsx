@@ -5,12 +5,14 @@ import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/P
 import { t } from '@/i18n/translate';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
 import { fmtDateTime } from '@/pages/inventory/utils/format';
-import type { TaskArea, TaskPerson } from '@/types/productionTasks';
+import type { ProductionTask, TaskPerson, TaskSection } from '@/types/productionTasks';
 
 import type { PersonNames } from '../tasks/PeopleCell';
 import { StageCard } from '../tasks/StageCard';
-import { areaLabelKey, formatPercent, tasksByStage } from '../tasks/taskModel';
-import { isWorkStage, stageNumber, type DeviceStage } from './deviceStages';
+import { TaskEditDialog } from '../tasks/TaskEditDialog';
+import { newTask } from '../tasks/templateDraft';
+import { formatPercent, roundPercent, sectionLabel, tasksByStage } from '../tasks/taskModel';
+import { stageNumber, type DeviceStage } from './deviceStages';
 import { TemplateLoadDialog } from './TemplateLoadDialog';
 import type { DeviceTasksHandle } from './useDeviceTasks';
 
@@ -25,10 +27,11 @@ import type { DeviceTasksHandle } from './useDeviceTasks';
  * Aufgaben, steht in der Mitte «Şablondan yükle». Danach eine schmale Leiste
  * (welche Vorlage, wer sie geladen hat, wie viele Aufgaben schon Personen
  * haben) und für JEDE Stufe des gewählten Bereichs ihre kleine Karte — ein
- * Klick auf die Personen einer Aufgabe öffnet die Auswahl.
+ * Klick auf die Personen einer Aufgabe öffnet die Auswahl. Die Bereiche und
+ * Stufen sind die der geladenen Vorlage (28.09.2026).
  */
 export const DeviceAssignmentBoard = ({
-    area,
+    section,
     stages,
     handle,
     names,
@@ -36,7 +39,8 @@ export const DeviceAssignmentBoard = ({
     staffLoading,
     meId,
 }: {
-    area: TaskArea;
+    /** Der gewählte Weg — null, solange keine Vorlage geladen ist (dann nur «Şablondan yükle»). */
+    section: TaskSection | null;
     stages: DeviceStage[];
     handle: DeviceTasksHandle;
     names: PersonNames;
@@ -44,16 +48,32 @@ export const DeviceAssignmentBoard = ({
     staffLoading: boolean;
     meId: string | null;
 }) => {
-    const { data, error, loading, busyTaskId, reload, assign, load, unload } = handle;
+    const { data, error, loading, busyTaskId, reload, assign, saveTasks, load, unload } = handle;
+    // Eine Aufgabe dieses Geräts im Fenster — bestehend oder neu in einer Stufe.
+    const [taskEdit, setTaskEdit] = useState<{ task: ProductionTask; isNew: boolean } | null>(null);
     const [loadOpen, setLoadOpen] = useState(false);
     const [confirmUnload, setConfirmUnload] = useState(false);
     const [unloading, setUnloading] = useState(false);
 
     const plan = data?.plan ?? null;
-    const workStages = stages.map((stage) => stage.id).filter(isWorkStage);
-    const groups = useMemo(() => tasksByStage(data?.tasks ?? [], area), [data?.tasks, area]);
-    const areaTasks = (data?.tasks ?? []).filter((task) => task.area === area);
+    const groups = useMemo(() => (section ? tasksByStage(data?.tasks ?? [], section) : new Map()), [data?.tasks, section]);
+    const areaTasks = (data?.tasks ?? []).filter((task) => task.area === section?.key);
     const assigned = areaTasks.filter((task) => task.assigneeIds.length > 0).length;
+
+    /* Anpassen (28.09.2026): «admin should be able to customize the tasks and
+       subtasks — it shouldn't change the template, only the version that the
+       project uses». Jedes «Tamam» speichert sofort alle Aufgaben des Geräts;
+       eine neue kommt ohne Kürzel, der Server gibt ihr das nächste freie. */
+    const tasksNow = data?.tasks ?? [];
+    const saveTask = (task: ProductionTask) => {
+        const exists = tasksNow.some((entry) => entry.id === task.id);
+        const next = exists ? tasksNow.map((entry) => (entry.id === task.id ? task : entry)) : [...tasksNow, task];
+        void saveTasks(next).then((ok) => { if (ok) setTaskEdit(null); });
+    };
+    const deleteTask = () => {
+        if (!taskEdit) return;
+        void saveTasks(tasksNow.filter((entry) => entry.id !== taskEdit.task.id)).then((ok) => { if (ok) setTaskEdit(null); });
+    };
 
     /* Die Namen, die eine Auswahl eben gesetzt hat, reisen mit (sofort sichtbar). */
     const known = (ids: string[]): TaskPerson[] =>
@@ -89,7 +109,7 @@ export const DeviceAssignmentBoard = ({
 
     return (
         <div className="ofi-ptk ofi-ptk-board">
-            {!plan ? (
+            {!plan || !section ? (
                 <div className="ofi-ptk-state is-board">
                     <span className="ofi-ptk-state__icon"><ListChecks aria-hidden /></span>
                     <b>{t('productionTasks.device.emptyTitle')}</b>
@@ -113,13 +133,14 @@ export const DeviceAssignmentBoard = ({
                         </span>
                         <span className="ofi-ptk-planbar__meta">
                             {t('productionTasks.device.areaShare', {
-                                area: t(areaLabelKey(area)),
-                                share: formatPercent(plan.areaShares[area]),
+                                area: sectionLabel(section),
+                                share: formatPercent(section.share),
                             })}
                         </span>
                         <span className={`ofi-ptk-planbar__count ${areaTasks.length && assigned === areaTasks.length ? 'is-done' : ''}`}>
                             {t('productionTasks.device.assignedCount', { assigned, total: areaTasks.length })}
                         </span>
+                        <span className="ofi-ptk-planbar__meta is-hint">{t('productionTasks.device.customizeHint')}</span>
                         <span className="ofi-ptk-planbar__actions">
                             <button type="button" className="ofi-ptk-btn is-small ofi-nosize" onClick={() => setLoadOpen(true)}>
                                 <RefreshCw />
@@ -138,14 +159,14 @@ export const DeviceAssignmentBoard = ({
                     </div>
 
                     <div className="ofi-ptk-grid">
-                        {workStages.map((stage) => (
+                        {section.stages.map((stage) => (
                             <StageCard
-                                key={stage}
-                                area={area}
+                                key={stage.key}
+                                area={section.key}
                                 stage={stage}
-                                number={stage === 'final' ? null : stageNumber(stages, stage)}
-                                tasks={groups.get(stage) ?? []}
-                                share={plan.areaShares[area]}
+                                number={stageNumber(stages, stage.key)}
+                                tasks={groups.get(stage.key) ?? []}
+                                share={section.share}
                                 names={names}
                                 mode="device"
                                 editable
@@ -154,6 +175,9 @@ export const DeviceAssignmentBoard = ({
                                 meId={meId}
                                 busyTaskId={busyTaskId}
                                 onAssign={(task, ids) => void assign(task, ids, known(ids))}
+                                // Den Stand setzt man auf den Stufen selbst, nicht hier beim Anpassen.
+                                onOpenTask={(task) => setTaskEdit({ task, isNew: false })}
+                                onAddTask={(area, stageKey) => setTaskEdit({ task: newTask(area, stageKey), isNew: true })}
                             />
                         ))}
                     </div>
@@ -161,6 +185,24 @@ export const DeviceAssignmentBoard = ({
             )}
 
             {loadOpen && <TemplateLoadDialog plan={plan} onLoad={load} onClose={() => setLoadOpen(false)} />}
+
+            {taskEdit && plan && (
+                <TaskEditDialog
+                    task={taskEdit.task}
+                    isNew={taskEdit.isNew}
+                    sections={plan.sections}
+                    otherWeight={roundPercent(tasksNow
+                        .filter((entry) => entry.area === taskEdit.task.area && entry.id !== taskEdit.task.id)
+                        .reduce((sum, entry) => sum + entry.weight, 0))}
+                    withDates
+                    names={names}
+                    staff={staff}
+                    staffLoading={staffLoading}
+                    onSave={saveTask}
+                    onDelete={taskEdit.isNew ? undefined : deleteTask}
+                    onClose={() => setTaskEdit(null)}
+                />
+            )}
 
             <PopupDialog
                 open={confirmUnload}

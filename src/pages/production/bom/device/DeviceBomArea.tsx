@@ -5,7 +5,7 @@ import { Boxes, TriangleAlert } from 'lucide-react';
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorOf, productionBomErrorText } from '@/lib/api/productionBom';
 import type { Bom, BomAreaView } from '@/types/productionBom';
-import type { TaskArea } from '@/types/productionTasks';
+import type { BuiltInArea } from '@/types/productionTasks';
 import { useNavGuardStore } from '@/store/navGuardStore';
 import '@/styles/modules/warehouse.css';
 import '@/styles/modules/productionBom.css';
@@ -44,7 +44,7 @@ export interface BomTasksBundle {
 export interface BomViewContext {
     nav: NavStackHandle<BomView>;
     data: BomAreaView;
-    area: TaskArea;
+    area: BuiltInArea;
     canEdit: boolean;
     /** Die vorige Ansicht beim Namen (für den blauen Zurück-Pfeil). */
     backTitle: string;
@@ -78,7 +78,7 @@ export const DeviceBomArea = ({
     tasks,
 }: {
     deviceId: string;
-    area: TaskArea;
+    area: BuiltInArea;
     tasks: BomTasksBundle | null;
 }) => {
     const navigate = useNavigate();

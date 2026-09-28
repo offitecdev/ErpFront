@@ -1,23 +1,40 @@
 import { useMemo, useState } from 'react';
-import { CircleCheck, Copy, Plus, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, CircleCheck, Copy, Info, Layers, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 
+import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
 import { fmtDateTime } from '@/pages/inventory/utils/format';
 import type { ProductionTask, TaskArea, TaskStage, TaskTemplate, TaskTemplateSummary } from '@/types/productionTasks';
 
 import { AreaIcon, AreaSwitch } from './AreaSwitch';
+import { InlineCreate, NameInput } from './InlineName';
 import type { PersonNames } from './PeopleCell';
 import { StageCard } from './StageCard';
-import type { TemplateDraft } from './templateDraft';
+import { TemplateNameField } from './TemplateNameField';
 import {
-    AREA_STAGES,
-    areaLabelKey,
+    addSection,
+    addStage,
+    moveSection,
+    moveStage,
+    removeSection,
+    removeStage,
+    renameSection,
+    renameStage,
+    setSectionShare,
+    type TemplateDraft,
+} from './templateDraft';
+import {
+    areaTone,
     checkTemplate,
     formatPercent,
+    isBuiltInArea,
+    isBuiltInStage,
     parsePercent,
-    stageLabelKey,
-    TASK_AREAS,
+    sectionLabel,
+    sectionNameTaken,
+    stageLabel,
+    stageNameTaken,
     TASK_LIMITS,
     tasksByStage,
 } from './taskModel';
@@ -29,11 +46,15 @@ const shareText = (value: number) => String(value).replace('.', ',');
  *
  * Oben der Name (als Titel, direkt zu tippen), daneben ob die Vorlage
  * «aufgeht». Darunter die Bereiche mit ihrem Anteil an der
- * Gesamtfertigstellung (Mekanik 60 / Elektrik 40) und ob ihre Gewichte 100 %
- * ergeben. Dann der Schalter Mekanik | Elektrik und je Stufe die kleine
- * Görevlendirme-Karte («her aşamada büyük olmayacak şekilde») — eine Aufgabe
- * öffnet sich mit einem Klick. Stufen ohne Aufgaben stehen als kleine
- * Knöpfe darunter: ein Klick legt dort die erste Aufgabe an.
+ * Gesamtfertigstellung und ob ihre Gewichte 100 % ergeben. Dann der Schalter
+ * der Bereiche und je Stufe die kleine Görevlendirme-Karte («her aşamada
+ * büyük olmayacak şekilde») — eine Aufgabe öffnet sich mit einem Klick.
+ *
+ * Seit dem 28.09.2026 legt man Bereiche und Stufen selbst an: «+ Bölüm ekle»
+ * unter den Bereichen, «+ Yeni aşama» hinter der letzten Karte. Ein eigener
+ * Bereich / eine eigene Stufe heisst, wie man sie tippt, und lässt sich
+ * verschieben und löschen. JEDE Stufe steht als Karte da, auch ohne Aufgaben
+ * (die Knöpfe «Görevsiz aşamalar» gibt es nicht mehr).
  */
 export const TemplateEditor = ({
     draft,
@@ -54,6 +75,7 @@ export const TemplateEditor = ({
     onDelete,
     onOpenTask,
     onAddTask,
+    isNameTaken,
 }: {
     draft: TemplateDraft;
     saved: TaskTemplate | null;
@@ -73,35 +95,80 @@ export const TemplateEditor = ({
     onDelete: () => void;
     onOpenTask: (task: ProductionTask) => void;
     onAddTask: (area: TaskArea, stage: TaskStage) => void;
+    /** Trägt schon eine ANDERE Vorlage der Firma diesen Namen? */
+    isNameTaken: (name: string) => boolean;
 }) => {
     // Die Anteile als Text: «6» auf dem Weg zu «60» darf stehen bleiben.
-    const [shares, setShares] = useState<Record<TaskArea, string>>(() => ({
-        MECHANICAL: shareText(draft.areaShares.MECHANICAL),
-        ELECTRICAL: shareText(draft.areaShares.ELECTRICAL),
-    }));
+    const [shares, setShares] = useState<Record<TaskArea, string>>(() =>
+        Object.fromEntries(draft.sections.map((section) => [section.key, shareText(section.share)])));
+    // Ein Bereich oder eine Stufe MIT Aufgaben geht erst nach Rückfrage.
+    const [removal, setRemoval] = useState<{ area: TaskArea; stage?: TaskStage; count: number } | null>(null);
 
-    const check = useMemo(() => checkTemplate(draft.areaShares, draft.tasks), [draft.areaShares, draft.tasks]);
-    const groups = useMemo(() => tasksByStage(draft.tasks, area), [draft.tasks, area]);
-    const stagesWithTasks = AREA_STAGES[area].filter((stage) => (groups.get(stage)?.length ?? 0) > 0);
-    const emptyStages = AREA_STAGES[area].filter((stage) => !(groups.get(stage)?.length));
+    const check = useMemo(() => checkTemplate(draft.sections, draft.tasks), [draft.sections, draft.tasks]);
+    /* Ist das Gewicht des gewählten Bereichs verteilt (Aufgaben zusammen 100 %),
+       gibt es nichts mehr zu vergeben — «+ Yeni aşama» und «+ Görev ekle»
+       sind dann gesperrt, bis eine Aufgabe weniger wiegt. */
+    const sectionFull = (key: TaskArea) => (check.areas.find((entry) => entry.area === key)?.weightSum ?? 0) >= 100 - 0.01;
+    const section = draft.sections.find((entry) => entry.key === area) ?? draft.sections[0] ?? null;
+    const groups = useMemo(() => (section ? tasksByStage(draft.tasks, section) : null), [draft.tasks, section]);
     const warnings = Object.fromEntries(check.areas.map((entry) => [entry.area, !entry.ok])) as Record<TaskArea, boolean>;
 
+    const shareOf = (key: TaskArea, fallback: number) => shares[key] ?? shareText(fallback);
     const setShare = (target: TaskArea, text: string) => {
         setShares((current) => ({ ...current, [target]: text }));
         const value = parsePercent(text);
-        if (value !== null) onChange({ ...draft, areaShares: { ...draft.areaShares, [target]: value } });
+        if (value !== null) onChange(setSectionShare(draft, target, value));
     };
 
+    const createSection = (name: string) => {
+        const { draft: next, key } = addSection(draft, name);
+        onChange(next);
+        onArea(key);
+    };
+
+    const taskCountIn = (target: TaskArea, stage?: TaskStage) =>
+        draft.tasks.filter((task) => task.area === target && (stage === undefined || task.stage === stage)).length;
+
+    const dropSection = (target: TaskArea) => {
+        onChange(removeSection(draft, target));
+        if (section?.key === target) onArea(draft.sections.find((entry) => entry.key !== target)?.key ?? '');
+    };
+    const requestRemoveSection = (target: TaskArea) => {
+        const count = taskCountIn(target);
+        if (count) setRemoval({ area: target, count });
+        else dropSection(target);
+    };
+    const requestRemoveStage = (target: TaskArea, stage: TaskStage) => {
+        const count = taskCountIn(target, stage);
+        if (count) setRemoval({ area: target, stage, count });
+        else onChange(removeStage(draft, target, stage));
+    };
+    const confirmRemoval = () => {
+        if (!removal) return;
+        if (removal.stage) onChange(removeStage(draft, removal.area, removal.stage));
+        else dropSection(removal.area);
+        setRemoval(null);
+    };
+    const removalSection = removal ? draft.sections.find((entry) => entry.key === removal.area) ?? null : null;
+    const removalStage = removal?.stage ? removalSection?.stages.find((entry) => entry.key === removal.stage) ?? null : null;
+
     const problems: string[] = [];
-    if (!draft.tasks.length) problems.push(t('productionTasks.check.noTasks'));
-    if (!check.sharesOk) problems.push(t('productionTasks.check.shares', { sum: formatPercent(check.sharesSum) }));
-    for (const entry of check.areas) {
-        if (entry.ok) continue;
-        const label = t(areaLabelKey(entry.area));
-        problems.push(entry.taskCount
-            ? t('productionTasks.check.weights', { area: label, sum: formatPercent(entry.weightSum) })
-            : t('productionTasks.check.noAreaTasks', { area: label, share: formatPercent(entry.share) }));
+    if (!draft.sections.length) {
+        problems.push(t('productionTasks.check.noSections'));
+    } else {
+        if (!draft.tasks.length) problems.push(t('productionTasks.check.noTasks'));
+        if (!check.sharesOk) problems.push(t('productionTasks.check.shares', { sum: formatPercent(check.sharesSum) }));
+        for (const entry of check.areas) {
+            if (entry.ok) continue;
+            const target = draft.sections.find((row) => row.key === entry.area);
+            const label = target ? sectionLabel(target) : entry.area;
+            problems.push(entry.taskCount
+                ? t('productionTasks.check.weights', { area: label, sum: formatPercent(entry.weightSum) })
+                : t('productionTasks.check.noAreaTasks', { area: label, share: formatPercent(entry.share) }));
+        }
     }
+
+    const nameTaken = Boolean(draft.name.trim()) && isNameTaken(draft.name.replace(/\s+/g, ' ').trim());
 
     const meta: string[] = [t('productionTasks.templates.taskCount', { count: draft.tasks.length })];
     if (saved) {
@@ -114,18 +181,13 @@ export const TemplateEditor = ({
     return (
         <section className="ofi-ptk-editor" aria-label={draft.name || t('productionTasks.templates.untitled')}>
             <header className="ofi-ptk-editor__head">
-                <input
-                    className="ofi-ptk-titleinput"
+                <TemplateNameField
                     value={draft.name}
-                    // Rückfall ohne `field-sizing`: ungefähr so breit wie der Name.
-                    size={Math.max(12, draft.name.length + 2)}
-                    maxLength={TASK_LIMITS.templateName}
-                    disabled={!canEdit}
+                    savedName={saved?.name ?? null}
+                    canEdit={canEdit}
                     autoFocus={!draft.id}
-                    spellCheck={false}
-                    placeholder={t('productionTasks.template.namePlaceholder')}
-                    aria-label={t('productionTasks.template.name')}
-                    onChange={(event) => onChange({ ...draft, name: event.target.value })}
+                    isTaken={isNameTaken}
+                    onChange={(name) => onChange({ ...draft, name })}
                 />
                 <span
                     className={`ofi-ptk-status ${check.valid ? 'is-ok' : 'is-warn'}`}
@@ -168,7 +230,7 @@ export const TemplateEditor = ({
                         <button
                             type="button"
                             className="ofi-ptk-btn is-primary ofi-nosize"
-                            disabled={!dirty || saving || !draft.name.trim()}
+                            disabled={!dirty || saving || !draft.name.trim() || nameTaken}
                             title={t('productionTasks.template.saveHint')}
                             onClick={onSave}
                         >
@@ -190,29 +252,62 @@ export const TemplateEditor = ({
             {/* ── Bereiche: Anteil an der Gesamtfertigstellung ── */}
             <div className="ofi-ptk-group">
                 <h2 className="ofi-ptk-group__title">{t('productionTasks.template.areasTitle')}</h2>
-                <div className="ofi-ptk-group__box">
-                    {TASK_AREAS.map((entry) => {
-                        const areaCheck = check.areas.find((row) => row.area === entry);
-                        const invalidShare = parsePercent(shares[entry]) === null;
+                <div className={`ofi-ptk-group__box ${canEdit ? 'is-editable' : ''}`}>
+                    {!draft.sections.length && (
+                        <div className="ofi-ptk-sectionsempty">
+                            <span className="ofi-ptk-sectionsempty__icon"><Layers aria-hidden /></span>
+                            <span className="ofi-ptk-sectionsempty__text">
+                                <b>{t('productionTasks.template.sectionsEmpty')}</b>
+                                {canEdit && <span>{t('productionTasks.template.sectionsEmptyHint')}</span>}
+                            </span>
+                        </div>
+                    )}
+                    {draft.sections.map((entry, index) => {
+                        const areaCheck = check.areas.find((row) => row.area === entry.key);
+                        const shareInput = shareOf(entry.key, entry.share);
+                        const invalidShare = parsePercent(shareInput) === null;
+                        const label = sectionLabel(entry);
                         return (
-                            <div key={entry} className="ofi-ptk-arearow">
+                            <div key={entry.key} className="ofi-ptk-arearow">
                                 <span className="ofi-ptk-arearow__name">
-                                    <span className={`ofi-ptk-areaicon is-${entry === 'ELECTRICAL' ? 'electrical' : 'mechanical'}`}>
-                                        <AreaIcon area={entry} size={13} />
+                                    <span className={`ofi-ptk-areaicon ${areaTone(entry.key)}`}>
+                                        <AreaIcon area={entry.key} size={13} />
                                     </span>
-                                    {t(areaLabelKey(entry))}
+                                    {canEdit && !isBuiltInArea(entry.key) ? (
+                                        <NameInput
+                                            className="ofi-ptk-arearow__nameinput"
+                                            value={entry.name}
+                                            maxLength={TASK_LIMITS.sectionName}
+                                            ariaLabel={t('productionTasks.template.sectionName')}
+                                            placeholder={t('productionTasks.template.sectionName')}
+                                            isTaken={(name) => sectionNameTaken(draft.sections, name, entry.key)}
+                                            onCommit={(name) => onChange(renameSection(draft, entry.key, name))}
+                                        />
+                                    ) : (
+                                        <span className="ofi-ptk-arearow__label" title={label}>{label}</span>
+                                    )}
                                 </span>
                                 <label className="ofi-ptk-arearow__share">
                                     <span>{t('productionTasks.template.shareLabel')}</span>
                                     <span className={`ofi-ptk-percent is-compact ${invalidShare ? 'is-invalid' : ''}`}>
                                         <input
                                             className="ofi-ptk-input is-num"
-                                            value={shares[entry]}
+                                            value={shareInput}
                                             inputMode="decimal"
                                             disabled={!canEdit}
-                                            aria-label={t('productionTasks.template.shareAria', { area: t(areaLabelKey(entry)) })}
-                                            onChange={(event) => setShare(entry, event.target.value)}
-                                            onBlur={() => setShares((current) => ({ ...current, [entry]: shareText(draft.areaShares[entry]) }))}
+                                            aria-label={t('productionTasks.template.shareAria', { area: label })}
+                                            onChange={(event) => setShare(entry.key, event.target.value)}
+                                            onKeyDown={(event) => {
+                                                // Tab springt von Anteil zu Anteil (Umschalt+Tab zurück) — nicht über Name und Werkzeuge.
+                                                if (event.key !== 'Tab') return;
+                                                const inputs = [...document.querySelectorAll<HTMLInputElement>('.ofi-ptk-arearow__share input')];
+                                                const next = inputs[inputs.indexOf(event.currentTarget) + (event.shiftKey ? -1 : 1)];
+                                                if (!next) return;
+                                                event.preventDefault();
+                                                next.focus();
+                                                next.select();
+                                            }}
+                                            onBlur={() => setShares((current) => ({ ...current, [entry.key]: shareText(entry.share) }))}
                                         />
                                         <span aria-hidden>%</span>
                                     </span>
@@ -221,7 +316,7 @@ export const TemplateEditor = ({
                                     {t('productionTasks.templates.taskCount', { count: areaCheck?.taskCount ?? 0 })}
                                 </span>
                                 {areaCheck && !areaCheck.taskCount && !areaCheck.share ? (
-                                    // Anteil 0, keine Aufgaben: der Bereich gehört nicht zu dieser Vorlage.
+                                    // Anteil 0, keine Aufgaben: der Bereich trägt (noch) nichts bei.
                                     <span className="ofi-ptk-arearow__sum is-unused">{t('productionTasks.template.areaUnused')}</span>
                                 ) : (
                                     <span className={`ofi-ptk-arearow__sum ${areaCheck?.ok ? 'is-ok' : 'is-warn'}`}>
@@ -229,16 +324,63 @@ export const TemplateEditor = ({
                                         {t('productionTasks.template.weightSum', { sum: formatPercent(areaCheck?.weightSum ?? 0) })}
                                     </span>
                                 )}
+                                {canEdit && (
+                                    <span className="ofi-ptk-arearow__tools">
+                                        <button
+                                            type="button"
+                                            className="ofi-ptk-toolbtn ofi-nosize"
+                                            disabled={index === 0}
+                                            title={t('productionTasks.template.moveUp')}
+                                            aria-label={t('productionTasks.template.moveUp')}
+                                            onClick={() => onChange(moveSection(draft, entry.key, -1))}
+                                        >
+                                            <ChevronUp aria-hidden />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="ofi-ptk-toolbtn ofi-nosize"
+                                            disabled={index === draft.sections.length - 1}
+                                            title={t('productionTasks.template.moveDown')}
+                                            aria-label={t('productionTasks.template.moveDown')}
+                                            onClick={() => onChange(moveSection(draft, entry.key, 1))}
+                                        >
+                                            <ChevronDown aria-hidden />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="ofi-ptk-toolbtn is-danger ofi-nosize"
+                                            title={t('productionTasks.template.removeSection')}
+                                            aria-label={t('productionTasks.template.removeSection')}
+                                            onClick={() => requestRemoveSection(entry.key)}
+                                        >
+                                            <Trash2 aria-hidden />
+                                        </button>
+                                    </span>
+                                )}
                             </div>
                         );
                     })}
-                    <div className={`ofi-ptk-arearow is-total ${check.sharesOk ? '' : 'is-warn'}`}>
-                        <span className="ofi-ptk-arearow__name">{t('productionTasks.template.total')}</span>
-                        <span className="ofi-ptk-arearow__totalvalue">{formatPercent(check.sharesSum)}</span>
-                        <span className="ofi-ptk-arearow__note">
-                            {check.sharesOk ? t('productionTasks.template.totalOk') : t('productionTasks.template.totalMust')}
-                        </span>
-                    </div>
+                    {canEdit && draft.sections.length < TASK_LIMITS.sections && (
+                        <div className="ofi-ptk-arearow is-add">
+                            <InlineCreate
+                                className="ofi-ptk-addsection"
+                                label={t('productionTasks.template.addSection')}
+                                placeholder={t('productionTasks.template.sectionNamePlaceholder')}
+                                maxLength={TASK_LIMITS.sectionName}
+                                isTaken={(name) => sectionNameTaken(draft.sections, name)}
+                                onCreate={createSection}
+                            />
+                        </div>
+                    )}
+                    {draft.sections.length > 0 && (
+                        <div className={`ofi-ptk-arearow is-total ${check.sharesOk ? '' : 'is-warn'}`}>
+                            <span className="ofi-ptk-arearow__name">{t('productionTasks.template.total')}</span>
+                            <span className="ofi-ptk-arearow__totalvalue">{formatPercent(check.sharesSum)}</span>
+                            <span className="ofi-ptk-arearow__note">
+                                {check.sharesOk ? t('productionTasks.template.totalOk') : t('productionTasks.template.totalMust')}
+                            </span>
+                        </div>
+                    )}
                 </div>
                 {!check.valid && problems.length > 0 && (
                     <div className="ofi-ptk-note is-warn" role="status">
@@ -251,63 +393,109 @@ export const TemplateEditor = ({
                 )}
             </div>
 
-            {/* ── Mekanik | Elektrik und die Karten der Stufen ── */}
-            <div className="ofi-ptk-editor__bar">
-                <AreaSwitch value={area} onChange={onArea} shares={draft.areaShares} warnings={warnings} ariaControls="ofi-ptk-template-stages" />
-                <span className="ofi-ptk-legend">
-                    <span>{t('productionTasks.template.legendWeight')}</span>
-                    <span className="ofi-ptk-legend__overall">{t('productionTasks.template.legendOverall')}</span>
-                </span>
-            </div>
-
-            <div id="ofi-ptk-template-stages" className="ofi-ptk-grid is-template" role="tabpanel">
-                {stagesWithTasks.map((stage) => (
-                    <StageCard
-                        key={stage}
-                        area={area}
-                        stage={stage}
-                        number={stage === 'final' ? null : AREA_STAGES[area].indexOf(stage) + 1}
-                        tasks={groups.get(stage) ?? []}
-                        share={draft.areaShares[area]}
-                        names={names}
-                        mode="template"
-                        editable={canEdit}
-                        staff={staff}
-                        staffLoading={staffLoading}
-                        onOpenTask={onOpenTask}
-                        onAddTask={onAddTask}
-                        onAssign={canEdit ? (task, assigneeIds) => onChange({
-                            ...draft,
-                            tasks: draft.tasks.map((entry) => (entry.id === task.id ? { ...entry, assigneeIds } : entry)),
-                        }) : undefined}
-                    />
-                ))}
-                {!stagesWithTasks.length && (
-                    <div className="ofi-ptk-state is-small is-wide">
-                        <AreaIcon area={area} size={26} />
-                        <b>{t('productionTasks.template.areaEmpty', { area: t(areaLabelKey(area)) })}</b>
-                        {canEdit && <span>{t('productionTasks.template.areaEmptyHint')}</span>}
+            {/* ── Der Schalter der Bereiche und die Karten der Stufen ── */}
+            {section && groups && (
+                <>
+                    <div className="ofi-ptk-editor__bar">
+                        <AreaSwitch
+                            sections={draft.sections}
+                            value={section.key}
+                            onChange={onArea}
+                            showShares
+                            warnings={warnings}
+                            ariaControls="ofi-ptk-template-stages"
+                        />
+                        <span className="ofi-ptk-legend">
+                            <span>{t('productionTasks.template.legendWeight')}</span>
+                            <span className="ofi-ptk-legend__overall">{t('productionTasks.template.legendOverall')}</span>
+                        </span>
                     </div>
-                )}
-            </div>
 
-            {canEdit && emptyStages.length > 0 && (
-                <div className="ofi-ptk-emptystages">
-                    <span className="ofi-ptk-emptystages__label">{t('productionTasks.template.emptyStages')}</span>
-                    {emptyStages.map((stage) => (
-                        <button
-                            key={stage}
-                            type="button"
-                            className="ofi-ptk-stagechip ofi-nosize"
-                            title={t('productionTasks.template.addToStage', { stage: t(stageLabelKey(stage)) })}
-                            onClick={() => onAddTask(area, stage)}
-                        >
-                            <Plus aria-hidden />
-                            {t(stageLabelKey(stage))}
-                        </button>
-                    ))}
-                </div>
+                    <div id="ofi-ptk-template-stages" className="ofi-ptk-grid is-template" role="tabpanel">
+                        {section.stages.map((stage, index) => {
+                            const last = index === section.stages.length - 1;
+                            return (
+                                <StageCard
+                                    key={stage.key}
+                                    area={section.key}
+                                    stage={stage}
+                                    // Die Fahne trägt nur der feste Abschluss am Ende des Weges.
+                                    number={stage.key === 'final' && last && isBuiltInArea(section.key) ? null : index + 1}
+                                    tasks={groups.get(stage.key) ?? []}
+                                    share={section.share}
+                                    names={names}
+                                    mode="template"
+                                    editable={canEdit}
+                                    staff={staff}
+                                    staffLoading={staffLoading}
+                                    onOpenTask={onOpenTask}
+                                    onAddTask={onAddTask}
+                                    addDisabledReason={sectionFull(section.key) ? t('productionTasks.template.sectionFull') : undefined}
+                                    onAssign={canEdit ? (task, assigneeIds) => onChange({
+                                        ...draft,
+                                        tasks: draft.tasks.map((entry) => (entry.id === task.id ? { ...entry, assigneeIds } : entry)),
+                                    }) : undefined}
+                                    tools={canEdit ? {
+                                        // Eine feste Stufe trägt ihren Namen aus der Übersetzung.
+                                        onRename: isBuiltInStage(stage.key) && !stage.name
+                                            ? undefined
+                                            : (name) => onChange(renameStage(draft, section.key, stage.key, name)),
+                                        isNameTaken: (name) => stageNameTaken(section, name, stage.key),
+                                        onMoveUp: index > 0 ? () => onChange(moveStage(draft, section.key, stage.key, -1)) : undefined,
+                                        onMoveDown: !last ? () => onChange(moveStage(draft, section.key, stage.key, 1)) : undefined,
+                                        onRemove: () => requestRemoveStage(section.key, stage.key),
+                                    } : undefined}
+                                />
+                            );
+                        })}
+                        {!section.stages.length && (
+                            <div className="ofi-ptk-state is-small is-wide">
+                                <AreaIcon area={section.key} size={26} />
+                                <b>{t('productionTasks.template.stagesEmpty', { area: sectionLabel(section) })}</b>
+                                {canEdit && <span>{t('productionTasks.template.stagesEmptyHint')}</span>}
+                            </div>
+                        )}
+                        {canEdit && section.stages.length < TASK_LIMITS.stages && (
+                            <InlineCreate
+                                className="ofi-ptk-addstage"
+                                label={t('productionTasks.template.addStage')}
+                                placeholder={t('productionTasks.template.stageNamePlaceholder')}
+                                maxLength={TASK_LIMITS.stageName}
+                                isTaken={(name) => stageNameTaken(section, name)}
+                                onCreate={(name) => onChange(addStage(draft, section.key, name))}
+                                disabledReason={sectionFull(section.key) ? t('productionTasks.template.sectionFull') : undefined}
+                            />
+                        )}
+                        {/* Warum gesperrt — gleich darunter, nicht nur im Tipp. */}
+                        {canEdit && sectionFull(section.key) && (
+                            <div className="ofi-ptk-note is-info ofi-ptk-fullnote" role="status">
+                                <Info aria-hidden />
+                                <span>{t('productionTasks.template.sectionFull')}</span>
+                            </div>
+                        )}
+                    </div>
+                </>
             )}
+
+            <PopupDialog
+                open={removal !== null}
+                onClose={() => setRemoval(null)}
+                title={removal?.stage ? t('productionTasks.template.removeStageTitle') : t('productionTasks.template.removeSectionTitle')}
+                subtitle={removal
+                    ? removal.stage
+                        ? t('productionTasks.template.removeStageText', { name: removalStage ? stageLabel(removalStage) : '', count: removal.count })
+                        : t('productionTasks.template.removeSectionText', { name: removalSection ? sectionLabel(removalSection) : '', count: removal.count })
+                    : undefined}
+                icon={<Trash2 size={18} />}
+                tone="danger"
+                width={460}
+                footer={(
+                    <PopupActions>
+                        <PopupButton onClick={() => setRemoval(null)}>{t('productionTasks.actions.cancel')}</PopupButton>
+                        <PopupButton variant="danger" onClick={confirmRemoval}>{t('productionTasks.actions.delete')}</PopupButton>
+                    </PopupActions>
+                )}
+            />
         </section>
     );
 };

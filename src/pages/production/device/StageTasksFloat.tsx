@@ -1,13 +1,16 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ChevronRight, ListChecks } from 'lucide-react';
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { ChevronRight, FileStack, ListChecks } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
-import type { ProductionTask, TaskArea, TaskStage } from '@/types/productionTasks';
+import type { ProductionTask, TaskArea, TaskSectionStage, TaskStatus, TaskSubtask } from '@/types/productionTasks';
 
 import type { PersonNames } from '../tasks/PeopleCell';
 import { StageCard } from '../tasks/StageCard';
-import { formatPercent, initialsOf, roundPercent, stageLabelKey } from '../tasks/taskModel';
+import { isImage, isPdf, type SubtaskActions } from '../tasks/subtaskFileModel';
+import { StageFilesCard } from './StageFilesCard';
+import { stageFilesOf } from './stageFileModel';
+import { formatPercent, initialsOf, roundPercent, stageLabel } from '../tasks/taskModel';
 
 /** Bleibt die Karte offen, wenn man die Stufe wechselt? — solange das Fenster lebt. */
 const OPEN_KEY = 'ofi:ptk-stage-float-open';
@@ -24,60 +27,10 @@ const reducedMotion = (): boolean =>
 const EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
 
 /**
- * ── DIE GLASKARTE DER AUFGABEN EINER STUFE (27.09.2026, Vorgabe Samet) ──────
- *
- * «Görevler diğer alanlarda küçük bir kart şeklinde olmalı — glass, güzel;
- *  küçük kart tıklanıp açılıp X ile kapanmalı, bir animasyonla sağa sola
- *  doğru açılmalı … içeriğin önüne geçmeli ama pop-up gibi değil — arka
- *  planın üzerinde kart kart glass, çarpı ile kapatılmalı.»
- *
- * Zu: ein kleines Glasplättchen oben links in der Fläche der Stufe — «Görevler»,
- * wie viele, ihr Gewicht, die Namenspunkte der Leute (die eigene Person
- * vorn und blau) und «sizde n», wenn welche der lesenden Person gehören.
- * Ein Klick zieht die Karte nach rechts auf (Breite und Höhe gemessen und
- * animiert, der Inhalt gleitet hinterher) — darin die Görevlendirme-Karte der
- * Stufe; ✕ (oder Escape) zieht sie wieder zusammen. Sie liegt ÜBER der Fläche
- * (kein Schleier, die Seite bleibt bedienbar), also kein Fenster.
+ * FLIP: die alte Grösse gemerkt (`from`), die neue gemessen, dazwischen
+ * animiert — so wächst das Plättchen zur Karte (und zurück), statt zu springen.
  */
-export const StageTasksFloat = ({
-    area,
-    stage,
-    number,
-    tasks,
-    share,
-    names,
-    editable,
-    staff,
-    staffLoading,
-    meId,
-    busyTaskId,
-    onAssign,
-}: {
-    area: TaskArea;
-    stage: TaskStage;
-    number: number | null;
-    tasks: ProductionTask[];
-    share: number;
-    names: PersonNames;
-    editable: boolean;
-    staff: StaffDirectoryRow[];
-    staffLoading: boolean;
-    meId: string | null;
-    busyTaskId: string | null;
-    onAssign?: (task: ProductionTask, assigneeIds: string[]) => void;
-}) => {
-    const [open, setOpen] = useState(readOpen);
-    const boxRef = useRef<HTMLDivElement>(null);
-    const fromRef = useRef<DOMRect | null>(null);
-
-    const toggle = (next: boolean) => {
-        fromRef.current = boxRef.current?.getBoundingClientRect() ?? null;
-        writeOpen(next);
-        setOpen(next);
-    };
-
-    /* FLIP: die alte Grösse gemerkt, die neue gemessen, dazwischen animiert —
-       so wächst das Plättchen zur Karte (und zurück), statt zu springen. */
+const useGrow = (boxRef: RefObject<HTMLDivElement | null>, fromRef: RefObject<DOMRect | null>, open: boolean) => {
     useLayoutEffect(() => {
         const box = boxRef.current;
         const from = fromRef.current;
@@ -100,7 +53,87 @@ export const StageTasksFloat = ({
             ],
             { duration: open ? 300 : 220, delay: open ? 130 : 70, easing: 'ease-out', fill: 'backwards' },
         );
-    }, [open]);
+    }, [boxRef, fromRef, open]);
+};
+
+/**
+ * ── DIE GLASKARTE DER AUFGABEN EINER STUFE (27.09.2026, Vorgabe Samet) ──────
+ *
+ * «Görevler diğer alanlarda küçük bir kart şeklinde olmalı — glass, güzel;
+ *  küçük kart tıklanıp açılıp X ile kapanmalı, bir animasyonla sağa sola
+ *  doğru açılmalı … içeriğin önüne geçmeli ama pop-up gibi değil — arka
+ *  planın üzerinde kart kart glass, çarpı ile kapatılmalı.»
+ *
+ * Zu: ein kleines Glasplättchen oben links in der Fläche der Stufe — «Görevler»,
+ * wie viele, ihr Gewicht, die Namenspunkte der Leute (die eigene Person
+ * vorn und blau) und «sizde n», wenn welche der lesenden Person gehören.
+ * Ein Klick zieht die Karte nach rechts auf (Breite und Höhe gemessen und
+ * animiert, der Inhalt gleitet hinterher) — darin die Görevlendirme-Karte der
+ * Stufe; ✕ (oder Escape) zieht sie wieder zusammen. Sie liegt ÜBER der Fläche
+ * (kein Schleier, die Seite bleibt bedienbar), also kein Fenster.
+ *
+ * Darunter (28.09.2026, nur die Verwaltung) ein zweites Plättchen «Dateien»:
+ * es zieht sich ebenso zur Liste aller Dateien der Stufe auf (StageFilesCard).
+ * Offen ist immer nur eine der beiden Karten.
+ */
+export const StageTasksFloat = ({
+    area,
+    stage,
+    number,
+    tasks,
+    share,
+    names,
+    editable,
+    staff,
+    staffLoading,
+    meId,
+    busyTaskId,
+    onAssign,
+    onStatus,
+    onSubtaskStatus,
+    canSetStatus,
+    subtaskActions,
+}: {
+    area: TaskArea;
+    stage: TaskSectionStage;
+    number: number | null;
+    tasks: ProductionTask[];
+    share: number;
+    names: PersonNames;
+    editable: boolean;
+    staff: StaffDirectoryRow[];
+    staffLoading: boolean;
+    meId: string | null;
+    busyTaskId: string | null;
+    onAssign?: (task: ProductionTask, assigneeIds: string[]) => void;
+    onStatus?: (task: ProductionTask, status: TaskStatus) => void;
+    onSubtaskStatus?: (task: ProductionTask, subtask: TaskSubtask, status: TaskStatus) => void;
+    canSetStatus?: (task: ProductionTask) => boolean;
+    /** Dateien und Abschluss der Unteraufgaben; mit `isAdmin` auch das Plättchen «Dateien». */
+    subtaskActions?: SubtaskActions;
+}) => {
+    const [open, setOpen] = useState(readOpen);
+    const [filesOpen, setFilesOpen] = useState(false);
+    const boxRef = useRef<HTMLDivElement>(null);
+    const fromRef = useRef<DOMRect | null>(null);
+    const filesRef = useRef<HTMLDivElement>(null);
+    const filesFromRef = useRef<DOMRect | null>(null);
+    const showFiles = Boolean(subtaskActions?.isAdmin);
+
+    const toggle = (next: boolean) => {
+        fromRef.current = boxRef.current?.getBoundingClientRect() ?? null;
+        writeOpen(next);
+        setOpen(next);
+        if (next) setFilesOpen(false);
+    };
+    const toggleFiles = (next: boolean) => {
+        filesFromRef.current = filesRef.current?.getBoundingClientRect() ?? null;
+        setFilesOpen(next);
+        if (next && open) toggle(false);
+    };
+
+    useGrow(boxRef, fromRef, open);
+    useGrow(filesRef, filesFromRef, filesOpen);
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Escape' && open) {
@@ -108,8 +141,17 @@ export const StageTasksFloat = ({
             toggle(false);
         }
     };
+    const onFilesKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === 'Escape' && filesOpen) {
+            event.stopPropagation();
+            toggleFiles(false);
+        }
+    };
+    const files = showFiles ? stageFilesOf(tasks) : [];
+    const pdfCount = files.filter((entry) => isPdf(entry.file)).length;
+    const imageCount = files.filter((entry) => isImage(entry.file)).length;
 
-    const stageName = t(stageLabelKey(stage));
+    const stageName = stageLabel(stage);
     const weight = roundPercent(tasks.reduce((sum, task) => sum + task.weight, 0));
     const people = [...new Set(tasks.flatMap((task) => task.assigneeIds))];
     const faces = meId && people.includes(meId) ? [meId, ...people.filter((id) => id !== meId)] : people;
@@ -140,6 +182,10 @@ export const StageTasksFloat = ({
                             meId={meId}
                             busyTaskId={busyTaskId}
                             onAssign={onAssign}
+                            onStatus={onStatus}
+                            onSubtaskStatus={onSubtaskStatus}
+                            canSetStatus={canSetStatus}
+                            subtaskActions={subtaskActions}
                             onClose={() => toggle(false)}
                         />
                     </div>
@@ -173,6 +219,41 @@ export const StageTasksFloat = ({
                     </button>
                 )}
             </div>
+            {/* Dateien der Stufe — nur die Verwaltung, solange die Aufgaben zu sind. */}
+            {showFiles && subtaskActions && !open && (
+                <div
+                    ref={filesRef}
+                    className={`ofi-ptk-float is-files ${filesOpen ? 'is-open' : ''}`}
+                    role="region"
+                    aria-label={t('productionTasks.stageFiles.region', { stage: stageName })}
+                    onKeyDown={onFilesKeyDown}
+                >
+                    {filesOpen ? (
+                        <div className="ofi-ptk-float__inner">
+                            <StageFilesCard stageName={stageName} tasks={tasks} names={names} actions={subtaskActions} onClose={() => toggleFiles(false)} />
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            className="ofi-ptk-float__summary ofi-nosize"
+                            aria-expanded="false"
+                            aria-label={t('productionTasks.stageFiles.open', { stage: stageName })}
+                            onClick={() => toggleFiles(true)}
+                        >
+                            <span className="ofi-ptk-float__icon is-files" aria-hidden><FileStack /></span>
+                            <span className="ofi-ptk-float__text">
+                                <b>{t('productionTasks.stageFiles.title')}</b>
+                                <small>
+                                    {files.length
+                                        ? t('productionTasks.stageFiles.summary', { count: files.length, pdf: pdfCount, image: imageCount })
+                                        : t('productionTasks.stageFiles.none')}
+                                </small>
+                            </span>
+                            <ChevronRight className="ofi-ptk-float__chevron" aria-hidden />
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

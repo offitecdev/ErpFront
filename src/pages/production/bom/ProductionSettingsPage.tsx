@@ -8,7 +8,7 @@ import { productionBomApi, productionBomErrorText, readBomSettings } from '@/lib
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
 import type { BomCode, BomSettings } from '@/types/productionBom';
-import type { TaskArea } from '@/types/productionTasks';
+import type { BuiltInArea } from '@/types/productionTasks';
 import '@/styles/modules/productionBom.css';
 
 import { tempKey } from './bomFormat';
@@ -18,12 +18,12 @@ import { BomUnsavedDialog } from './device/BomUnsavedDialog';
 type Section = 'bom';
 const SECTIONS: Section[] = ['bom'];
 const MAX = 12;
-const AREAS: TaskArea[] = ['MECHANICAL', 'ELECTRICAL'];
+const AREAS: BuiltInArea[] = ['MECHANICAL', 'ELECTRICAL'];
 /** «Ana BOM kod şudur: BOM-MEK-00001, BOM-ELK-00001» — fest, je Bereich. */
-const MAIN_PREFIX: Record<TaskArea, string> = { MECHANICAL: 'BOM-MEK', ELECTRICAL: 'BOM-ELK' };
+const MAIN_PREFIX: Record<BuiltInArea, string> = { MECHANICAL: 'BOM-MEK', ELECTRICAL: 'BOM-ELK' };
 
 interface CodeRow { key: string; prefix: string; name: string }
-interface Draft { maxPerArea: number; codes: Record<TaskArea, CodeRow[]> }
+interface Draft { maxPerArea: number; codes: Record<BuiltInArea, CodeRow[]> }
 
 const draftOf = (settings: BomSettings): Draft => ({
     maxPerArea: settings.maxPerArea,
@@ -36,7 +36,7 @@ const draftOf = (settings: BomSettings): Draft => ({
 /** Wie der Server den Vorsatz liest: gross, Leerzeichen → «-», ein «-XXXX» am Ende fällt weg. */
 const cleanPrefix = (value: string): string => value.trim().toUpperCase().replace(/\s+/g, '-').replace(/-X{3,}$/, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
 
-const codesOf = (draft: Draft): Record<TaskArea, BomCode[]> => ({
+const codesOf = (draft: Draft): Record<BuiltInArea, BomCode[]> => ({
     MECHANICAL: draft.codes.MECHANICAL.filter((row) => row.prefix.trim() || row.name.trim()).map((row) => ({ prefix: cleanPrefix(row.prefix), name: row.name.trim() })),
     ELECTRICAL: draft.codes.ELECTRICAL.filter((row) => row.prefix.trim() || row.name.trim()).map((row) => ({ prefix: cleanPrefix(row.prefix), name: row.name.trim() })),
 });
@@ -76,15 +76,15 @@ export const ProductionSettingsPage = () => {
     const canEdit = Boolean(settings?.canEdit);
 
     const edit = (next: Draft) => setLocal(next);
-    const patchRow = (area: TaskArea, key: string, patch: Partial<CodeRow>) => {
+    const patchRow = (area: BuiltInArea, key: string, patch: Partial<CodeRow>) => {
         if (!draft) return;
         edit({ ...draft, codes: { ...draft.codes, [area]: draft.codes[area].map((row) => (row.key === key ? { ...row, ...patch } : row)) } });
     };
-    const addRow = (area: TaskArea) => {
+    const addRow = (area: BuiltInArea) => {
         if (!draft) return;
         edit({ ...draft, codes: { ...draft.codes, [area]: [...draft.codes[area], { key: tempKey(), prefix: '', name: '' }] } });
     };
-    const removeRow = (area: TaskArea, key: string) => {
+    const removeRow = (area: BuiltInArea, key: string) => {
         if (!draft) return;
         edit({ ...draft, codes: { ...draft.codes, [area]: draft.codes[area].filter((row) => row.key !== key) } });
     };

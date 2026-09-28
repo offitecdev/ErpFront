@@ -6,6 +6,7 @@ import type {
     DeviceTasks,
     ProductionTask,
     TaskPerson,
+    TaskStatus,
     TaskTemplate,
     TaskTemplateInput,
     TaskTemplateSummary,
@@ -21,6 +22,10 @@ import type {
 
 const TAGS = ['production'];
 const PAGE_CACHE = { freshMs: 15_000, staleMs: 600_000, tags: TAGS };
+
+/** Der Weg zu einer Unteraufgabe am Gerät. */
+const subtaskPath = (deviceId: string, taskId: string, subtaskId: string): string =>
+    `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}`;
 
 export const productionTasksApi = {
     templates: async (): Promise<TaskTemplateSummary[]> =>
@@ -44,6 +49,37 @@ export const productionTasksApi = {
         (await apiClient.patch(
             `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}`,
             { assigneeIds },
+        )).data,
+    /**
+     * Die Aufgaben des Geräts anpassen — nur die Kopie am Gerät, nie die
+     * Vorlage (28.09.2026). Schickt ALLE Aufgaben; neue ohne bekannte Kennung.
+     */
+    updateTasks: async (deviceId: string, tasks: ProductionTask[]): Promise<DeviceTasks> =>
+        (await apiClient.put(`/production/devices/${encodeURIComponent(deviceId)}/tasks`, { tasks })).data,
+    /** Der Stand einer Unteraufgabe — dieselben Leute; die Aufgabe folgt ihren Unteraufgaben. */
+    setSubtaskStatus: async (deviceId: string, taskId: string, subtaskId: string, status: TaskStatus): Promise<{ task: ProductionTask }> =>
+        (await apiClient.patch(
+            `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}/status`,
+            { status },
+        )).data,
+    /** «Complete the task» — nur die Verwaltung; mit kurzer Notiz. */
+    completeSubtask: async (deviceId: string, taskId: string, subtaskId: string, note: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/complete`, { note })).data,
+    /** Eine Datei an eine Unteraufgabe (PDF/Foto). */
+    uploadSubtaskFile: async (deviceId: string, taskId: string, subtaskId: string, file: File): Promise<{ task: ProductionTask }> => {
+        const form = new FormData();
+        form.append('file', file, file.name);
+        return (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/files`, form)).data;
+    },
+    subtaskFile: async (deviceId: string, taskId: string, subtaskId: string, fileId: string): Promise<Blob> =>
+        (await apiClient.get(`${subtaskPath(deviceId, taskId, subtaskId)}/files/${encodeURIComponent(fileId)}`, { responseType: 'blob' })).data,
+    removeSubtaskFile: async (deviceId: string, taskId: string, subtaskId: string, fileId: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.delete(`${subtaskPath(deviceId, taskId, subtaskId)}/files/${encodeURIComponent(fileId)}`)).data,
+    /** Der Stand einer Aufgabe — die Verwaltung und wer in der Aufgabe steht. */
+    setStatus: async (deviceId: string, taskId: string, status: TaskStatus): Promise<{ task: ProductionTask }> =>
+        (await apiClient.patch(
+            `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/status`,
+            { status },
         )).data,
     unload: async (deviceId: string): Promise<void> => {
         await apiClient.delete(`/production/devices/${encodeURIComponent(deviceId)}/tasks`);
