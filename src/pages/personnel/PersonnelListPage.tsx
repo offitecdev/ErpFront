@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, QrCode01 } from '@/components/icons/antIconCompat';
+import { Mail01, Plus, QrCode01 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { PersonAvatar } from '@/components/ui-shared/PersonAvatar';
 import { t } from '@/i18n/translate';
@@ -9,6 +9,8 @@ import type { StaffRow } from './types/personnel';
 import { STAFF_PAGE_SIZE, useLanguageTick, useStaffList } from './hooks/usePersonnel';
 import { StaffCreateSheet } from './components/StaffCreateSheet';
 import { StaffQrSheet } from './components/StaffQrSheet';
+import { StaffMailSheet } from './components/StaffMailSheet';
+import { personnelMailboxApi } from '@/lib/api/personnelMailbox';
 import { Chip, FilterBar, Pager, SearchBox, SectionCard, TableStateRow } from './components/primitives';
 import { formatDate, fullName, workLocationLabel } from './utils/format';
 
@@ -30,9 +32,21 @@ export const PersonnelListPage = () => {
     const list = useStaffList();
     const permissions = useAuthStore((state) => state.permissions);
     const canCreate = permissions.includes('employees.create');
+    // Persönliche Postfächer richtet die Verwaltung ein (Fenster «Mail», 28.09.2026).
+    const canManageMail = permissions.includes('mail.manage') || permissions.includes('employees.update');
 
     const [createOpen, setCreateOpen] = useState(false);
     const [qrPerson, setQrPerson] = useState<StaffRow | null>(null);
+    const [mailPerson, setMailPerson] = useState<StaffRow | null>(null);
+    /* Wer schon ein eigenes Postfach hat (blau) und wessen Abruf hakt (rot). */
+    const [mailboxes, setMailboxes] = useState<Map<string, { error: boolean }>>(new Map());
+    const loadMailboxes = useCallback(() => {
+        if (!canManageMail) return;
+        personnelMailboxApi.list()
+            .then((rows) => setMailboxes(new Map(rows.map((row) => [row.employeeId, { error: Boolean(row.imapLastError) }]))))
+            .catch(() => undefined);
+    }, [canManageMail]);
+    useEffect(() => { loadMailboxes(); }, [loadMailboxes]);
 
     return (
         <div className="flex w-full flex-col gap-4">
@@ -67,7 +81,7 @@ export const PersonnelListPage = () => {
                         <col style={{ width: 150 }} />
                         <col style={{ width: 150 }} />
                         <col style={{ width: 140 }} />
-                        <col style={{ width: 92 }} />
+                        <col style={{ width: canManageMail ? 104 : 92 }} />
                     </colgroup>
                     <thead>
                         <tr>
@@ -141,7 +155,23 @@ export const PersonnelListPage = () => {
                                 <td className="font-mono text-[12.5px] text-slate-600 dark:text-white/70">
                                     {formatDate(person.createdAt)}
                                 </td>
-                                <td className="text-right">
+                                <td className="whitespace-nowrap text-right">
+                                    {canManageMail && (
+                                        <button
+                                            type="button"
+                                            aria-label={t('personnel.mailbox.open', { name: fullName(person) })}
+                                            title={mailboxes.has(person.id) ? t('personnel.mailbox.configured') : t('personnel.mailbox.title')}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                setMailPerson(person);
+                                            }}
+                                            className={`mr-1 inline-flex size-7 items-center justify-center rounded-md transition-colors hover:bg-slate-100 dark:hover:bg-white/10 ${mailboxes.get(person.id)?.error
+                                                ? 'text-red-500'
+                                                : mailboxes.has(person.id) ? 'text-[#0a7aff]' : 'text-slate-400 hover:text-[#0066e0] dark:hover:text-white'}`}
+                                        >
+                                            <Mail01 size={14} />
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         aria-label={t('personnel.qr.open', { name: fullName(person) })}
@@ -180,6 +210,13 @@ export const PersonnelListPage = () => {
             {/* Der Schlüssel steht nicht mehr in der Zeile (er meldet ohne
                 Kennwort an) — das Fenster holt ihn sich selbst, und ein neu
                 ausgegebener bleibt dort. Die Liste hat nichts mehr zu merken. */}
+            <StaffMailSheet
+                open={Boolean(mailPerson)}
+                person={mailPerson}
+                onClose={() => { setMailPerson(null); loadMailboxes(); }}
+                onChanged={() => { list.reload(); loadMailboxes(); }}
+            />
+
             <StaffQrSheet
                 open={Boolean(qrPerson)}
                 person={qrPerson}

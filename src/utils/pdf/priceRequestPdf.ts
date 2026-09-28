@@ -1,9 +1,9 @@
 /**
  * ── FİYAT TALEBİ (PREISANFRAGE) PDF ŞABLONU ─────────────────────────────────
- * `orderPdf.ts`'in fiyatsız uyarlaması — fiyat talebi aşamasındaki siparişler
+ * Fiyat talebi aşamasındaki siparişler
  * (TALEP TASLAĞI = DRAFT, gönderilmiş talep = PRICE_REQUEST) için AYRI belge
- * (kullanıcı isteği 2026-08-01). Fiyat sütunu ve toplam bloğu YOKTUR — fiyatlar
- * tedarikçiden İSTENMEKTEDİR.
+ * için talep belgesi. Birim fiyat ve tutar alanları, tedarikçinin verdiği
+ * fiyatları aynı belgede gösterebilir; henüz fiyat yoksa alanlar sıfırdır.
  *
  * DAS BLATT NACH DER REFERENZ (Vorgabe Samet, 11.09.2026: «bunun aynısı —
  * sadece pdf'i daha temiz yapmak; tenant adresleri yine doğru gelmeli»):
@@ -52,6 +52,10 @@ interface PriceRequestPdfStrings {
     colDesc: string;
     colCode: string;
     colQty: string;
+    colGrossPrice: string;
+    colNetPrice: string;
+    colPrice: string;
+    colDiscount: string;
     pageWord: string;
     pageOf: string;
     serialShort: string;
@@ -76,6 +80,10 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         colDesc: 'Ürün / Malzeme',
         colCode: 'Seri Kod',
         colQty: 'Miktar',
+        colGrossPrice: 'Birim Fiyat',
+        colNetPrice: 'Net Fiyat',
+        colPrice: 'Tutar',
+        colDiscount: 'İndirim',
         pageWord: 'Sayfa',
         pageOf: '/',
         serialShort: 'Seri No',
@@ -95,6 +103,10 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         colDesc: 'Produkt / Material',
         colCode: 'Seriencode',
         colQty: 'Menge',
+        colGrossPrice: 'Einzelpreis',
+        colNetPrice: 'Nettopreis',
+        colPrice: 'Betrag',
+        colDiscount: 'Rabatt',
         pageWord: 'Seite',
         pageOf: 'von',
         serialShort: 'Serien-Nr.',
@@ -114,6 +126,10 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         colDesc: 'Product / Material',
         colCode: 'Serial Code',
         colQty: 'Quantity',
+        colGrossPrice: 'Unit Price',
+        colNetPrice: 'Net Price',
+        colPrice: 'Amount',
+        colDiscount: 'Discount',
         pageWord: 'Page',
         pageOf: 'of',
         serialShort: 'Serial No.',
@@ -338,7 +354,7 @@ const buildTableLayout = (
                 ? items.map((item) => requestExtraRaw(item, column.key) || '—')
                 : items.map((item) => requestExtraValue(item, column.key) || '—');
         }
-        return items.map((item) => fmtQty(item.quantity || 0));
+        return items.map((item) => priceRequestPdfCellText(item, column.kind));
     };
 
     const measureAll = (fs: number): MeasuredColumn[] =>
@@ -578,6 +594,31 @@ async function loadHeaderWave(wMm: number, hMm: number): Promise<string | null> 
 const fmtQty = (v: number) =>
     new Intl.NumberFormat('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(v || 0);
 
+/** Use the stored supplier values, including direct-entry totals and explicit zeroes. */
+export const priceRequestPdfCellText = (item: PurchaseOrderRow['items'][number], kind: SupplierPdfColumn['kind']): string => {
+    const amount = (value: number | undefined, digits = 2) => new Intl.NumberFormat('de-DE', {
+        minimumFractionDigits: 2, maximumFractionDigits: digits,
+    }).format(Number.isFinite(value) ? Math.max(0, value ?? 0) : 0);
+    if (kind === 'gross') return amount(item.grossPrice, 3);
+    if (kind === 'net') return amount(item.displayNetPrice ?? item.netPrice, 3);
+    if (kind === 'price') return amount(item.lineTotal);
+    if (kind === 'disc') return [item.discount, item.discount2, item.discount3].filter((value) => value > 0).map((value) => `${fmtQty(value)}%`).join(' + ') || '—';
+    return fmtQty(item.quantity || 0);
+};
+
+export const priceRequestPdfColumns = (order: PurchaseOrderRow, lang: PriceRequestPdfLang): SupplierPdfColumn[] => {
+    const L = I18N[lang];
+    const labels = new Set((order.tableColumns ?? []).map((column) => column.label));
+    return resolveSupplierPdfColumns(order, {
+        captions: { desc: L.colDesc, qty: L.colQty, gross: L.colGrossPrice, net: L.colNetPrice, disc: L.colDiscount, price: L.colPrice },
+        fixed: ['qty', 'gross', ...(labels.has('netPrice') ? ['net' as const] : []),
+            ...(labels.has('discount') || labels.has('discount2') ? ['disc' as const] : []), 'price'],
+        hidden: new Set([...(order.hiddenColumnKeys ?? []), 'code']),
+        maxExtras: PDF_MAX_EXTRA_COLUMNS,
+        lang,
+    });
+};
+
 const fmtDateShort = (iso?: string | null) => {
     if (!iso) return '';
     const d = new Date(iso);
@@ -648,13 +689,7 @@ export async function buildPriceRequestPdfBytes(
        der Vorlage («GESAMTMENGE», nicht «Menge»), Reihenfolge = die der
        Vorlage. Der ERP-Code steht nie im PDF; Ausgeblendetes bleibt weg. Kopf,
        Masse und Zeilen lesen DIESELBE Liste. */
-    const columns = resolveSupplierPdfColumns(order, {
-        captions: { desc: L.colDesc, qty: L.colQty },
-        fixed: ['qty'],
-        hidden: new Set([...(order.hiddenColumnKeys ?? []), 'code']),
-        maxExtras: PDF_MAX_EXTRA_COLUMNS,
-        lang,
-    }).map((column) => ({ ...column, caption: upper(column.caption) }));
+    const columns = priceRequestPdfColumns(order, lang).map((column) => ({ ...column, caption: upper(column.caption) }));
     const layout = buildTableLayout(doc, order, columns);
     const st: TableState = { y: 0 };
     if (CONTENT_BOTTOM - letterEnd >= TABLE_START_MIN) {
@@ -1205,9 +1240,9 @@ function drawRow(
                 break;
             }
             default:
-                // Die Menge — ohne Einheit darunter (kullanıcı isteği 2026-08-21).
+                // Quantity and supplier prices use the same text for measuring and drawing.
                 doc.setTextColor(...COLOR_TEXT);
-                drawFittedRight(doc, fmtQty(item.quantity || 0), cell.x + width, width, baseY, 'normal', fs);
+                drawFittedRight(doc, priceRequestPdfCellText(item, cell.column.kind), cell.x + width, width, baseY, 'normal', fs);
                 break;
         }
     }

@@ -181,12 +181,34 @@ export const bomProcess = (bom: Bom, subs: Bom[] = []): BomProcess => {
 export const openRequests = (bom: Bom): BomProcurementSummary[] =>
     (bom.procurement ?? []).filter((entry) => OPEN.has(entry.status));
 
-/** Zeilen, die schon in einem offenen Talep dieser Art stehen (kommen in keinen zweiten). */
+/** Remaining quantities in the current draft, after open price requests. */
+export const priceRequestRemaining = (bom: Bom): Map<string, number> => {
+    const draft = bom.status !== 'DRAFT' ? bom.revisionDraft : null;
+    const lines = draft?.lines ?? bom.lines;
+    const revision = draft?.revision ?? bom.revision;
+    const remaining = new Map(lines.map((line) => [line.id, line.quantity]));
+    for (const request of openRequests(bom)) {
+        if (request.kind !== 'PRICE' || request.bomRevision !== revision) continue;
+        for (const line of request.lines) {
+            if (!remaining.has(line.bomLineId)) continue;
+            remaining.set(line.bomLineId, Math.round(Math.max(0, remaining.get(line.bomLineId)! - Math.max(0, line.quantity)) * 1000) / 1000);
+        }
+    }
+    return remaining;
+};
+
+/** A partially requested PRICE line remains selectable for its remaining quantity. */
 export const pendingLineIds = (bom: Bom, kind: 'PRICE' | 'ORDER'): Map<string, string> => {
     const map = new Map<string, string>();
+    const remaining = kind === 'PRICE' ? priceRequestRemaining(bom) : null;
+    const revision = bom.status !== 'DRAFT' && bom.revisionDraft ? bom.revisionDraft.revision : bom.revision;
     for (const entry of openRequests(bom)) {
         if (entry.kind !== kind) continue;
-        for (const line of entry.lines) if (!map.has(line.bomLineId)) map.set(line.bomLineId, entry.requestNumber);
+        if (kind === 'PRICE' && entry.bomRevision !== revision) continue;
+        for (const line of entry.lines) {
+            if (remaining && (remaining.get(line.bomLineId) ?? 0) > EPS) continue;
+            if (!map.has(line.bomLineId)) map.set(line.bomLineId, entry.requestNumber);
+        }
     }
     return map;
 };

@@ -25,13 +25,14 @@ import { labelsForDocument, nextColumnKey, templateLabelName } from './importTem
  * Zuordnung, Breite, Griff. Wegnehmen fragt nach, solange die Vorlage nicht
  * gespeichert ist.
  */
-export const TemplateColumnsPanel = ({ config, onChange, documentType, showErrors = false }: {
+export const TemplateColumnsPanel = ({ config, onChange, documentType, showErrors = false, embedded = false }: {
     config: SupplierCalcConfig;
     onChange: (next: SupplierCalcConfig) => void;
     /** Eine Preisanfrage kennt nur Produktname und Menge als Zuordnung. */
     documentType: PurchaseTemplateDocumentType;
     /** Nach einem gescheiterten Speichern: leere Namen rot anstreichen. */
     showErrors?: boolean;
+    embedded?: boolean;
 }) => {
     const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
     /** Welche Spalte gerade gezogen wird — null, wenn niemand zieht. */
@@ -208,7 +209,14 @@ export const TemplateColumnsPanel = ({ config, onChange, documentType, showError
                 {t('inv.aiImport.columnsFixedErp')}
             </p>
 
-            <ConfirmDialog
+            {embedded ? (pendingRemoval && <div className="ofi-ows-inline-confirm" role="alert">
+                <span>{t('inv.aiImport.extraRemoveConfirm')}</span>
+                <button type="button" className="ofi-page-button ofi-nosize" onClick={() => setPendingRemoval(null)}>{t('common.cancel')}</button>
+                <button type="button" className="ofi-page-button ofi-nosize is-danger" onClick={() => {
+                    patch(columns.filter((entry) => entry.key !== pendingRemoval));
+                    setPendingRemoval(null);
+                }}>{t('common.delete')}</button>
+            </div>) : <ConfirmDialog
                 open={pendingRemoval !== null}
                 title={t('inv.aiImport.extraRemoveTitle')}
                 message={t('inv.aiImport.extraRemoveConfirm')}
@@ -220,7 +228,7 @@ export const TemplateColumnsPanel = ({ config, onChange, documentType, showError
                 /* Über dem Vorlagenfenster (900), sonst läge die Rückfrage
                    dahinter und niemand könnte sie beantworten. */
                 zIndex={960}
-            />
+            />}
         </>
     );
 };

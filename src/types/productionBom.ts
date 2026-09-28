@@ -462,6 +462,8 @@ export interface BomTableAiResult {
     model: string;
     usage: { promptTokens: number; completionTokens: number; totalTokens: number; estimatedUsd: number | null };
     sources: Array<'prompt' | 'sheet' | 'pdf' | 'image'>;
+    /** Nur mit `header: true`: Angebotsnummer und Datum (ISO) des Lieferanten, '' = nicht gedruckt. */
+    document?: { number: string; date: string } | null;
 }
 
 /** Die Herkunft eines Belegs aus einer BOM (GET /inventory/purchase-orders/:id → `bomOrigin`). */
@@ -593,46 +595,6 @@ export interface ProcurementRequest {
     documents: ProcurementDocument[];
 }
 
-export interface ProcurementList {
-    requests: ProcurementRequest[];
-    counts: Record<BomProcurementStatus, number>;
-    canProcure: boolean;
-}
-
-export interface ProcurementSpendingTotal {
-    currency: string;
-    ordered: number;
-    confirmed: number;
-    received: number;
-}
-
-export interface ProcurementSpending {
-    totals: ProcurementSpendingTotal[];
-    suppliers: Array<{
-        key: string;
-        supplierName: string;
-        orders: number;
-        confirmedOrders: number;
-        requests: number;
-        totals: ProcurementSpendingTotal[];
-        lastAt: string | null;
-    }>;
-    projects: Array<{
-        productionProjectId: string;
-        projectNumber: string;
-        projectName: string;
-        orders: number;
-        totals: ProcurementSpendingTotal[];
-    }>;
-    documents: Array<ProcurementDocument & {
-        bomId: string;
-        bomNumber: string | null;
-        projectNumber: string | null;
-        projectName: string | null;
-        deviceName: string | null;
-    }>;
-}
-
 /** Wohin ein Wareneingang Ware gab (Antwort von «receive»). */
 export interface BomReceiptAllocation {
     productId: string;
@@ -708,29 +670,4 @@ export interface CostingProjectSummary {
 
 export interface CostingProject extends CostingProjectSummary {
     deviceList: CostingDevice[];
-}
-
-/* ── Satın alma › Revizyonlar (27.09.2026 abends) ────────────────────────── */
-
-/** Eine freigegebene BOM-Revision, wie der Einkauf sie sieht — MIT Lieferant. */
-export interface ProcurementRevision {
-    bomId: string;
-    bomNumber: string;
-    revision: number;
-    reason: string | null;
-    approvedAt: string | null;
-    approvedByName: string | null;
-    project: { id: string; projectNumber: string; projectName: string } | null;
-    device: { id: string; name: string } | null;
-    changes: { added: number; removed: number; increased: number; decreased: number; edited: number };
-    orderActions: Array<{
-        purchaseOrderId: string;
-        referenceNumber: string;
-        supplierName: string;
-        action: BomOrderActionKind;
-        orderRevision: number | null;
-        atSupplier: boolean;
-        statusAfter: string;
-        lines: number;
-    }>;
 }

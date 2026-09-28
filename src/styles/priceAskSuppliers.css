@@ -1,0 +1,17 @@
+.ofi-buy-suppliers { padding: 0; gap: 12px; }
+.ofi-buy-suppliers__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ofi-buy-suppliers__toolbar .ofi-buy-search { margin-left: 0; }
+.ofi-buy-supplier-picker .ofi-buy-search input { flex: 1; width: 0; min-width: 0; height: 30px; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--buy-text); font: inherit; font-size: 13px; outline: none; }
+.ofi-buy-supplier-picker input.ofi-buy-check { flex: none; width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--buy-accent); cursor: pointer; }
+.ofi-buy-suppliers > .ofi-buy-note { display: block; margin: 8px 0; }
+.ofi-buy-suppliers__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 18px; align-items: start; }
+.ofi-buy-suppliers__option { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 0; color: var(--buy-text); font-size: 12.5px; cursor: pointer; }
+.ofi-buy-suppliers__option > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ofi-buy-suppliers__option > svg { color: var(--buy-sec); }
+.ofi-buy-suppliers__option:has(input:disabled) { color: var(--buy-sec); cursor: default; }
+.ofi-buy-price-ask .ofi-buy-matrix th:first-child,
+.ofi-buy-price-ask .ofi-buy-matrix td:first-child { min-width: 220px; }
+@media (max-width: 640px) {
+    .ofi-buy-suppliers__list { grid-template-columns: 1fr; }
+    .ofi-buy-suppliers__toolbar .ofi-buy-search { width: 100%; }
+}

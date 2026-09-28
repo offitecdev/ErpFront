@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { FocusEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { AlertTriangle, Check, CheckCircle, ChevronLeft, ChevronRight, Copy01, File05, Minus, Plus, RefreshCcw01, Save01, Settings01, ShoppingCart01, SquareDivide, Trash01, Zap } from '@/components/icons/antIconCompat';
+import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Copy01, File05, Minus, Plus, RefreshCcw01, Save01, Settings01, ShoppingCart01, SquareDivide, Trash01 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { LoadingDots } from '@/components/ui-shared/Loader';
-import { BotLoadingPanel } from '@/components/ui-shared/OffitecBot';
+import { MacLoading } from '@/components/ui-shared/MacLoading';
+import { readQuery } from '@/lib/api/queryCache';
 import { t } from '@/i18n/translate';
 import { canPickRequestSuppliers } from '@/lib/access';
 import { inventoryApi, purchaseOrdersApi, supplyApi } from '@/lib/api/inventory';
@@ -24,12 +25,9 @@ import type {
 } from '@/types/inventory';
 import { SelectMenu } from '@/components/ui-shared/SelectMenu';
 import { ArticleComboCell } from './components/ArticleComboCell';
-import { useDrawnCheck } from './components/useDrawnCheck';
 import { ArticlePickerModal } from './components/ArticlePickerModal';
-import { BottomSheet } from './components/BottomSheet';
-import { SupplierImportDialog } from './import/SupplierImportDialog';
-import { usePasteToImport } from './import/usePasteToImport';
-import { TemplateManagerPopup } from './import/TemplateManagerPopup';
+import { WorkspaceSection } from '@/components/ui-shared/WorkspaceSection';
+import { PopupDialog } from '@/components/ui-shared/PopupKit';
 import { CalcModeCard } from './components/CalcModeCard';
 import {
     calcModeError,
@@ -42,11 +40,11 @@ import {
     remapRowExtras,
     tableColumnsFromTemplate,
     tableColumnsSnapshot,
+    withPriceRequestTableColumns,
     templateProblemText,
     templateProblems,
     type OrderColumnId,
 } from './import/importTemplate';
-import { SupplierComboCell } from './components/SupplierComboCell';
 import { SupplierPickerModal } from './components/SupplierPickerModal';
 import { SchemePickDialog } from './components/SchemePickDialog';
 import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard } from './components/primitives';
@@ -54,7 +52,7 @@ import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import type { DraftOrderFee, DraftOrderRow } from './types';
 import { fmtMoneyIn, fmtUnitPricePrecise, parseNum } from './utils/format';
-import { CURRENCY_CODES, CURRENCY_SYMBOLS, DEFAULT_CURRENCY, toCurrencyCode, type CurrencyCode } from '@/utils/currency';
+import { CURRENCY_CODES, DEFAULT_CURRENCY, toCurrencyCode, type CurrencyCode } from '@/utils/currency';
 import {
     allVatCountries,
     clampPercent,
@@ -97,19 +95,26 @@ import { displayTemplateTitle, isStandardColumns } from '@/utils/standardOrderCo
 /* Die Reiter, die ihre Daten ERST BEIM ÖFFNEN holen. (Wareneingang und
    «Stoğa gidenler» ruhen seit dem 22.09.2026 — siehe
    `_disabled/inventory-receive/README.md`.) */
-import { PdfPanel } from './workspace/PdfPanel';
 /* Die Wegleiste links neben den Einstellungen. */
-import { FlowRail, type FlowStep } from './workspace/FlowRail';
-import { MailPanel } from './workspace/MailPanel';
 import '@/styles/modules/orderWorkspace.css';
+import '@/styles/modules/productionBom.css';
+import '@/styles/mailTemplatePicker.css';
+import '@/styles/orderWorkspaceSurface.css';
 // BOM der Produktion (27.09.2026): Regeln, Band und die KI, die ihre Tabelle füllt.
 import { productionBomErrorText } from '@/lib/api/productionBom';
 import { BomOrderBanner, BomSendLocked } from '@/pages/production/bom/order/BomOrderParts';
 import { BOM_ERP_KEY, BOM_MODEL_KEY, bomColumnsSnapshot, isBomLockedColumn, orderBomColumns } from '@/pages/production/bom/order/bomColumns';
-import { BomTableAiDialog } from '@/pages/production/bom/order/BomTableAiDialog';
 import type { TableAiChange, TableAiColumn, TableAiLabel, TableAiRow } from '@/pages/production/bom/order/tableAiPlan';
 
 let rowSeed = 0;
+const loadImport = () => import('./import/SupplierImportDialog');
+const loadTemplates = () => import('./import/TemplateManagerPopup');
+const loadBomImport = () => import('@/pages/production/bom/order/BomTableAiDialog');
+const SupplierImportDialog = lazy(() => loadImport().then((module) => ({ default: module.SupplierImportDialog })));
+const TemplateManagerPopup = lazy(() => loadTemplates().then((module) => ({ default: module.TemplateManagerPopup })));
+const PdfPanel = lazy(() => import('./workspace/PdfPanel').then((module) => ({ default: module.PdfPanel })));
+const MailPanel = lazy(() => import('./workspace/MailPanel').then((module) => ({ default: module.MailPanel })));
+const BomTableAiDialog = lazy(() => loadBomImport().then((module) => ({ default: module.BomTableAiDialog })));
 let feeSeed = 0;
 
 /** Boş ek ücret satırı — detay penceresindeki "ek ücret ekle" bunu ekler. */
@@ -147,19 +152,7 @@ const TEMPLATE_PAGE_SIZE = 15;
  */
 type CalcMode = 'AUTO' | 'DIRECT' | 'SUPPLIER';
 
-/**
- * SİPARİŞ GİRİŞ YOLU (kullanıcı isteği 2026-08-01, ikinci tur):
- *   ORDER         → doğrudan resmî sipariş (PENDING) — eski davranış.
- *   PRICE_REQUEST → fiyat talebi: satırlar FİYATSIZDIR (seri kod + ad + miktar),
- *                   fiyat sütunları gizlenir. KAYDET henüz gönderilmemiş talebi
- *                   TALEP TASLAĞI (DRAFT) olarak yazar; mail gönderilince
- *                   FİYAT TALEBİ (PRICE_REQUEST) olur, siparişe dönüştürülünce
- *                   fiyatlı sipariş taslağına geçer.
- * Seçim EN BAŞTA yapılır: sayfa iki büyük düğmeyle açılır (listede iki ayrı
- * "ekle" düğmesi YOKTUR) ve editörün ortasında kip anahtarı bulunmaz — yol
- * sonradan değiştirilemez. Ayrı bir "taslak" seçeneği de yoktur; taslak,
- * kaydedilmiş ama gönderilmemiş fiyat talebinin kendisidir.
- */
+/** Requests allow pending prices; orders use the same priced document table. */
 type OrderMode = 'ORDER' | 'PRICE_REQUEST';
 
 /**
@@ -258,7 +251,12 @@ const emptyRow = (calcMode: CalcMode = 'DIRECT'): DraftOrderRow => ({
  * `?id=` ile açılırsa mevcut sipariş yüklenir ve PATCH ile güncellenir
  * (mail gönderilmiş siparişte içerik değişikliği backend'de revizyonu artırır).
  */
-export const OrderWorkspacePage = () => {
+export const OrderWorkspacePage = ({ workspaceId, initialTab, onBack, onOpenDocument }: {
+    workspaceId?: string;
+    initialTab?: WorkspaceTab;
+    onBack?: () => void;
+    onOpenDocument?: (id: string) => void;
+} = {}) => {
     useLanguageTick();
     const navigate = useNavigate();
     /* Der Vorgang steht in der ADRESSE, nicht mehr in `?id=`: die Liste führt
@@ -272,7 +270,7 @@ export const OrderWorkspacePage = () => {
     /* Sipariş ⇄ fiyat talebi geçişi AYNI kaydı değiştirir (24.09.2026) — adres
        aynı kalır, bu sayaç kaydı yeniden yükletir. */
     const [reloadTick, setReloadTick] = useState(0);
-    const editId = routeId && routeId !== 'new' ? routeId : null;
+    const editId = workspaceId ?? (routeId && routeId !== 'new' ? routeId : null);
     const newKind: OrderMode = searchParams.get('kind') === 'request' ? 'PRICE_REQUEST' : 'ORDER';
     const permissions = useAuthStore((state) => state.permissions);
     const user = useAuthStore((state) => state.user);
@@ -304,12 +302,12 @@ export const OrderWorkspacePage = () => {
     const [tab, setTab] = useState<WorkspaceTab>(() => {
         // `/inventory/orders/:id/receive` von früher landet über eine Umleitung
         // hier — mit `?tab=receive`, damit der alte Link denselben Ort öffnet.
-        const wanted = new URLSearchParams(window.location.search).get('tab');
+        const wanted = initialTab ?? searchParams.get('tab');
         return (wanted === 'settings' || wanted === 'template'
             || wanted === 'pdf' || wanted === 'mail') ? wanted : 'lines';
     });
     /** Die Anschrift des Lieferanten, wie sie in der Bestellung steht (nur lesen). */
-    const [supplierAddress, setSupplierAddress] = useState<string | null>(null);
+    const [, setSupplierAddress] = useState<string | null>(null);
     /* DER NUMMERNKREIS steht in den EINSTELLUNGEN (Vorgabe Samet, 22.09.2026:
        «Kod aralığı da ayarlarda olsun»), gilt aber für den Wareneingang: dort
        entstehen die ERP-Codes codeloser Zeilen. Deshalb liegt er hier, in der
@@ -455,6 +453,7 @@ export const OrderWorkspacePage = () => {
     /** Was auf der Seite eingefuegt wurde — das Import-Fenster oeffnet damit. */
     const [pastedFiles, setPastedFiles] = useState<File[] | null>(null);
     const [templatesOpen, setTemplatesOpen] = useState(false);
+    const [toolBusy, setToolBusy] = useState(false);
     /** Die RECHENvorlagen — die Anschreiben-Vorlagen heissen weiter `templates`. */
     const [calcTemplates, setCalcTemplates] = useState<SupplierOrderTemplate[]>([]);
     const [activeTemplate, setActiveTemplate] = useState<SupplierOrderTemplate | null>(null);
@@ -480,7 +479,6 @@ export const OrderWorkspacePage = () => {
        soll ein Haken kommen, und er soll wirklich gezeichnet werden.» Er meldet
        die beiden Ereignisse, die man sonst nur an einer Zeile mehr erkennt:
        uebernommene Belegzeilen und die gespeicherte Bestellung. */
-    const drawnCheck = useDrawnCheck();
     const [detailsOpen, setDetailsOpen] = useState(false);
     /**
      * ── ÖN YAZI (ANSCHREIBEN) ────────────────────────────────────────────────
@@ -525,6 +523,7 @@ export const OrderWorkspacePage = () => {
     const [draftTitle, setDraftTitle] = useState('');
     const [draftError, setDraftError] = useState<string | null>(null);
     const [draftBusy, setDraftBusy] = useState(false);
+    const [templateDelete, setTemplateDelete] = useState<PurchaseOrderTextTemplate | null>(null);
     // Tedarikçi sipariş düzeyinde tutulur — tek sipariş = tek tedarikçi.
     const [supplier, setSupplier] = useState<{ id: string | null; name: string; email: string | null }>({
         id: null,
@@ -752,8 +751,8 @@ export const OrderWorkspacePage = () => {
                         ? undefined
                         : {
                             [itemMode]: {
-                                netPrice: String(item.netPrice || ''),
-                                lineTotal: String(item.lineTotal || ''),
+                                netPrice: String(item.netPrice ?? ''),
+                                lineTotal: String(item.lineTotal ?? ''),
                                 quantity: String(item.quantity),
                             },
                         };
@@ -767,14 +766,14 @@ export const OrderWorkspacePage = () => {
                         unit: item.unit ?? '',
                         quantity: String(item.quantity),
                         // Brüt fiyat tek fiyat girişidir; eski kayıtta yoksa net fiyat taban olur.
-                        grossPrice: String(item.grossPrice || item.netPrice || ''),
+                        grossPrice: String(item.grossPrice ?? item.netPrice ?? ''),
                         // Net fiyat DIRECT'te (elle girilen) ve SUPPLIER'da (sabit
                         // tedarikçi fiyatı) taslakta yaşar; AUTO'da türetilir.
                         netPrice: itemMode === 'SUPPLIER'
                             ? String(item.displayNetPrice ?? item.netPrice ?? '')
-                            : (itemMode !== 'AUTO' ? String(item.netPrice || '') : ''),
-                        supplierUnitBase: itemMode === 'SUPPLIER' ? String(item.netPrice || '') : undefined,
-                        lineTotal: itemMode === 'DIRECT' ? String(item.lineTotal || '') : '',
+                            : (itemMode !== 'AUTO' ? String(item.netPrice ?? '') : ''),
+                        supplierUnitBase: itemMode === 'SUPPLIER' ? String(item.netPrice ?? '') : undefined,
+                        lineTotal: itemMode === 'DIRECT' ? String(item.lineTotal ?? '') : '',
                         discount: implied ? String(implied) : (item.discount ? String(item.discount) : ''),
                         // ESKİ ÜÇÜNCÜ İNDİRİM ek indirime KATLANIR: arayüzde
                         // sütunu kalmadığı için aksi hâlde sessizce silinir ve
@@ -784,9 +783,9 @@ export const OrderWorkspacePage = () => {
                         modeStash,
                         // Kayıttaki fiyat ÖZGÜN hâldir: geri çağır düğmesi buraya döner.
                         origin: {
-                            grossPrice: String(item.grossPrice || item.netPrice || ''),
-                            netPrice: itemMode !== 'AUTO' ? String(item.netPrice || '') : '',
-                            lineTotal: itemMode === 'DIRECT' ? String(item.lineTotal || '') : '',
+                            grossPrice: String(item.grossPrice ?? item.netPrice ?? ''),
+                            netPrice: itemMode !== 'AUTO' ? String(item.netPrice ?? '') : '',
+                            lineTotal: itemMode === 'DIRECT' ? String(item.lineTotal ?? '') : '',
                             discount: implied ? String(implied) : (item.discount ? String(item.discount) : ''),
                             discount2: foldedExtraDiscount(item) || '',
                             calcMode: itemMode,
@@ -820,8 +819,10 @@ export const OrderWorkspacePage = () => {
                 setSupplierAddress(order.supplierAddress ?? null);
             })
             .catch((err) => {
+                if (cancelled) return;
                 toast.error(err?.response?.data?.error || t('inv.orders.loadFailed'));
-                navigate('/inventory/orders');
+                if (onBack) onBack();
+                else navigate('/inventory/orders');
             })
             .finally(() => { if (!cancelled) setLoadingOrder(false); });
         return () => { cancelled = true; };
@@ -878,10 +879,10 @@ export const OrderWorkspacePage = () => {
     };
 
     const deleteTemplate = async (template: PurchaseOrderTextTemplate) => {
-        if (!window.confirm(t('inv.orders.coverLetter.deleteConfirm'))) return;
         setDraftBusy(true);
         try {
             await purchaseOrdersApi.deleteTextTemplate(template.id);
+            setTemplateDelete(null);
             // Sayfadaki son kayıt silindiyse bir önceki sayfaya kayılır.
             if (templates.length === 1 && templatePage > 1) setTemplatePage((page) => page - 1);
             setTemplateTick((tick) => tick + 1);
@@ -941,10 +942,8 @@ export const OrderWorkspacePage = () => {
        el ile başka şablon seçilmedikçe tablo da onunla açılır. */
     const standardRecord = Boolean(projectPrefill && !editId) || isStandardColumns(loadedOrder?.tableColumns);
     useEffect(() => {
-        let cancelled = false;
-        purchaseOrdersApi.listSupplierTemplates(null, templateDocumentType)
-            .then((items) => {
-                if (cancelled) return;
+        return readQuery(`purchase:templates:${templateDocumentType}:${poLang}`, () => purchaseOrdersApi.listSupplierTemplates(null, templateDocumentType), { freshMs: 30_000, tags: ['catalog'] },
+            (items) => {
                 setCalcTemplates(items);
                 const standard = standardRecord && !activeTemplateId
                     ? items.find((entry) => isStandardColumns(entry.config.columns))
@@ -960,10 +959,9 @@ export const OrderWorkspacePage = () => {
                 setAiConfig(nextConfig);
                 remapLoadedExtras(nextConfig, loadedExtrasRef.current);
                 setTemplatesLoaded(true);
-            })
-            .catch(() => { if (!cancelled) { setActiveTemplate(null); setAiConfig(defaultCalcConfig()); setTemplatesLoaded(true); } });
-        return () => { cancelled = true; };
-    }, [templateTick2, activeTemplateId, templateDocumentType, standardRecord]); // eslint-disable-line react-hooks/exhaustive-deps
+            },
+            () => { setActiveTemplate(null); setAiConfig(defaultCalcConfig()); setTemplatesLoaded(true); });
+    }, [templateTick2, activeTemplateId, templateDocumentType, standardRecord, poLang]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
      * ── DIE VORLAGE IST DIE TABELLE (Vorgabe Samet, 11.09.2026) ─────────────
@@ -996,9 +994,12 @@ export const OrderWorkspacePage = () => {
         });
     }, [templatesLoaded, templateReady, editId]);
     /** Die Rechenart gegen die Vorlage — `null` = sie darf rechnen. */
-    const calcModeProblem = priceless ? null : calcModeError(aiConfig, calcMode);
+    const pricingConfig = useMemo<SupplierCalcConfig>(() => priceless
+        ? { ...aiConfig, columns: withPriceRequestTableColumns(tableColumnsFromTemplate(aiConfig)).filter((column) => !column.fixed).map(({ key, name, type, label }) => ({ key, name, type, label })) }
+        : aiConfig, [aiConfig, priceless]);
+    const calcModeProblem = calcModeError(pricingConfig, calcMode, templateDocumentType);
     const applyCalcMode = (next: CalcMode) => {
-        const problem = calcModeError(aiConfig, next);
+        const problem = calcModeError(pricingConfig, next, templateDocumentType);
         if (problem) {
             setCalcError(problem);
             toast.error(problem);
@@ -1014,12 +1015,13 @@ export const OrderWorkspacePage = () => {
        Bestellungen.» Die feste Code-Spalte fehlt darum hier; eine Zeile, die an
        einem Katalogartikel hängt, trägt dessen Code weiter still mit. */
     const tableColumns = useMemo(() => {
-        const columns = templateReady ? tableColumnsFromTemplate(aiConfig, loadedExtraColumns).filter((column) => !column.fixed) : [];
+        const templateColumns = tableColumnsFromTemplate(aiConfig, loadedExtraColumns).filter((column) => !column.fixed);
+        const columns = templateReady ? (priceless ? withPriceRequestTableColumns(templateColumns) : templateColumns) : [];
         // BOM-Beleg: «ERP kodu, ürün adı, …» — der ERP-Code steht vorn, wie im PDF;
         // die Preisanfrage trägt statt seiner das Modell, gleich nach dem Namen.
         if (!bomRecord) return columns;
         return orderBomColumns(columns);
-    }, [templateReady, aiConfig, loadedExtraColumns, bomRecord]);
+    }, [templateReady, aiConfig, loadedExtraColumns, bomRecord, priceless]);
     /** Die freien Spalten — ihre Werte werden als eigene Angaben gespeichert. */
     const extraColumns = useMemo(
         () => tableColumns
@@ -1065,14 +1067,7 @@ export const OrderWorkspacePage = () => {
        fuer die Bestellung wie fuer die Preisanfrage. Ohne gueltige Vorlage
        nicht: dann ist auch der Import-Knopf aus. Ein BOM-Beleg öffnet statt
        dessen «Tabloyu yapay zekâ ile doldur» — seine Zeilen bleiben stehen. */
-    usePasteToImport(templateReady && !aiOpen && !templatesOpen && !bomFill && (!bomRecord || bomFillReady), (files) => {
-        if (bomRecord) {
-            void openBomFill(files);
-            return;
-        }
-        setPastedFiles(files);
-        setAiOpen(true);
-    });
+
     /* Eine geladene Bestellung, deren eigene Angabe in der Vorlage unter
        demselben Namen steht: der Wert wandert unter den Schluessel der
        Vorlage, sonst staende die Spalte da und die Zelle bliebe leer.
@@ -1208,8 +1203,8 @@ export const OrderWorkspacePage = () => {
         });
         setRows(imported);
         setSelectedRows(new Set());
+        setTab('lines');
         toast.success(t('inv.aiImport.importedToast', { count: imported.length }));
-        drawnCheck.show();
     };
 
     /* ── WELCHE ZEILE MITGESPEICHERT WIRD ───────────────────────────────
@@ -1301,39 +1296,6 @@ export const OrderWorkspacePage = () => {
 
     const rowToItem = (row: DraftOrderRow, articleId?: string): PurchaseOrderItemInput => {
         const figures = rowFigures(row);
-        // ⚠ ZATEN FİYATLI SATIR, fiyat talebi kipinde de FİYATLARIYLA kaydedilir
-        // (kullanıcı isteği 2026-08-03): "onayı geri al" bir siparişi talebe
-        // döndürebiliyor ve geri alma FİYAT SİLMEMELİDİR. Gerçek bir fiyat
-        // talebinde bu alanlar zaten boştur (fiyat sütunları görünmez, Excel
-        // eşleme listesi de fiyat taşımaz), dolayısıyla davranış değişmez.
-        const rowIsPriced = (parseNum(row.grossPrice) ?? 0) > 0 || figures.lineTotal > 0;
-        // FİYAT TALEBİ: satır fiyatsız kaydedilir (seri kod + ad + miktar) —
-        // fiyatlar tedarikçiden istenecektir.
-        if (priceless && !rowIsPriced) {
-            const extras = draftExtras(row, extraColumns);
-            return {
-                itemType: row.itemType,
-                articleId: articleId ?? row.articleId,
-                code: row.code.trim() || null,
-                serialNumber: row.serialNumber.trim() || null,
-                name: row.name.trim(),
-                quantity: parseNum(row.quantity) ?? 1,
-                unit: row.unit || null,
-                // DOĞRUDAN GİRİŞ olarak kaydedilir (kullanıcı isteği 2026-08-02):
-                // fiyat talebi siparişe dönüştüğünde satırlar doğrudan giriş
-                // kipiyle açılır ve tedarikçinin fiyatları elle/dosyadan girilir.
-                calcMode: 'DIRECT',
-                directCopy: true,
-                lineTotal: 0,
-                ...(extras.length ? { extras } : {}),
-                ...(productionOn ? { productionItemId: row.productionItemId ?? null } : {}),
-                ...(row.source ? { source: row.source } : {}),
-                ...(row.bomLineId ? { bomLineId: row.bomLineId } : {}),
-                // Mal kabul durumu aynen geri gönderilir (sunucu kırparak korur).
-                receivedQuantity: row.receivedQuantity,
-                receivedAt: row.receivedAt,
-            };
-        }
         return {
             itemType: row.itemType,
             articleId: articleId ?? row.articleId,
@@ -1509,7 +1471,8 @@ export const OrderWorkspacePage = () => {
                Text» ist weg) — ohne Hinweis bliebe das Speichern stumm. */
             setSupplierError(t('inv.orders.supplierRequired'));
             toast.error(t('inv.orders.supplierRequired'));
-            setTab('settings');
+            setTab('lines');
+            setSupplierPickerOpen(true);
             return null;
         }
 
@@ -1556,15 +1519,15 @@ export const OrderWorkspacePage = () => {
                 coverLetter: coverCustom?.trim() || null,
                 // Was die Vorlage nicht traegt, merkt sich die Bestellung: das PDF
                 // wird später ohne die Vorlage gebaut. Der ERP-Code steht nie darin.
-                hiddenColumnKeys: hiddenKeysForTemplate(aiConfig),
+                hiddenColumnKeys: hiddenKeysForTemplate(pricingConfig),
                 // Und die Spalten der Vorlage selbst: das PDF schreibt ihre Namen
                 // als Titel und haelt ihre Reihenfolge (Vorgabe Samet, 11.09.2026).
                 /* BOM: die gewählte Vorlage gilt DIREKT (27.09.2026: «direkt şablon
                    uygulanacak») — vorn bleibt die ERP-Spalte der Bestellung, nach
                    dem Namen das Modell der Preisanfrage, wie im PDF. */
                 tableColumns: bomRecord
-                    ? bomColumnsSnapshot(tableColumnsSnapshot(aiConfig), loadedOrder?.tableColumns, { erpAlways: bomOrder })
-                    : tableColumnsSnapshot(aiConfig),
+                    ? bomColumnsSnapshot((priceless ? tableColumns.filter((column) => !column.fixed).map(({ key, name, label, type }) => ({ key, name, label, type })) : tableColumnsSnapshot(pricingConfig)), loadedOrder?.tableColumns, { erpAlways: bomOrder })
+                    : (priceless ? tableColumns.filter((column) => !column.fixed).map(({ key, name, label, type }) => ({ key, name, label, type })) : tableColumnsSnapshot(pricingConfig)),
                 /* Talep: yetkili rol LİSTEYİ gönderir (yazılı kalmış ad da
                    eklenir), diğer roller hiçbir tedarikçi alanı göndermez —
                    BOM talebi de göndermez: tedarikçisi BOM'da seçildi. */
@@ -1585,7 +1548,7 @@ export const OrderWorkspacePage = () => {
                         supplierEmail: supplier.email,
                     }),
                 // KDV SİPARİŞ DÜZEYİNDE: tek oran, (net + ek ücretler) üzerinden.
-                // Fiyat talebinde tutar yoktur → oran 0 gider.
+                // Fiyat talebinde vergi uygulanmaz; girilen fiyatlar korunur.
                 vatMode: 'TOTAL' as const,
                 orderVatRate: priceless ? 0 : clampPercent(parseNum(orderVatRate) ?? 0),
                 orderVatCountry: priceless ? null : (orderVatCountry.trim() || null),
@@ -1615,7 +1578,6 @@ export const OrderWorkspacePage = () => {
                 setEditStatus(updated.status);
                 syncRequestSuppliers(updated);
                 toast.success(t('inv.orders.updatedToast'));
-                drawnCheck.show();
             } else {
                 // 2) Tek sipariş = tek tedarikçi (üstten seçilen). Bestellung boşsa sunucu
                 //    üretir. Fiyat talebi HENÜZ ONAYLANMADIĞI için TASLAK (DRAFT)
@@ -1635,7 +1597,6 @@ export const OrderWorkspacePage = () => {
                 toast.success(t(priceless
                     ? 'inv.orders.priceRequestCreatedToast'
                     : 'inv.orders.orderDraftCreatedToast'));
-                drawnCheck.show();
             }
             /* Der frisch angelegte Vorgang bekommt seine ADRESSE — die nächsten
                Speichervorgänge schreiben in denselben Datensatz, und der Zurück-
@@ -1672,7 +1633,8 @@ export const OrderWorkspacePage = () => {
                 setTab('lines');
                 setReloadTick((tick) => tick + 1);
             } else {
-                navigate(`/inventory/orders/${created.id}`);
+                if (onOpenDocument) onOpenDocument(created.id);
+                else navigate(`/inventory/orders/${created.id}`);
             }
         } catch (error) {
             toast.error(productionErrorText(error, t('inv.orders.saveFailed')));
@@ -1715,7 +1677,8 @@ export const OrderWorkspacePage = () => {
             if (filledRows.length && !linesLocked) await save();
             const created = await purchaseOrdersApi.duplicate(editId);
             toast.success(t(priceless ? 'inv.orders.duplicatedRequestToast' : 'inv.orders.duplicatedOrderToast'));
-            navigate(`/inventory/orders/${created.id}`);
+            if (onOpenDocument) onOpenDocument(created.id);
+            else navigate(`/inventory/orders/${created.id}`);
         } catch (error) {
             toast.error(productionErrorText(error, t('inv.orders.saveFailed')));
         } finally {
@@ -1730,7 +1693,8 @@ export const OrderWorkspacePage = () => {
         try {
             await purchaseOrdersApi.remove(editId);
             toast.success(t('inv.orders.flow.recordDeleted'));
-            navigate(priceless ? '/inventory/orders?kind=request' : '/inventory/orders');
+            if (onBack) onBack();
+            else navigate(priceless ? '/inventory/orders?kind=request' : '/inventory/orders');
         } catch (error) {
             toast.error(productionErrorText(error, t('inv.orders.saveFailed')));
             setPageBusy(null);
@@ -1828,8 +1792,8 @@ export const OrderWorkspacePage = () => {
             return priced ? { ...next, origin: captureRowOrigin(next) } : next;
         }));
         if (count) {
+            setTab('lines');
             toast.success(t('productionBom.ai.applied', { count }));
-            drawnCheck.show();
         }
     };
 
@@ -2041,11 +2005,11 @@ export const OrderWorkspacePage = () => {
                         <span
                             className="flex items-center justify-end gap-1 font-mono text-[13px] text-slate-700 dark:text-white/80"
                             title={supplierFactor < 1 && row.netPrice.trim()
-                                ? t('inv.orders.calcMode.supplierListPrice', { price: fmtUnitPricePrecise(listPrice) })
+                                ? t('inv.orders.calcMode.supplierListPrice', { price: fmtUnitPricePrecise(listPrice, currency) })
                                 : undefined}
                         >
                             {row.netPrice.trim()
-                                ? fmtUnitPricePrecise(supplierFactor < 1 ? figures.netUnitPrice : listPrice)
+                                ? fmtUnitPricePrecise(supplierFactor < 1 ? figures.netUnitPrice : listPrice, currency)
                                 : '—'}
                             {recallButton(row, rowChanged)}
                         </span>
@@ -2103,7 +2067,6 @@ export const OrderWorkspacePage = () => {
     const tabs: Array<{ key: WorkspaceTab; label: string; badge?: number; warn?: boolean }> = [
         { key: 'lines', label: t('inv.orders.tabs.lines'), badge: filledRows.length },
         { key: 'settings', label: t('inv.orders.tabs.settings') },
-        { key: 'template', label: t('inv.orders.tabs.template') },
         ...(editId && loadedOrder
             ? [
                 { key: 'pdf' as const, label: t('inv.orders.views.pdf') },
@@ -2128,34 +2091,37 @@ export const OrderWorkspacePage = () => {
         ?? (!editId ? projectPrefill?.projectId : undefined)
         ?? null;
 
-    /* ── DER WEG DURCH DIE EINSTELLUNGEN (22.09.2026, Vorgabe Samet) ──────
-       «Siparişlerde ve fiyat [talebi] ayarlarında solda bir başlık şeyi olması
-       lazım … süreç gibi görmesi lazım hepsini kullanıcının, yani aşağıya
-       indikçe o şeyin dolması gerekiyor.»
-
-       Die Stationen sind GENAU die Kisten, die dieser Vorgang zeigt: eine
-       Anfrage kennt keine Beträge, also weder Zusatzkosten noch MwSt noch
-       Währung, und ohne Produktionsmodul fällt das Gerät weg. Bewusst OHNE
-       `useMemo`: die Beschriftungen kommen aus `t()`, und `useLanguageTick()`
-       zeichnet die Seite bei jedem Sprachwechsel neu. */
-    const settingsSteps: FlowStep[] = [
-        { id: 'details', label: t('inv.orders.detailsTitle'), on: true },
-        // Talepte tedarikçi yalnızca Administrator + muhasebe içindir.
-        { id: 'supplier', label: t(priceless ? 'inv.orders.requestSuppliers.title' : 'inv.columns.supplier'), on: !priceless || canPickSuppliers || bomRecord },
-        { id: 'production', label: t('production.assign.label'), on: productionOn && !bomRecord },
-        { id: 'codeRange', label: t('inv.orders.receive.codeRange'), on: true },
-        { id: 'fees', label: t('inv.orders.fees.title'), on: !priceless },
-        { id: 'vat', label: t('inv.orders.columns.vat'), on: !priceless },
-        { id: 'currency', label: t('inv.orders.currencyPicker.title'), on: !priceless },
-        { id: 'coverLetter', label: t('inv.orders.coverLetter.title'), on: true },
-    ].filter((step) => step.on).map(({ id, label }) => ({ id, label }));
+    const toolActive = draftsOpen;
+    const preloadImport = () => { void (bomRecord ? loadBomImport() : loadImport()).catch(() => undefined); };
+    const back = () => {
+        if (toolBusy || draftBusy || saving || pageBusy) return;
+        if (toolActive) {
+            setBomFill(null);
+            setAiOpen(false);
+            setPastedFiles(null);
+            setTemplatesOpen(false);
+            setOpenTemplateId(null);
+            setDraftsOpen(false);
+            setTemplateDelete(null);
+            setAllPickerRowKey(null);
+            setSupplierPickerOpen(false);
+            setSchemeOpen(false);
+            setCalcOpen(false);
+            setCalcError(null);
+            setPickerOpen(false);
+        } else if (onBack) onBack();
+        else navigate(priceless ? '/inventory/orders?kind=request' : '/inventory/orders');
+    };
 
     return (
-        <div className="ofi-ows flex w-full flex-col gap-4">
-            {/* DER KOPF LÄUFT NICHT MEHR MIT (Vorgabe Samet, 09.09.2026:
-                «‹Auftrag bestätigen› soll nicht festgeklebt sein; die
-                Überschriften sollen beim Runterscrollen nicht stehen bleiben»).
-                Er scrollt weg wie jeder andere Seiteninhalt. */}
+        <div className="ofi-bom ofi-ows ofi-order-page flex w-full flex-col">
+            <header className="ofi-ows-pagehead">
+            <div className="ofi-ows-navigation">
+                <button type="button" className="ofi-ows-back" disabled={toolBusy || draftBusy || saving || pageBusy !== null} onClick={back}>
+                    <ChevronLeft size={17} />{t('common.back')}
+                </button>
+                {editId && !toolBusy && <a className="ofi-ows-back" href={`/inventory/orders/${encodeURIComponent(editId)}?tab=${activeTab}`} target="_blank" rel="noopener noreferrer">{t('productionBom.purchasing.openSeparate')}</a>}
+            </div>
             <InventoryListHeader
                 /* Der Titel sagt in EINEM Wort, was dieser Vorgang ist, daneben
                    steht seine Nummer im Farbton seines Zustands — MAL KABULDE
@@ -2187,8 +2153,9 @@ export const OrderWorkspacePage = () => {
                         )}
                     </span>
                 )}
-                action={(
+                action={!toolActive && templatesLoaded && !loadingOrder && (activeTab === 'lines' || activeTab === 'settings') ? (
                     <div className="flex flex-wrap items-center gap-2">
+                        <div className="ofi-ows-record-actions" hidden={activeTab !== 'settings'}>
                         {editId && canTransfer && (
                             <button
                                 type="button"
@@ -2283,6 +2250,7 @@ export const OrderWorkspacePage = () => {
                                 {t('inv.orders.actions.convertToOrder')}
                             </button>
                         )}
+                        </div>
                         <button
                             type="button"
                             disabled={saving || !canTransfer || !filledRows.length || linesLocked}
@@ -2295,8 +2263,227 @@ export const OrderWorkspacePage = () => {
                             {saving ? <LoadingDots label={t('common.loadingData')} /> : t('common.save')}
                         </button>
                     </div>
-                )}
+                ) : undefined}
             />
+            </header>
+            <div className={toolActive ? "ofi-ows-tool" : undefined}>
+            {allPickerRowKey !== null && (
+            <ArticlePickerModal
+                open={allPickerRowKey !== null}
+                onClose={() => setAllPickerRowKey(null)}
+                onPick={(article) => { if (allPickerRowKey) onProductPicked(allPickerRowKey, article); }}
+                title={kindLabels.allTitle}
+            />
+            )}
+            {supplierPickerOpen && (
+            <SupplierPickerModal
+                open={supplierPickerOpen}
+                multiple={priceless}
+                selectedIds={requestSuppliers.flatMap((entry) => entry.id ? [entry.id] : [])}
+                onPickMany={(picked) => picked.forEach((entry) => addRequestSupplier({ id: entry.id, name: entry.companyName, email: entry.email ?? null, address: null }))}
+                onClose={() => setSupplierPickerOpen(false)}
+                onPick={(picked) => {
+                    if (priceless) {
+                        addRequestSupplier({ id: picked.id, name: picked.companyName, email: picked.email ?? null, address: null });
+                        return;
+                    }
+                    setSupplier({ id: picked.id, name: picked.companyName, email: picked.email ?? null });
+                    setSupplierError(null);
+                }}
+            />
+            )}
+            {schemeOpen && (
+            <SchemePickDialog
+                open={schemeOpen}
+                onClose={() => setSchemeOpen(false)}
+                onPick={(scheme, category) => {
+                    const chosen = { id: scheme.id, label: `${category.code} · ${scheme.code}`, next: scheme.nextCode };
+                    setCodeScheme(chosen);
+                    try { localStorage.setItem(RECEIPT_SCHEME_KEY, JSON.stringify(chosen)); } catch { /* privates Fenster */ }
+                    setSchemeOpen(false);
+                }}
+            />
+            )}
+            {calcOpen && (
+            <CalcModeCard
+                open={calcOpen}
+                onClose={() => { setCalcOpen(false); setCalcError(null); }}
+                mode={calcMode}
+                documentType={templateDocumentType}
+                config={pricingConfig}
+                onApply={applyCalcMode}
+                error={calcError}
+            />
+            )}
+            {productionOn && pickerOpen && (
+                <ProductionPickerDialog
+                    open={pickerOpen}
+                    initial={production?.selection ?? null}
+                    onClose={() => setPickerOpen(false)}
+                    onApply={(selection, _lines, details) => applyProduction(selection, details)}
+                />
+            )}
+
+            {bomFill && editId && loadedOrder && (
+                <Suspense fallback={<MacLoading label={t("common.loadingData")} />}>
+<BomTableAiDialog onBusyChange={setToolBusy}
+                    purchaseOrderId={editId}
+                    columns={bomFillColumns}
+                    rows={bomFillRows()}
+                    initialPrompt={bomFill.prompt}
+                    initialFiles={bomFill.files}
+                    onApply={applyBomFill}
+                    onClose={() => setBomFill(null)}
+                />
+</Suspense>
+            )}
+            {aiOpen && (<PopupDialog open title={t('productionBom.purchasing.pdfImport')} width={1080}
+                bodyClassName="ofi-bom-pop ofi-ows ofi-order-tool-dialog" closeOnBackdrop={false} closeOnEscape={!toolBusy} hideClose={toolBusy}
+                onClose={() => { if (!toolBusy) { setAiOpen(false); setPastedFiles(null); } }}>
+<Suspense fallback={<MacLoading label={t("common.loadingData")} />}>
+<SupplierImportDialog embedded onBusyChange={setToolBusy}
+                open={aiOpen}
+                onClose={() => { setAiOpen(false); setPastedFiles(null); }}
+                config={pricingConfig}
+                template={activeTemplate}
+                onApply={applyAiRows}
+                calcMode={calcMode}
+                documentType={templateDocumentType}
+                initialFiles={pastedFiles ?? undefined}
+            />
+</Suspense></PopupDialog>)}
+            {templatesOpen && (<PopupDialog open title={t('inv.aiImport.templatesTitle')} width={1080}
+                bodyClassName="ofi-bom-pop ofi-ows ofi-order-tool-dialog" closeOnBackdrop={false} closeOnEscape={!toolBusy} hideClose={toolBusy}
+                onClose={() => { if (!toolBusy) { setTemplatesOpen(false); setOpenTemplateId(null); } }}>
+<Suspense fallback={<MacLoading label={t("common.loadingData")} />}>
+<TemplateManagerPopup embedded onBusyChange={setToolBusy} initialTemplates={calcTemplates}
+                open={templatesOpen}
+                onClose={() => { setTemplatesOpen(false); setOpenTemplateId(null); }}
+                openTemplateId={openTemplateId}
+                documentType={templateDocumentType}
+                /* Eine gespeicherte Vorlage gilt SOFORT: `activeTemplateId`
+                   schaltet sie scharf, der Zähler lädt sie neu. Ohne das erste
+                   blieb eine frisch angelegte Vorlage wirkungslos, bis jemand
+                   sie im Menü noch einmal von Hand auswählte. */
+                onSaved={(templateId) => {
+                    if (templateId) {
+                        setActiveTemplateId(templateId);
+                        selectPreferredTemplate(templateDocumentType, templateId);
+                    }
+                    setTemplateTick2((tick) => tick + 1);
+                }}
+            />
+</Suspense></PopupDialog>)}
+            <WorkspaceSection
+                open={draftsOpen}
+                title={t('inv.orders.coverLetter.draftsTitle')}
+                subtitle={t('inv.orders.coverLetter.draftsHint')}
+                /* ÜBER der Detailkarte (`.ofi-ord-scrim`, z-index 820) — von dort
+                   wird dieses Blatt geöffnet. */
+                footer={(
+                    <>
+                        <span className="text-[11.5px] text-slate-400 dark:text-white/50">
+                            {t('inv.orders.coverLetter.pageOf', { page: templatePage, pages: templatePages })}
+                        </span>
+                        <span className="flex items-center gap-1">
+                            <button
+                                type="button"
+                                disabled={templatePage <= 1 || templatesLoading}
+                                onClick={() => setTemplatePage((page) => Math.max(1, page - 1))}
+                                title={t('inv.orders.coverLetter.prev')}
+                                aria-label={t('inv.orders.coverLetter.prev')}
+                                className="flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:text-white/60 dark:hover:text-white"
+                            >
+                                <ChevronLeft size={15} />
+                            </button>
+                            <button
+                                type="button"
+                                disabled={templatePage >= templatePages || templatesLoading}
+                                onClick={() => setTemplatePage((page) => Math.min(templatePages, page + 1))}
+                                title={t('inv.orders.coverLetter.next')}
+                                aria-label={t('inv.orders.coverLetter.next')}
+                                className="flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:text-white/60 dark:hover:text-white"
+                            >
+                                <ChevronRight size={15} />
+                            </button>
+                        </span>
+                    </>
+                )}
+            >
+                {/* Ekrandaki ön yazıyı YENİ taslak olarak kaydetme satırı. */}
+                <div className="border-b border-slate-200 px-4 py-3 dark:border-white/10">
+                    <div className="flex items-center gap-2">
+                        <input
+                            value={draftTitle}
+                            onChange={(event) => { setDraftTitle(event.target.value); setDraftError(null); }}
+                            placeholder={t('inv.orders.coverLetter.draftTitle')}
+                            className={`${INPUT_BASE_CLASS} min-w-0 flex-1 ${draftError && !draftTitle.trim() ? '!border-red-400' : ''}`}
+                        />
+                        <button
+                            type="button"
+                            disabled={draftBusy}
+                            onClick={() => void saveTemplate()}
+                            className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-[#0a7aff] px-3 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <Save01 size={13} />
+                            {t('inv.orders.coverLetter.saveDraft')}
+                        </button>
+                    </div>
+                    {draftError && (
+                        <span className="mt-1.5 block text-[11px] font-semibold text-red-500">{draftError}</span>
+                    )}
+                </div>
+
+                <div className="flex flex-col gap-2 p-4">
+                    {templatesLoading && <LoadingDots label={t('common.loadingData')} />}
+                    {!templatesLoading && templates.length === 0 && (
+                        <span className="py-6 text-center text-[12.5px] text-slate-400 dark:text-white/50">
+                            {t('inv.orders.coverLetter.empty')}
+                        </span>
+                    )}
+                    {!templatesLoading && templates.map((template) => (
+                        <div
+                            key={template.id}
+                            className="flex items-start gap-2 rounded-lg border border-slate-200 p-2.5 transition-colors hover:border-[#0066e0] dark:border-white/10 dark:hover:border-white/40"
+                        >
+                            {/* Satırın kendisi UYGULAR (kullanıcı isteği: taslak
+                                düğmesi seçileni ön yazıya geçirsin). */}
+                            <button
+                                type="button"
+                                onClick={() => applyTemplate(template)}
+                                title={t('inv.orders.coverLetter.applyDraft')}
+                                className="min-w-0 flex-1 text-left"
+                            >
+                                <span className="block truncate text-[13px] font-semibold text-slate-700 dark:text-white/85">
+                                    {template.title}
+                                </span>
+                                <span className="mt-0.5 line-clamp-2 block whitespace-pre-line text-[11.5px] leading-relaxed text-slate-400 dark:text-white/50">
+                                    {template.content}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                disabled={draftBusy}
+                                onClick={() => setTemplateDelete(template)}
+                                title={t('inv.orders.coverLetter.deleteDraft')}
+                                aria-label={t('inv.orders.coverLetter.deleteDraft')}
+                                className="flex size-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-40 dark:hover:bg-red-500/15"
+                            >
+                                <Trash01 size={13} />
+                            </button>
+                        </div>
+                    ))}
+                    {templateDelete && <div className="ofi-ows-inline-confirm" role="alert">
+                        <span>{t('inv.orders.coverLetter.deleteConfirm')} <b>{templateDelete.title}</b></span>
+                        <button type="button" className="ofi-poi-btn" disabled={draftBusy} onClick={() => setTemplateDelete(null)}>{t('common.cancel')}</button>
+                        <button type="button" className="ofi-poi-btn" disabled={draftBusy} onClick={() => void deleteTemplate(templateDelete)}>{t('common.delete')}</button>
+                    </div>}
+                </div>
+            </WorkspaceSection>
+            </div>
+            {!toolActive && (!templatesLoaded || loadingOrder) && <MacLoading label={t('common.loadingData')} />}
+            <div className="ofi-ows-document" hidden={toolActive || !templatesLoaded || loadingOrder}>
+
 
             {bomOrigin && editId && (
                 <BomOrderBanner
@@ -2307,17 +2494,7 @@ export const OrderWorkspacePage = () => {
                 />
             )}
 
-            {bomFill && editId && loadedOrder && (
-                <BomTableAiDialog
-                    purchaseOrderId={editId}
-                    columns={bomFillColumns}
-                    rows={bomFillRows()}
-                    initialPrompt={bomFill.prompt}
-                    initialFiles={bomFill.files}
-                    onApply={applyBomFill}
-                    onClose={() => setBomFill(null)}
-                />
-            )}
+
 
             {/* Die Rückfrage steht IN der Seite, gleich unter ihrem Knopf. */}
             {pageAsk && (
@@ -2404,73 +2581,61 @@ export const OrderWorkspacePage = () => {
                 diesen beiden Enden — in der Anfrage gibt es nichts zu rechnen,
                 dort steht links nichts. */}
             {showTools && (
-                <div className="ofi-ows-bar">
-                    {!priceless && (
-                        <button
-                            type="button"
-                            onClick={() => { setCalcError(calcModeProblem); setCalcOpen(true); }}
-                            title={t('inv.orders.calcMode.title')}
-                            disabled={!templateReady}
-                            className={`ofi-ord-calcbtn${calcOpen ? ' is-on' : ''}${calcModeProblem && templateReady ? ' is-warn' : ''}`}
-                        >
-                            <SquareDivide size={16} />
-                            <span>{t(calcMode === 'AUTO' ? 'inv.orders.calcMode.auto' : calcMode === 'SUPPLIER' ? 'inv.orders.calcMode.supplier' : 'inv.orders.calcMode.direct')}</span>
+                <div className="ofi-order-controls">
+                    <div className="ofi-order-controls__row">
+                        <label className="ofi-order-template-choice">
+                            <span>{t('inv.orders.tabs.template')}</span>
+                            <select value={activeTemplate?.id ?? ''} aria-label={t('inv.orders.tabs.template')}
+                                onChange={(event) => { setActiveTemplateId(event.target.value); selectPreferredTemplate(templateDocumentType, event.target.value); }}>
+                                {!activeTemplate && <option value="">{t('inv.aiImport.templateCreateButton')}</option>}
+                                {calcTemplates.map((template) => <option key={template.id} value={template.id}>
+                                    {displayTemplateTitle(template.title, template.config.columns, poLang)}
+                                </option>)}
+                            </select>
+                        </label>
+                        <button type="button" className="ofi-bom-btn is-icon" title={t('common.edit')} aria-label={t('common.edit')}
+                            onPointerEnter={() => { void loadTemplates().catch(() => undefined); }}
+                            onFocus={() => { void loadTemplates().catch(() => undefined); }}
+                            onClick={() => { setOpenTemplateId(activeTemplate?.id ?? null); setTemplatesOpen(true); }}>
+                            <Settings01 size={15} />
                         </button>
-                    )}
-                    <span className="ofi-ows-bar__end">
-                        {/* BOM: an der Stelle des Beleg-Imports — derselbe Knopf,
-                            aber er füllt die Tabelle, statt sie zu ersetzen. Eine
-                            BOM-Preisanfrage (Name · Modell · Menge) hat nichts zu
-                            füllen — dort steht er nur, wenn ihre Vorlage mehr trägt. */}
-                        {bomRecord ? (!bomOrder && !bomFillColumns.length ? null : (
-                            <button
-                                type="button"
-                                className="ofi-poi-launch is-alive"
-                                disabled={!bomFillReady}
-                                title={!templateReady
-                                    ? t('inv.aiImport.templateRequiredTitle')
-                                    : linesLocked
-                                        ? t('inv.orders.editCompleted')
-                                        : !bomFillColumns.length
-                                            ? t('productionBom.ai.noColumns', { tab: t('inv.orders.tabs.template') })
-                                            : t('productionBom.ai.fillButtonTitle')}
-                                onClick={() => void openBomFill()}
-                            >
-                                <Zap size={14} />
-                                {t('productionBom.ai.fillButton')}
-                            </button>
-                        )) : (
-                            <button
-                                type="button"
-                                className="ofi-poi-launch is-alive"
-                                disabled={!templateReady}
-                                title={templateReady ? undefined : t('inv.aiImport.templateRequiredTitle')}
-                                onClick={() => setAiOpen(true)}
-                            >
-                                <Zap size={14} />
-                                {t('inv.aiImport.importButton')}
-                            </button>
-                        )}
-                    </span>
+                        <button type="button" className="ofi-bom-btn" disabled={!templateReady}
+                            onClick={() => { setCalcError(calcModeProblem); setCalcOpen(true); }}>
+                            <SquareDivide size={15} />
+                            {t(calcMode === 'AUTO' ? 'inv.orders.calcMode.auto' : calcMode === 'SUPPLIER' ? 'inv.orders.calcMode.supplier' : 'inv.orders.calcMode.direct')}
+                        </button>
+                        <label className="ofi-order-currency">
+                            <span className="sr-only">{t('inv.orders.currencyPicker.label')}</span>
+                            <select value={currency} onChange={(event) => setCurrency(toCurrencyCode(event.target.value))}>
+                                {CURRENCY_CODES.map((code) => <option key={code} value={code}>{code}</option>)}
+                            </select>
+                        </label>
+                        <button type="button" className="ofi-bom-btn ofi-order-import"
+                            disabled={!templateReady || linesLocked || (bomRecord && !bomFillReady)}
+                            onPointerEnter={preloadImport} onFocus={preloadImport}
+                            onClick={() => { if (bomRecord) void openBomFill(); else setAiOpen(true); }}>
+                            <File05 size={15} />{t('productionBom.purchasing.pdfImport')}
+                        </button>
+                    </div>
+                    {(!priceless || canPickSuppliers || bomRecord) && <div className="ofi-order-suppliers">
+                        <span className="ofi-order-suppliers__label">{t(priceless ? 'inv.orders.requestSuppliers.title' : 'inv.columns.supplier')}</span>
+                        <div className="ofi-order-suppliers__values">
+                            {priceless ? requestSuppliers.map((entry, index) => <span className="ofi-order-supplier" key={`${entry.id ?? entry.name}-${index}`} title={entry.email ?? undefined}>
+                                {entry.name}
+                                {!bomRecord && canPickSuppliers && <button type="button" disabled={linesLocked} aria-label={t('inv.orders.requestSuppliers.remove')}
+                                    onClick={() => setRequestSuppliers((current) => current.filter((_, at) => at !== index))}><Minus size={12} /></button>}
+                            </span>) : supplier.name && <span className="ofi-order-supplier" title={supplier.email ?? undefined}>{supplier.name}</span>}
+                        </div>
+                        {(!priceless || (canPickSuppliers && !bomRecord)) && <button type="button" className="ofi-bom-btn is-small" disabled={linesLocked} onClick={() => setSupplierPickerOpen(true)}>
+                            <Plus size={14} />{t(priceless ? 'inv.orders.requestSuppliers.add' : 'inv.orders.supplierModal.title')}
+                        </button>}
+                        {supplierError && <span className="ofi-ord-err">{supplierError}</span>}
+                    </div>}
                 </div>
             )}
 
-            {/* ══ AYARLAR — ZWEI SPALTEN (Vorgabe Samet, 22.09.2026) ═══════
-                «Bu düzenleme pop-up'ı, tedarikçi ekleme, hepsi Ayarlar tabında
-                olacak … ayarlar iki sütun olsun … cihaz seçimi ya da proje
-                seçimi bu da ayarlarda olsun … kod aralığı da ayarlarda olsun.»
-
-                Die schwebende Apple-Kiste ist damit fort: dieselben Felder,
-                aber IN der Seite, in zwei Spalten, jede Sache in ihrer eigenen
-                Kiste. Nichts davon ist Pflicht; bleibt die Nummer leer, vergibt
-                der Server sie. */}
             {activeTab === 'settings' && (
                 <div className="ofi-ows-flow">
-                    <FlowRail
-                        title={t('inv.orders.tabs.settings')}
-                        steps={settingsSteps}
-                        stackRef={settingsStackRef}
-                    />
                     <div className="ofi-ows-grid" ref={settingsStackRef}>
                         {/* ── DER BELEG ───────────────────────────────────────── */}
                         <section className="ofi-ows-card" data-flow-step="details">
@@ -2514,107 +2679,6 @@ export const OrderWorkspacePage = () => {
                             Nur Administrator + Buchhaltung; jeder Lieferant
                             bekommt sein eigenes PDF und seine eigene Mail. Alle
                             anderen Rollen sehen diese Kiste gar nicht. */}
-                        {priceless && canPickSuppliers && !bomRecord && (
-                            <section className="ofi-ows-card" data-flow-step="supplier">
-                                <h3>{t('inv.orders.requestSuppliers.title')}</h3>
-                                <div className="ofi-ord-group">
-                                    {requestSuppliers.map((entry, index) => (
-                                        <div key={`${entry.id ?? entry.name}-${index}`} className="ofi-ord-row">
-                                            <button
-                                                type="button"
-                                                className="ofi-ord-dot is-remove"
-                                                onClick={() => setRequestSuppliers((current) => current.filter((_, at) => at !== index))}
-                                                title={t('inv.orders.requestSuppliers.remove')}
-                                                aria-label={t('inv.orders.requestSuppliers.remove')}
-                                            >
-                                                <Minus size={13} />
-                                            </button>
-                                            <span className="min-w-0 flex-1 truncate font-medium">{entry.name}</span>
-                                            {(entry.email || entry.address) && (
-                                                <span className="min-w-0 max-w-[55%] truncate text-[12px] text-slate-500 dark:text-white/55" title={[entry.email, entry.address].filter(Boolean).join('\n')}>
-                                                    {entry.email || entry.address?.split('\n').join(', ')}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
-                                    <div className="ofi-ord-row">
-                                        <button
-                                            type="button"
-                                            className="ofi-ord-dot is-add"
-                                            onClick={() => addRequestSupplier({ id: null, name: supplierDraft, email: null, address: null })}
-                                            disabled={!supplierDraft.trim()}
-                                            title={t('inv.orders.requestSuppliers.add')}
-                                            aria-label={t('inv.orders.requestSuppliers.add')}
-                                        >
-                                            <Plus size={13} />
-                                        </button>
-                                        <SupplierComboCell
-                                            value={supplierDraft}
-                                            onChange={setSupplierDraft}
-                                            onSelect={(choice) => addRequestSupplier({ id: choice.supplierId, name: choice.supplierName, email: null, address: null })}
-                                            onOpenAll={() => setSupplierPickerOpen(true)}
-                                            viewAllLabel={`${t('inv.orders.allSuppliers')} …`}
-                                            placeholder={t('inv.orders.requestSuppliers.placeholder')}
-                                        />
-                                    </div>
-                                    <div className="ofi-ord-note">{t('inv.orders.requestSuppliers.hint')}</div>
-                                </div>
-                            </section>
-                        )}
-                        {/* Eine BOM-Preisanfrage gehört GENAU einem Lieferanten (27.09.2026:
-                            «fiyat talepleri ayrı ayrı tedarikçiler üzerinden açılsın») — hier
-                            nur zu sehen; ein weiterer Lieferant bekommt seine eigene Anfrage
-                            aus der BOM. Der Server lässt die Liste ebenso stehen. */}
-                        {priceless && bomRecord && (
-                            <section className="ofi-ows-card" data-flow-step="supplier">
-                                <h3>{t('inv.orders.requestSuppliers.title')}</h3>
-                                <div className="ofi-ord-group">
-                                    {requestSuppliers.map((entry, index) => (
-                                        <div key={`${entry.id ?? entry.name}-${index}`} className="ofi-ord-row">
-                                            <span className="min-w-0 flex-1 truncate font-medium">{entry.name}</span>
-                                            {(entry.email || entry.address) && (
-                                                <span className="min-w-0 max-w-[55%] truncate text-[12px] text-slate-500 dark:text-white/55" title={[entry.email, entry.address].filter(Boolean).join('\n')}>
-                                                    {entry.email || entry.address?.split('\n').join(', ')}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
-                                    <div className="ofi-ord-note">{t('productionBom.origin.requestOneSupplier')}</div>
-                                </div>
-                            </section>
-                        )}
-                        {!priceless && (
-                        <section className="ofi-ows-card" data-flow-step="supplier">
-                            <h3>{t('inv.columns.supplier')}</h3>
-                            <div className="ofi-ord-group">
-                                <div className={`ofi-ord-row is-full${supplierError ? ' is-invalid' : ''}`}>
-                                    <SupplierComboCell
-                                        value={supplier.name}
-                                        onChange={(next) => { setSupplier({ id: null, name: next, email: null }); setSupplierError(null); }}
-                                        onSelect={(choice) => {
-                                            setSupplier({ id: choice.supplierId, name: choice.supplierName, email: null });
-                                            setSupplierError(null);
-                                        }}
-                                        onOpenAll={() => setSupplierPickerOpen(true)}
-                                        viewAllLabel={`${t('inv.orders.allSuppliers')} …`}
-                                        placeholder={t('inv.orders.supplierPlaceholder')}
-                                    />
-                                </div>
-                                {(supplier.email || supplierAddress) && (
-                                    <div className="ofi-ord-note">
-                                        {supplier.email}
-                                        {supplier.email && supplierAddress && <br />}
-                                        {supplierAddress && <span className="whitespace-pre-line">{supplierAddress}</span>}
-                                    </div>
-                                )}
-                            </div>
-                            {supplierError && <span className="ofi-ord-err">{supplierError}</span>}
-                        </section>
-                        )}
-
-                        {/* ── PROJEKT UND GERÄT ───────────────────────────────────
-                            Freiwillig (21.09.2026) und seit heute NUR hier: die
-                            Positionstabelle trägt keine Gerätespalte mehr. */}
                         {productionOn && !bomRecord && (
                             <section className="ofi-ows-card" data-flow-step="production">
                                 <h3>{t('production.assign.label')}</h3>
@@ -2779,32 +2843,6 @@ export const OrderWorkspacePage = () => {
                         )}
 
                         {/* ── WÄHRUNG ─────────────────────────────────────────── */}
-                        {!priceless && (
-                            <section className="ofi-ows-card" data-flow-step="currency">
-                                <h3>{t('inv.orders.currencyPicker.title')}</h3>
-                                <div className="ofi-ord-group">
-                                    <div className="ofi-ord-row">
-                                        <span className="ofi-ord-label">{t('inv.orders.currencyPicker.label')}</span>
-                                        <SelectMenu
-                                            className="ofi-ord-menu"
-                                            buttonClassName="ofi-ord-select"
-                                            ariaLabel={t('inv.orders.currencyPicker.label')}
-                                            value={currency}
-                                            listWidth={260}
-                                            prefix={<span className="ofi-ord-cur">{CURRENCY_SYMBOLS[currency]}</span>}
-                                            options={CURRENCY_CODES.map((code) => ({
-                                                value: code,
-                                                label: t(`inv.orders.currencyPicker.${code}`),
-                                                hint: code,
-                                                icon: <span className="ofi-ord-cur">{CURRENCY_SYMBOLS[code]}</span>,
-                                            }))}
-                                            onChange={(next) => setCurrency(toCurrencyCode(next))}
-                                        />
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-
                         {/* ── ANSCHREIBEN ─────────────────────────────────────────
                             Der Text, der im PDF VOR den Positionen steht. Das Feld
                             trägt ihn WIRKLICH (kein Platzhalter mehr) — solange
@@ -2839,78 +2877,22 @@ export const OrderWorkspacePage = () => {
                 </div>
             )}
 
-            {/* ══ ŞABLON SEÇİMİ ════════════════════════════════════════════
-                Die Rechenvorlage bestimmt, WELCHE Spalten die Tabelle zeichnet
-                und wie gerechnet wird. Sie war ein Menü in der Werkzeugzeile;
-                jetzt ist sie ein Reiter, und die Wahl gilt sofort — bearbeitet
-                wird in «Meine Vorlagen». */}
-            {activeTab === 'template' && (
-                <SectionCard
-                    title={t('inv.orders.tabs.template')}
-                    action={(
-                        <button
-                            type="button"
-                            className="ofi-poi-ghost"
-                            onClick={() => { setOpenTemplateId(activeTemplate?.id ?? null); setTemplatesOpen(true); }}
-                        >
-                            <Settings01 size={14} />
-                            {t('inv.aiImport.menuTemplates')}
-                        </button>
-                    )}
-                >
-                    <div className="p-3.5">
-                        {!templatesLoaded && <LoadingDots label={t('common.loadingData')} />}
-                        {templatesLoaded && calcTemplates.length === 0 && (
-                            <div className="ofi-ord-need">
-                                <AlertTriangle size={22} />
-                                <b>{t('inv.aiImport.templateRequiredTitle')}</b>
-                                <span>{t('inv.aiImport.templateRequiredHint')}</span>
-                                <button type="button" className="ofi-ord-done" onClick={() => setTemplatesOpen(true)}>
-                                    {t('inv.aiImport.templateCreateButton')}
-                                </button>
-                            </div>
-                        )}
-                        {calcTemplates.length > 0 && (
-                            <div className="ofi-ows-tpl">
-                                {calcTemplates.map((template) => (
-                                    <button
-                                        key={template.id}
-                                        type="button"
-                                        className={`ofi-ows-tplcard${activeTemplate?.id === template.id ? ' is-on' : ''}`}
-                                        onClick={() => {
-                                            setActiveTemplateId(template.id);
-                                            selectPreferredTemplate(templateDocumentType, template.id);
-                                        }}
-                                    >
-                                        <b>
-                                            {activeTemplate?.id === template.id && <Check size={13} />} {displayTemplateTitle(template.title, template.config.columns, poLang)}
-                                        </b>
-                                        <small>{t('inv.aiImport.columnCount', { count: template.config.columns.length })}</small>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </SectionCard>
-            )}
-
-            {/* ══ DIE VIER FAULEN REITER ═══════════════════════════════════
-                Sie werden ERST EINGEHÄNGT, wenn man sie öffnet — «biz bu
-                tablara bastıkça veri gelecek, tüm veriler asla aynı anda
-                yüklenmesin». Jeder holt sein Zeug selbst und arbeitet mit dem
-                GESPEICHERTEN Stand. */}
             {(activeTab === 'pdf' || activeTab === 'mail') && loadedOrder && bomOrder && !(loadedOrder.quoteNumber ?? '').trim() && (
                 <BomSendLocked />
             )}
             {activeTab === 'pdf' && loadedOrder && !(bomOrder && !(loadedOrder.quoteNumber ?? '').trim()) && (
-                <PdfPanel order={loadedOrder} priceRequest={priceless} />
+                <Suspense fallback={<MacLoading label={t("common.loadingData")} />}>
+<PdfPanel order={loadedOrder} priceRequest={priceless} />
+                </Suspense>
             )}
             {activeTab === 'mail' && loadedOrder && !(bomOrder && !(loadedOrder.quoteNumber ?? '').trim()) && (
-                <MailPanel
+                <Suspense fallback={<MacLoading label={t("common.loadingData")} />}>
+<MailPanel
                     order={loadedOrder}
                     priceRequest={priceless}
                     onOrderChanged={(next) => { setLoadedOrder(bomOrigin ? { ...next, bomOrigin } : next); setEditStatus(next.status); }}
                 />
+                </Suspense>
             )}
 
 
@@ -2927,13 +2909,15 @@ export const OrderWorkspacePage = () => {
                 «Die Tabellenspalten lassen sich ohne Vorlage nicht anzeigen.»
                 Fehlt sie — oder fehlen ihr die Pflichtzuordnungen —, steht
                 hier der Hinweis und der Weg zur Vorlage; nichts sonst. */}
-            {activeTab === 'lines' && (!templateReady ? (
+            {activeTab === 'lines' && (!templatesLoaded || loadingOrder ? (
+                <MacLoading label={t('common.loadingData')} />
+            ) : !templateReady ? (
                 <SectionCard title={t('inv.orders.sectionEditor', { count: 0 })}>
                     <div className="ofi-ord-need">
                         <AlertTriangle size={22} />
                         <b>{t('inv.aiImport.templateRequiredTitle')}</b>
                         <span>{activeTemplate ? templateProblemText(templateFaults[0]) : t('inv.aiImport.templateRequiredHint')}</span>
-                        <button type="button" className="ofi-ord-done" onClick={() => setTab('template')}>
+                        <button type="button" className="ofi-ord-done" onClick={() => { setOpenTemplateId(activeTemplate?.id ?? null); setTemplatesOpen(true); }}>
                             {t(activeTemplate ? 'inv.aiImport.templateFixButton' : 'inv.aiImport.templateCreateButton')}
                         </button>
                     </div>
@@ -2952,8 +2936,8 @@ export const OrderWorkspacePage = () => {
                        nicht als Sprechblase. Es verschwindet auch nicht mehr,
                        wenn die Tabelle noch leer ist: dann steht 0.00 da, und
                        man sieht, dass gerechnet wird.
-                       In der Preisanfrage gibt es keine Betraege — dort nichts. */
-                    !priceless ? (
+                       Preise werden auch in der Anfrage angezeigt. */
+                    (
                         <span className="ofi-ord-sum">
                             {(totals.vat > 0 || totals.fees !== 0) && (
                                 <span className="ofi-ord-sum__parts">
@@ -2972,11 +2956,11 @@ export const OrderWorkspacePage = () => {
                             )}
                             <b className="ofi-ord-sum__value">{fmtMoney(totals.grand)}</b>
                         </span>
-                    ) : undefined
+                    )
                 )}
             >
                 <div className="overflow-x-auto">
-                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full" style={{ minWidth: tableMinWidth }}>
+                    <table data-inv-table data-grid-lines data-unstyled-table className="ofi-bom-table w-full" style={{ minWidth: tableMinWidth }}>
                         {/* Die Spaltenbreiten folgen der REIHENFOLGE, nicht mehr
                             einer festen Liste: was oben in der Spaltenliste
                             steht, steht hier links. Der Name trägt keine Breite
@@ -3024,7 +3008,7 @@ export const OrderWorkspacePage = () => {
                                             Tabelle leer, steht hier nur der Satz, wie
                                             man eine Zeile anlegt. */}
                                         {loadingOrder
-                                            ? <BotLoadingPanel label={t('common.loadingData')} minHeight={220} size={88} />
+                                            ? <MacLoading label={t('common.loadingData')} />
                                             : t('inv.orders.editorEmpty')}
                                     </td>
                                 </tr>
@@ -3134,245 +3118,12 @@ export const OrderWorkspacePage = () => {
                             </button>
                         </span>
                     )}
-                    <span className="ofi-ord-spacer" />
-                    <button
-                        type="button"
-                        disabled={saving || !canTransfer || !filledRows.length}
-                        title={canTransfer ? undefined : t('inv.stock.noPermission')}
-                        onClick={() => void save()}
-                        className="ofi-ord-done"
-                    >
-                        {/* Kaydetme sırasında sunucu toplamları yeniden hesaplar —
-                            düğme de yanıp sönen noktalarla bunu gösterir. */}
-                        {/* TEK kaydet düğmesi — "değişiklikleri kaydet" diye ayrı
-                            bir düğme YOKTUR; kaydetmek siparişi TASLAK olarak
-                            saklar ve SAYFADAN ÇIKMAZ (kullanıcı isteği). */}
-                        {saving
-                            ? <LoadingDots label={t('common.loadingData')} />
-                            : priceless
-                                ? t('inv.orders.savePriceRequest', { count: filledRows.length })
-                                : t('inv.orders.saveDraft', { count: filledRows.length })}
-                    </button>
                 </div>
             </SectionCard>
             ))}
 
-            <ArticlePickerModal
-                open={allPickerRowKey !== null}
-                onClose={() => setAllPickerRowKey(null)}
-                onPick={(article) => { if (allPickerRowKey) onProductPicked(allPickerRowKey, article); }}
-                title={kindLabels.allTitle}
-            />
-            {/* ── DIE BESTELLDETAILS — EINE KISTE ─────────────────────────────
-                Vorgabe Samet (07.09.2026): «Zusatzkosten gehören unter die
-                Bestelldetails, und dort steht nur ein Stift. Da klickt man
-                drauf — der viele einzelne Text kann weg. Eine einfache Kiste
-                im Apple-Stil, und alles liegt darin.»
 
-                Also liegt hier ALLES, was vorher auf zwei Fenster und drei
-                Knöpfe verteilt war: die Angaben der Bestellung, die
-                Zusatzkosten, die Mehrwertsteuer und das Anschreiben — jede
-                Sache in ihrer eigenen weissen Kiste auf grauem Grund, mit
-                eingerückten Haarlinien dazwischen. Keine Hinweiszeilen mehr:
-                was ein Feld will, sagt sein Platzhalter.
-
-                Nichts davon ist Pflicht; bleibt die Bestellnummer leer, vergibt
-                der Server BE-{Jahr}-{Reihe}. */}
-            {/* ── ÖN YAZI TASLAKLARI ──────────────────────────────────────────
-                Tenant genelinde paylaşılan metin şablonları: ekrandaki ön yazı
-                başlıkla birlikte kaydedilir, listedeki bir taslağa tıklamak onu
-                ön yazıya UYGULAR. Liste 15'erli sayfalanır — taslak eklendikçe
-                yeni sayfa açılır. Detay penceresinin ÜSTÜNDE açılır (zIndex). */}
-            <BottomSheet
-                open={draftsOpen}
-                onClose={() => setDraftsOpen(false)}
-                title={t('inv.orders.coverLetter.draftsTitle')}
-                subtitle={t('inv.orders.coverLetter.draftsHint')}
-                width={640}
-                height={600}
-                /* ÜBER der Detailkarte (`.ofi-ord-scrim`, z-index 820) — von dort
-                   wird dieses Blatt geöffnet. */
-                zIndex={860}
-                footer={(
-                    <>
-                        <span className="text-[11.5px] text-slate-400 dark:text-white/50">
-                            {t('inv.orders.coverLetter.pageOf', { page: templatePage, pages: templatePages })}
-                        </span>
-                        <span className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                disabled={templatePage <= 1 || templatesLoading}
-                                onClick={() => setTemplatePage((page) => Math.max(1, page - 1))}
-                                title={t('inv.orders.coverLetter.prev')}
-                                aria-label={t('inv.orders.coverLetter.prev')}
-                                className="flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:text-white/60 dark:hover:text-white"
-                            >
-                                <ChevronLeft size={15} />
-                            </button>
-                            <button
-                                type="button"
-                                disabled={templatePage >= templatePages || templatesLoading}
-                                onClick={() => setTemplatePage((page) => Math.min(templatePages, page + 1))}
-                                title={t('inv.orders.coverLetter.next')}
-                                aria-label={t('inv.orders.coverLetter.next')}
-                                className="flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:text-white/60 dark:hover:text-white"
-                            >
-                                <ChevronRight size={15} />
-                            </button>
-                        </span>
-                    </>
-                )}
-            >
-                {/* Ekrandaki ön yazıyı YENİ taslak olarak kaydetme satırı. */}
-                <div className="border-b border-slate-200 px-4 py-3 dark:border-white/10">
-                    <div className="flex items-center gap-2">
-                        <input
-                            value={draftTitle}
-                            onChange={(event) => { setDraftTitle(event.target.value); setDraftError(null); }}
-                            placeholder={t('inv.orders.coverLetter.draftTitle')}
-                            className={`${INPUT_BASE_CLASS} min-w-0 flex-1 ${draftError && !draftTitle.trim() ? '!border-red-400' : ''}`}
-                        />
-                        <button
-                            type="button"
-                            disabled={draftBusy}
-                            onClick={() => void saveTemplate()}
-                            className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-[#0a7aff] px-3 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            <Save01 size={13} />
-                            {t('inv.orders.coverLetter.saveDraft')}
-                        </button>
-                    </div>
-                    {draftError && (
-                        <span className="mt-1.5 block text-[11px] font-semibold text-red-500">{draftError}</span>
-                    )}
-                </div>
-
-                <div className="flex flex-col gap-2 p-4">
-                    {templatesLoading && <LoadingDots label={t('common.loadingData')} />}
-                    {!templatesLoading && templates.length === 0 && (
-                        <span className="py-6 text-center text-[12.5px] text-slate-400 dark:text-white/50">
-                            {t('inv.orders.coverLetter.empty')}
-                        </span>
-                    )}
-                    {!templatesLoading && templates.map((template) => (
-                        <div
-                            key={template.id}
-                            className="flex items-start gap-2 rounded-lg border border-slate-200 p-2.5 transition-colors hover:border-[#0066e0] dark:border-white/10 dark:hover:border-white/40"
-                        >
-                            {/* Satırın kendisi UYGULAR (kullanıcı isteği: taslak
-                                düğmesi seçileni ön yazıya geçirsin). */}
-                            <button
-                                type="button"
-                                onClick={() => applyTemplate(template)}
-                                title={t('inv.orders.coverLetter.applyDraft')}
-                                className="min-w-0 flex-1 text-left"
-                            >
-                                <span className="block truncate text-[13px] font-semibold text-slate-700 dark:text-white/85">
-                                    {template.title}
-                                </span>
-                                <span className="mt-0.5 line-clamp-2 block whitespace-pre-line text-[11.5px] leading-relaxed text-slate-400 dark:text-white/50">
-                                    {template.content}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                disabled={draftBusy}
-                                onClick={() => void deleteTemplate(template)}
-                                title={t('inv.orders.coverLetter.deleteDraft')}
-                                aria-label={t('inv.orders.coverLetter.deleteDraft')}
-                                className="flex size-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-40 dark:hover:bg-red-500/15"
-                            >
-                                <Trash01 size={13} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </BottomSheet>
-
-            {/* ── BELEG IMPORTIEREN (07.09.2026) ─────────────────────────────
-                Das Fenster rechnet nichts und speichert nichts: es ordnet die
-                gelesenen Angaben nach der AKTIVEN VORLAGE zu und gibt die
-                Zeilen an `applyAiRows` zurück. Gerechnet wird danach in der
-                Tabelle, gespeichert mit demselben Knopf wie immer. */}
-            {/* Der Beleg ERSETZT die Positionsliste (wie bisher). */}
-            <SupplierImportDialog
-                open={aiOpen}
-                onClose={() => { setAiOpen(false); setPastedFiles(null); }}
-                config={aiConfig}
-                template={activeTemplate}
-                onApply={applyAiRows}
-                calcMode={calcMode}
-                documentType={templateDocumentType}
-                initialFiles={pastedFiles ?? undefined}
-            />
-
-            {/* Der Nummernkreis: gewählt in «Ayarlar». Er gehört dem ruhenden
-                Wareneingang und wird für ihn aufbewahrt. */}
-            <SchemePickDialog
-                open={schemeOpen}
-                onClose={() => setSchemeOpen(false)}
-                onPick={(scheme, category) => {
-                    const chosen = { id: scheme.id, label: `${category.code} · ${scheme.code}`, next: scheme.nextCode };
-                    setCodeScheme(chosen);
-                    try { localStorage.setItem(RECEIPT_SCHEME_KEY, JSON.stringify(chosen)); } catch { /* privates Fenster */ }
-                    setSchemeOpen(false);
-                }}
-            />
-
-            {/* ── MEINE VORLAGEN ─────────────────────────────────────────────
-                Der EINE Ort, an dem die Spalten benannt, geordnet und
-                zugeordnet werden. Nach dem Speichern lädt die Seite ihre
-                aktive Vorlage neu — die Tabelle folgt ihr sofort. */}
-            <TemplateManagerPopup
-                open={templatesOpen}
-                onClose={() => { setTemplatesOpen(false); setOpenTemplateId(null); }}
-                openTemplateId={openTemplateId}
-                /* Eine Preisanfrage kennt nur Produktname und Menge als Zuordnung. */
-                documentType={templateDocumentType}
-                /* Eine gespeicherte Vorlage gilt SOFORT: `activeTemplateId`
-                   schaltet sie scharf, der Zähler lädt sie neu. Ohne das erste
-                   blieb eine frisch angelegte Vorlage wirkungslos, bis jemand
-                   sie im Menü noch einmal von Hand auswählte. */
-                onSaved={(templateId) => {
-                    if (templateId) {
-                        setActiveTemplateId(templateId);
-                        selectPreferredTemplate(templateDocumentType, templateId);
-                    }
-                    setTemplateTick2((tick) => tick + 1);
-                }}
-            />
-            {drawnCheck.node}
-
-            <SupplierPickerModal
-                open={supplierPickerOpen}
-                onClose={() => setSupplierPickerOpen(false)}
-                onPick={(picked) => {
-                    if (priceless) {
-                        addRequestSupplier({ id: picked.id, name: picked.companyName, email: picked.email ?? null, address: null });
-                        return;
-                    }
-                    setSupplier({ id: picked.id, name: picked.companyName, email: picked.email ?? null });
-                    setSupplierError(null);
-                }}
-            />
-
-            <CalcModeCard
-                open={calcOpen}
-                onClose={() => { setCalcOpen(false); setCalcError(null); }}
-                mode={calcMode}
-                config={aiConfig}
-                onApply={applyCalcMode}
-                error={calcError}
-            />
-
-            {productionOn && (
-                <ProductionPickerDialog
-                    open={pickerOpen}
-                    initial={production?.selection ?? null}
-                    onClose={() => setPickerOpen(false)}
-                    onApply={(selection, _lines, details) => applyProduction(selection, details)}
-                />
-            )}
+            </div>
         </div>
     );
 };

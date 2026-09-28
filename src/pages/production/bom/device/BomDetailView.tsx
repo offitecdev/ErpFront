@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
     CalendarClock,
     CheckCircle2,
@@ -34,7 +34,8 @@ import { addProduct, insertTemplateLines, type DraftLine } from '../templates/te
 import { AddSubBomDialog, InsertTemplateDialog } from './BomDialogs';
 import { diffDraft, draftOfRevisionLine } from './bomRevision';
 import { DiscardRevisionDialog, RevisionApproveDialog, StartRevisionDialog } from './BomRevisionDialogs';
-import { ChangeChips } from './BomRevisionsView';
+import { BomRevisionNotice } from './BomRevisionNotice';
+import { BomTabs, type BomTab } from './BomTabs';
 import { BomUnsavedDialog } from './BomUnsavedDialog';
 import { BomProcessButton } from './BomProcessButton';
 import { BomGoodsInSection, BomProcurementSection } from './BomProcurementPanels';
@@ -115,6 +116,13 @@ const payloadValid = (lines: DraftLine[]): boolean => lines.every((line) => {
 
 type Ask = 'delete' | 'consume' | 'reviseStart' | 'reviseApprove' | 'reviseDiscard' | null;
 
+/* Die drei Reiter einer BOM (28.09.2026, Samet: «malzemeler, satın alma talepleri,
+   gelen mallar alt alta — en üstte tabler şeklinde olsun, macOS SwiftUI»). Der
+   gewählte bleibt je BOM, solange die Seite lebt: zurück aus den Revisionen
+   steht man wieder dort, wo man war. */
+type BomTabKey = 'lines' | 'requests' | 'goods';
+const tabMemory = new Map<string, BomTabKey>();
+
 /**
  * ── EINE BOM: DIE HAUPT-BOM (WURZEL) ODER EINE ALT-BOM (27.09.2026) ─────────
  *
@@ -156,6 +164,19 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
     /* «Bom'da sadece sipariş ve fiyat talep istekleri oluşsun» (27.09.2026 abends):
        die BOM stellt einen Talep an den Einkauf — ohne Lieferant, ohne Preis. */
     const [requesting, setRequesting] = useState<BomProcurementKind | null>(null);
+    const [requestKind, setRequestKind] = useState<BomProcurementKind>('ORDER');
+    const [requestBusy, setRequestBusy] = useState(false);
+    const openRequest = (kind: BomProcurementKind) => {
+        setRequestKind(kind);
+        setRequesting(kind);
+    };
+    const closeRequest = () => { if (!requestBusy) setRequesting(null); };
+    const [tab, setTabState] = useState<BomTabKey>(() => tabMemory.get(bom.id) ?? 'lines');
+    const setTab = (next: BomTabKey) => {
+        tabMemory.set(bom.id, next);
+        setTabState(next);
+    };
+    const tabIds = useId();
 
     const serverLines = useMemo(
         () => (draftRevision ? draftRevision.lines.map(draftOfRevisionLine) : bom.lines.map(draftOf)),
@@ -270,8 +291,19 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
        (Samet: «ilk başta bu olmasın … alt BOM'lar olsun, üstüne tıkladıkça açılsın»).
        Die Zeilen stehen in den Alt-BOMs; abgeschlossen wird sie, wenn alle es sind. */
     const container = isMain && bom.lines.length === 0;
+    const tabs: Array<BomTab<BomTabKey>> = [
+        { key: 'lines', label: t('productionBom.detail.tab.lines'), count: rows.length },
+        { key: 'requests', label: t('productionBom.detail.tab.requests'), count: bom.procurement?.length ?? 0 },
+        { key: 'goods', label: t('productionBom.detail.tab.goods'), count: bom.goodsIn?.length ?? 0 },
+    ];
+    const notes = (
+        <>
+            {!canEdit && <Note>{t('productionBom.device.readOnly')}</Note>}
+            {consumed && <Note>{t('productionBom.detail.consumedHint')}</Note>}
+        </>
+    );
 
-    const saveLabel = saving ? t('productionBom.common.saving') : dirty ? t('productionBom.detail.unsaved') : null;
+    const saveLabel =saving ? t('productionBom.common.saving') : dirty ? t('productionBom.detail.unsaved') : null;
 
     const tasksButton = isMain && context.tasks ? (
         <button
@@ -290,15 +322,15 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
     return (
         <>
             <NavBar
-                nav={nav}
-                backTitle={context.backTitle}
+                nav={requesting ? { ...nav, back: closeRequest, canBack: !requestBusy, canForward: false } : nav}
+                backTitle={requesting ? bom.bomNumber : context.backTitle}
                 title={<span className="ofi-bom-code is-title">{bom.bomNumber}</span>}
                 badge={(
                     <>
                         <StatusPill status={bom.status} consumed={consumed} />
                         {showRevision && <RevisionPill revision={bom.revision} draft={draftRevision?.revision ?? null} />}
                         {/* DER WEG — immer oben, als gläserner Knopf: ein Klick zeigt die Stationen. */}
-                        {(!container || subs.length > 0) && <BomProcessButton bom={bom} subs={subs} />}
+                        {!requesting && (!container || subs.length > 0) && <BomProcessButton bom={bom} subs={subs} />}
                     </>
                 )}
                 subtitle={(
@@ -322,7 +354,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                         {saveLabel && <><span className="ofi-bom-dot">·</span><span className={dirty ? 'ofi-bom-dirty' : 'ofi-bom-saving'}>{saveLabel}</span></>}
                     </span>
                 )}
-                actions={(
+                actions={!requesting && (
                     <>
                         {tasksButton}
                         {editable && !container && (dirty || saving) && (
@@ -378,7 +410,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                             className="ofi-bom-btn ofi-nosize"
                                             disabled={!bom.lines.length || busy !== null || dirty || saving}
                                             title={dirty ? t('productionBom.detail.saveFirst') : t('productionBom.procurement.priceButtonTitle')}
-                                            onClick={() => setRequesting('PRICE')}
+                                            onClick={() => openRequest('PRICE')}
                                         >
                                             <FileText />
                                             {t('productionBom.procurement.priceButton')}
@@ -408,7 +440,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                             className="ofi-bom-btn ofi-nosize"
                                             disabled={!lines.length || busy !== null || dirty || saving}
                                             title={dirty ? t('productionBom.detail.saveFirst') : t('productionBom.revision.requestTitle')}
-                                            onClick={() => setRequesting('PRICE')}
+                                            onClick={() => openRequest('PRICE')}
                                         >
                                             <FileText />
                                             {t('productionBom.procurement.priceButton')}
@@ -441,7 +473,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                             title={requestableMissing === 0
                                                 ? t(missingLines > 0 ? 'productionBom.procurement.allRequested' : 'productionBom.wizard.allOrdered')
                                                 : t('productionBom.procurement.orderButtonTitle')}
-                                            onClick={() => setRequesting('ORDER')}
+                                            onClick={() => openRequest('ORDER')}
                                         >
                                             <ShoppingCart />
                                             {t('productionBom.procurement.orderButton')}
@@ -482,7 +514,23 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                 )}
             />
 
-            <div className="ofi-bom-body">
+            <ProcurementRequestDialog
+                key={`${bom.id}:${requestKind}`}
+                open={Boolean(requesting)}
+                embedded
+                bom={bom}
+                kind={requestKind}
+                onClose={closeRequest}
+                onBusyChange={setRequestBusy}
+                onDone={(next) => {
+                    setRequesting(null);
+                    context.applyBom(next);
+                    // Der neue Talep steht im Reiter «Satın alma talepleri» — dorthin.
+                    setTab('requests');
+                }}
+            />
+
+            <div className="ofi-bom-body" hidden={Boolean(requesting)} style={requesting ? { display: 'none' } : undefined}>
                 {parent && (
                     <nav className="ofi-bom-crumb" aria-label={t('productionBom.sub.path')}>
                         <button type="button" className="ofi-bom-crumb__link ofi-nosize" onClick={() => nav.back()}>
@@ -497,20 +545,21 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                     </nav>
                 )}
 
-                {revising && draftRevision && (
-                    <div className="ofi-bom-revbanner" role="status">
-                        <span className="ofi-bom-revbanner__icon"><FilePen aria-hidden /></span>
-                        <span className="ofi-bom-revbanner__text">
-                            <b>{t('productionBom.revision.drafting', { revision: draftRevision.revision, current: bom.revision })}</b>
-                            <small>{t('productionBom.revision.draftingHint', { current: bom.revision })}</small>
-                            {draftRevision.reason && (
-                                <small className="ofi-bom-revbanner__reason">
-                                    <b>{t('productionBom.revision.reasonLabel')}:</b> {draftRevision.reason}
-                                    {draftRevision.createdByName && <> · {draftRevision.createdByName}, {shortDate(draftRevision.createdAt)}</>}
-                                </small>
-                            )}
-                        </span>
-                        {diff && <ChangeChips counts={diff.counts} />}
+                {/* DIE REITER — ganz oben (Samet, 28.09.2026: «en üstte tabler şeklinde,
+                    macOS SwiftUI»). Rechts daneben die Revision im Entwurf: erst ein
+                    gläsernes Warnfenster, dann klein als gläserne Gedankenblase. */}
+                {!container && (
+                    <div className="ofi-bom-tabbar">
+                        <BomTabs tabs={tabs} value={tab} onChange={setTab} label={t('productionBom.detail.tabs')} idPrefix={tabIds} />
+                        {revising && draftRevision && (
+                            <BomRevisionNotice
+                                key={`${bom.id}:${draftRevision.revision}`}
+                                bomId={bom.id}
+                                draft={draftRevision}
+                                current={bom.revision}
+                                counts={diff?.counts ?? null}
+                            />
+                        )}
                     </div>
                 )}
 
@@ -530,137 +579,143 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                     </div>
                 )}
 
-                {!isDraft && !container && (
-                    <div className="ofi-bom-overview">
-                        {!consumed && (
-                            <div className="ofi-bom-overview__checks">
-                                <span className="ofi-bom-overview__caption">{t('productionBom.detail.checksTitle')}</span>
-                                <CompletionChecks completion={bom.completion} />
-                            </div>
-                        )}
-                        <div className="ofi-bom-links">
-                            {bom.status === 'APPROVED' && !consumed && (
-                                <NavLinkRow
-                                    icon={<ShoppingCart />}
-                                    label={t('productionBom.procurement.orderButton')}
-                                    detail={requestableMissing > 0
-                                        ? t('productionBom.device.cardMissing', { count: requestableMissing })
-                                        : missingLines > 0 ? t('productionBom.procurement.allRequested') : t('productionBom.wizard.allOrdered')}
-                                    tone={requestableMissing > 0 ? 'warn' : 'ok'}
-                                    disabled={requestableMissing === 0 || !canEdit}
-                                    onClick={() => setRequesting('ORDER')}
-                                />
-                            )}
-                            {showRevision && (
-                                <NavLinkRow
-                                    icon={<History />}
-                                    label={t('productionBom.revision.history')}
-                                    detail={lastRevision
-                                        ? [
-                                            t('productionBom.revision.label', { revision: lastRevision.revision }),
-                                            lastRevision.approvedAt ? shortDate(lastRevision.approvedAt) : null,
-                                            lastRevision.approvedByName,
-                                        ].filter(Boolean).join(' · ')
-                                        : undefined}
-                                    count={bom.revisions.length}
-                                    onClick={() => context.open({ kind: 'revisions', bomId: bom.id })}
-                                />
-                            )}
-                        </div>
-                    </div>
-                )}
-
-
-                {!canEdit && <Note>{t('productionBom.device.readOnly')}</Note>}
-                {consumed && <Note>{t('productionBom.detail.consumedHint')}</Note>}
-                {!isDraft && !revising && !consumed && !container && <p className="ofi-bom-hint">{t('productionBom.detail.priority')}</p>}
+                {container && notes}
 
                 {!container && (
-                <section className="ofi-bom-group is-lines">
-                    <div className="ofi-bom-linesbar">
-                        <h3 className="ofi-bom-group__title">
-                            {t('productionBom.detail.lines')}
-                            <span className="ofi-bom-group__count">{rows.length}</span>
-                            {revising && draftRevision && (
-                                <span className="ofi-bom-group__meta">{t('productionBom.revision.linesMeta', { revision: draftRevision.revision })}</span>
-                            )}
-                        </h3>
-                        {editable && (
-                            <div className="ofi-bom-linesbar__tools">
-                                <ProductSearch onPick={pick} placeholder={t('productionBom.search.short')} />
-                                <button type="button" className="ofi-bom-btn is-quiet ofi-nosize" onClick={() => setInserting(true)}>
-                                    <LayoutTemplate />
-                                    {t('productionBom.insert.button')}
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                    {isDraft && !rows.length && editable && <p className="ofi-bom-hint">{t('productionBom.detail.draftHint')}</p>}
-                    <BomLinesTable
-                        plain
-                        rows={rows}
-                        mode={mode}
-                        editable={editable}
-                        emptyText={t(isMain ? 'productionBom.detail.emptyMain' : 'productionBom.detail.empty')}
-                        onQuantity={(key, text) => patchLine(key, { quantityText: text })}
-                        onUnit={(key, unit: BomUnit) => patchLine(key, { unit })}
-                        onNote={(key, note) => patchLine(key, { note })}
-                        onRemove={(key) => change(lines.filter((line) => line.key !== key))}
-                        hideSupplier
-                        numericOnly
-                        footer={editable ? (
-                            <ProductSearch
-                                variant="row"
-                                onPick={pick}
-                                placeholder={t('productionBom.detail.addRowPlaceholder')}
-                                trailing={(
-                                    <button
-                                        type="button"
-                                        className="ofi-bom-rowlink ofi-nosize"
-                                        onMouseDown={(event) => event.preventDefault()}
-                                        onClick={() => setInserting(true)}
-                                    >
-                                        <LayoutTemplate />
-                                        {t('productionBom.insert.button')}
-                                    </button>
+                    <div
+                        key={tab}
+                        id={`${tabIds}-panel`}
+                        role="tabpanel"
+                        aria-labelledby={`${tabIds}-tab-${tab}`}
+                        className="ofi-bom-tabpanel"
+                    >
+                        {tab === 'lines' && (
+                            <>
+                                {!isDraft && (
+                                    <div className="ofi-bom-overview">
+                                        {!consumed && (
+                                            <div className="ofi-bom-overview__checks">
+                                                <span className="ofi-bom-overview__caption">{t('productionBom.detail.checksTitle')}</span>
+                                                <CompletionChecks completion={bom.completion} />
+                                            </div>
+                                        )}
+                                        <div className="ofi-bom-links">
+                                            {bom.status === 'APPROVED' && !consumed && (
+                                                <NavLinkRow
+                                                    icon={<ShoppingCart />}
+                                                    label={t('productionBom.procurement.orderButton')}
+                                                    detail={requestableMissing > 0
+                                                        ? t('productionBom.device.cardMissing', { count: requestableMissing })
+                                                        : missingLines > 0 ? t('productionBom.procurement.allRequested') : t('productionBom.wizard.allOrdered')}
+                                                    tone={requestableMissing > 0 ? 'warn' : 'ok'}
+                                                    disabled={requestableMissing === 0 || !canEdit}
+                                                    onClick={() => openRequest('ORDER')}
+                                                />
+                                            )}
+                                            {showRevision && (
+                                                <NavLinkRow
+                                                    icon={<History />}
+                                                    label={t('productionBom.revision.history')}
+                                                    detail={lastRevision
+                                                        ? [
+                                                            t('productionBom.revision.label', { revision: lastRevision.revision }),
+                                                            lastRevision.approvedAt ? shortDate(lastRevision.approvedAt) : null,
+                                                            lastRevision.approvedByName,
+                                                        ].filter(Boolean).join(' · ')
+                                                        : undefined}
+                                                    count={bom.revisions.length}
+                                                    onClick={() => context.open({ kind: 'revisions', bomId: bom.id })}
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
                                 )}
-                            />
-                        ) : undefined}
-                    />
-                </section>
-                )}
 
-                {/* Was die Revision entfernt — mit «Geri al» wieder in die Arbeitskopie. */}
-                {revising && diff && diff.removed.length > 0 && (
-                    <section className="ofi-bom-group ofi-bom-removed">
-                        <h3 className="ofi-bom-group__title">
-                            {t('productionBom.revision.removedTitle')}
-                            <span className="ofi-bom-group__count">{diff.removed.length}</span>
-                        </h3>
-                        <div className="ofi-bom-group__box">
-                            {diff.removed.map((line) => (
-                                <div key={line.id} className="ofi-bom-removed__row">
-                                    <span className="ofi-bom-code">{line.product?.erpCode ?? line.erpCode ?? '—'}</span>
-                                    <span className="ofi-bom-removed__name" title={line.name}>{line.product?.name ?? line.name}</span>
-                                    <span className="ofi-bom-removed__qty"><s>{fmtQty(line.quantity)} {unitLabel(line.unit)}</s></span>
-                                    {line.orders.some((order) => order.kind === 'ORDER') && (
-                                        <span className="ofi-bom-tag">{t('productionBom.revision.removedOrdered')}</span>
-                                    )}
+                                {notes}
+                                {!isDraft && !revising && !consumed && <p className="ofi-bom-hint">{t('productionBom.detail.priority')}</p>}
+
+                                <section className="ofi-bom-group is-lines">
+                                    {/* Titel und Zahl stehen im Reiter — hier nur das schmale Feld und «Şablondan ekle». */}
                                     {editable && (
-                                        <button type="button" className="ofi-bom-btn is-small is-quiet ofi-nosize" onClick={() => change([...lines, draftOf(line)])}>
-                                            <Undo2 />
-                                            {t('productionBom.revision.restore')}
-                                        </button>
+                                        <div className="ofi-bom-linesbar is-tools">
+                                            <div className="ofi-bom-linesbar__tools">
+                                                <ProductSearch onPick={pick} placeholder={t('productionBom.search.short')} />
+                                                <button type="button" className="ofi-bom-btn is-quiet ofi-nosize" onClick={() => setInserting(true)}>
+                                                    <LayoutTemplate />
+                                                    {t('productionBom.insert.button')}
+                                                </button>
+                                            </div>
+                                        </div>
                                     )}
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                )}
+                                    {isDraft && !rows.length && editable && <p className="ofi-bom-hint">{t('productionBom.detail.draftHint')}</p>}
+                                    <BomLinesTable
+                                        plain
+                                        rows={rows}
+                                        mode={mode}
+                                        editable={editable}
+                                        emptyText={t(isMain ? 'productionBom.detail.emptyMain' : 'productionBom.detail.empty')}
+                                        onQuantity={(key, text) => patchLine(key, { quantityText: text })}
+                                        onUnit={(key, unit: BomUnit) => patchLine(key, { unit })}
+                                        onNote={(key, note) => patchLine(key, { note })}
+                                        onRemove={(key) => change(lines.filter((line) => line.key !== key))}
+                                        hideSupplier
+                                        numericOnly
+                                        footer={editable ? (
+                                            <ProductSearch
+                                                variant="row"
+                                                onPick={pick}
+                                                placeholder={t('productionBom.detail.addRowPlaceholder')}
+                                                trailing={(
+                                                    <button
+                                                        type="button"
+                                                        className="ofi-bom-rowlink ofi-nosize"
+                                                        onMouseDown={(event) => event.preventDefault()}
+                                                        onClick={() => setInserting(true)}
+                                                    >
+                                                        <LayoutTemplate />
+                                                        {t('productionBom.insert.button')}
+                                                    </button>
+                                                )}
+                                            />
+                                        ) : undefined}
+                                    />
+                                </section>
 
-                {/* Was beim Einkauf liegt und was schon ankam — nur der Weg, ohne Lieferant und Preis. */}
-                {!container && <BomProcurementSection bom={bom} canEdit={canEdit} onChanged={(next) => context.applyBom(next)} />}
-                {!container && <BomGoodsInSection bom={bom} />}
+                                {/* Was die Revision entfernt — mit «Geri al» wieder in die Arbeitskopie. */}
+                                {revising && diff && diff.removed.length > 0 && (
+                                    <section className="ofi-bom-group ofi-bom-removed">
+                                        <h3 className="ofi-bom-group__title">
+                                            {t('productionBom.revision.removedTitle')}
+                                            <span className="ofi-bom-group__count">{diff.removed.length}</span>
+                                        </h3>
+                                        <div className="ofi-bom-group__box">
+                                            {diff.removed.map((line) => (
+                                                <div key={line.id} className="ofi-bom-removed__row">
+                                                    <span className="ofi-bom-code">{line.product?.erpCode ?? line.erpCode ?? '—'}</span>
+                                                    <span className="ofi-bom-removed__name" title={line.name}>{line.product?.name ?? line.name}</span>
+                                                    <span className="ofi-bom-removed__qty"><s>{fmtQty(line.quantity)} {unitLabel(line.unit)}</s></span>
+                                                    {line.orders.some((order) => order.kind === 'ORDER') && (
+                                                        <span className="ofi-bom-tag">{t('productionBom.revision.removedOrdered')}</span>
+                                                    )}
+                                                    {editable && (
+                                                        <button type="button" className="ofi-bom-btn is-small is-quiet ofi-nosize" onClick={() => change([...lines, draftOf(line)])}>
+                                                            <Undo2 />
+                                                            {t('productionBom.revision.restore')}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+                            </>
+                        )}
+
+                        {/* Was beim Einkauf liegt und was schon ankam — nur der Weg, ohne Lieferant und Preis. */}
+                        {tab === 'requests' && <BomProcurementSection bom={bom} canEdit={canEdit} onChanged={(next) => context.applyBom(next)} />}
+                        {tab === 'goods' && <BomGoodsInSection bom={bom} />}
+                    </div>
+                )}
 
                 {isMain && (
                     <SubBomTree
@@ -699,18 +754,6 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                         context.applyBom(sub);
                         context.reload();
                         context.open({ kind: 'bom', bomId: sub.id });
-                    }}
-                />
-            )}
-            {requesting && (
-                <ProcurementRequestDialog
-                    open
-                    bom={bom}
-                    kind={requesting}
-                    onClose={() => setRequesting(null)}
-                    onDone={(next) => {
-                        setRequesting(null);
-                        context.applyBom(next);
                     }}
                 />
             )}

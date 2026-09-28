@@ -1,4 +1,8 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { lazy, Suspense, useState } from 'react';
+import { MacLoading } from '@/components/ui-shared/MacLoading';
+import { purchaseOrdersApi } from '@/lib/api/inventory';
+import '@/styles/modules/purchasing.css';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { t } from '@/i18n/translate';
 import { useAuthStore } from '@/store/authStore';
@@ -12,9 +16,12 @@ import { ORDER_STATUS_META, statusesOfKind, type PurchaseKind } from './utils/or
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 import { PurchaseCode } from '@/components/ui-shared/PurchaseCode';
 import '@/styles/modules/orderWorkspace.css';
+import '@/styles/orderWorkspaceSurface.css';
 
 /* Der Filter neben der Suche trägt das hausweite Mass (styles/controls.css). */
 const TOOLBAR_CONTROL_CLASS = 'ofi-filter';
+const loadWorkspace = () => import('./OrderWorkspacePage');
+const Workspace = lazy(() => loadWorkspace().then((module) => ({ default: module.OrderWorkspacePage })));
 
 /**
  * ══ ZWEI LISTEN, EIN FENSTER (Vorgabe Samet, 22.09.2026) ═══════════════════
@@ -50,6 +57,8 @@ export const OrdersPage = () => {
     const permissions = useAuthStore((state) => state.permissions);
     const canManage = permissions.includes('inventory.transfer');
     const list = useOrdersList(kind);
+    const [documentId, setDocumentId] = useState<string | null>(null);
+    const closeDocument = () => { setDocumentId(null); list.reload(); };
     const grid = useColumnWidths<OrderListColumn>({
         storageKey: 'offitec:inv-orders:col-widths:v1',
         defaults: ORDER_LIST_COLUMN_WIDTHS,
@@ -87,6 +96,7 @@ export const OrdersPage = () => {
 
     return (
         <div className="flex w-full flex-col gap-4">
+            <div hidden={Boolean(documentId)} className="ofi-orders-list-content">
             <InventoryListHeader
                 title={t(isRequest ? 'inv.orders.kind.request' : 'inv.orders.kind.order')}
                 center={segmented}
@@ -231,7 +241,10 @@ export const OrdersPage = () => {
                                 return (
                                     <tr
                                         key={order.id}
-                                        onClick={() => navigate(`/inventory/orders/${order.id}`)}
+                                        onClick={() => setDocumentId(order.id)}
+                                        tabIndex={0}
+                                        onKeyDown={(event) => { if (event.key === 'Enter') setDocumentId(order.id); }}
+                                        onPointerEnter={() => { void loadWorkspace().catch(() => undefined); void purchaseOrdersApi.get(order.id).catch(() => undefined); }}
                                         className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
                                     >
                                         <td className="font-mono text-[13px] text-slate-700 dark:text-white/80"><PurchaseCode value={order.referenceNumber} /></td>
@@ -279,6 +292,12 @@ export const OrdersPage = () => {
                     />
                 </div>
             </SectionCard>
+            </div>
+            {documentId && <div>
+                <Suspense fallback={<MacLoading label={t('common.loadingData')} />}>
+                    <Workspace key={documentId} workspaceId={documentId} onBack={closeDocument} onOpenDocument={setDocumentId} />
+                </Suspense>
+            </div>}
         </div>
     );
 };

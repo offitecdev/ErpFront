@@ -11,8 +11,9 @@ import { PopupButton, PopupDialog, PopupField, PopupNote } from '@/components/ui
  * Kategorie → Unterkategorie, der nächste Code steht daneben. Gibt es keinen
  * freigegebenen Kreis, sagt das Fenster, wo die IT ihn freigibt.
  */
-export const SchemePickDialog = ({ open, onClose, onPick }: {
+export const SchemePickDialog = ({ open, onClose, onPick, embedded = false }: {
     open: boolean;
+    embedded?: boolean;
     onClose: () => void;
     onPick: (scheme: CodeScheme, category: CodeCategory) => void;
 }) => {
@@ -44,6 +45,7 @@ export const SchemePickDialog = ({ open, onClose, onPick }: {
 
     return (
         <PopupDialog
+            embedded={embedded}
             open={open}
             onClose={onClose}
             title={t('inv.newProduct.codeFromScheme')}

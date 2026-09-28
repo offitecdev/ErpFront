@@ -13,6 +13,7 @@ import { fmtDateTime } from '../utils/format';
 import { stageMailState } from '../utils/orderStatus';
 import { orderForSupplier, requestSuppliersOf, supplierPdfFileName } from '../utils/requestSuppliers';
 import '@/styles/orderDetails.css';
+import { MailTemplatePicker } from './MailTemplatePicker';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -75,7 +76,7 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
     const mailState = active ? (active.emailSentAt ? 'SENT' : 'NOT_SENT') : stageMailState(order);
     const sentAt = active ? active.emailSentAt : order.emailSentAt;
     const isResend = Boolean(sentAt);
-    const canSend = Boolean(to.trim() || target.supplierEmail);
+    const canSend = EMAIL_RE.test(to.trim() || target.supplierEmail || '');
 
     /* Die Felder werden EINMAL je Vorgang und Belegart gefüllt, damit ein selbst
        geschriebener Text nicht bei jeder Antwort des Servers verschwindet. */
@@ -413,6 +414,7 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
                     </label>
                 </div>
 
+                <MailTemplatePicker disabled={busy !== null} onApply={setMessage} />
                 <textarea
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}

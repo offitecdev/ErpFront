@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, FileText, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -8,7 +8,8 @@ import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBo
 import type { Bom, BomProcurementKind, BomUnit } from '@/types/productionBom';
 
 import { fmtQty, parseQuantityText, quantityToText, unitLabel } from '../bomFormat';
-import { pendingLineIds } from './bomProcess';
+import { pendingLineIds, priceRequestRemaining } from './bomProcess';
+import '@/styles/procurementRequestPage.css';
 
 interface RequestRow {
     id: string;
@@ -29,6 +30,7 @@ interface RowState { include: boolean; text: string }
 const rowsOf = (bom: Bom, kind: BomProcurementKind): RequestRow[] => {
     const pending = pendingLineIds(bom, kind);
     if (kind === 'PRICE') {
+        const remaining = priceRequestRemaining(bom);
         // Im Entwurf die Zeilen der BOM, in einer Revision die der Arbeitskopie.
         const source = bom.status !== 'DRAFT' && bom.revisionDraft ? bom.revisionDraft.lines : bom.lines;
         return source.map((line) => ({
@@ -37,7 +39,7 @@ const rowsOf = (bom: Bom, kind: BomProcurementKind): RequestRow[] => {
             name: line.product?.name ?? line.name,
             modelNumber: line.product?.modelNumber ?? line.modelNumber,
             unit: line.unit as BomUnit,
-            suggested: line.quantity,
+            suggested: remaining.get(line.id) ?? line.quantity,
             floor: 0,
             pending: pending.get(line.id) ?? null,
         }));
@@ -73,17 +75,46 @@ export const ProcurementRequestDialog = ({
     kind,
     onClose,
     onDone,
+    embedded = false,
+    onBusyChange,
 }: {
     open: boolean;
     bom: Bom;
     kind: BomProcurementKind;
     onClose: () => void;
     onDone: (bom: Bom) => void;
+    embedded?: boolean;
+    onBusyChange?: (busy: boolean) => void;
 }) => {
     const rows = useMemo(() => rowsOf(bom, kind), [bom, kind]);
     const [state, setState] = useState<Record<string, RowState>>({});
     const [note, setNote] = useState('');
     const [busy, setBusy] = useState(false);
+    const pageRef = useRef<HTMLDivElement>(null);
+
+    useLayoutEffect(() => {
+        if (open && embedded) pageRef.current?.closest('.ofi-bom-nav__view')?.scrollIntoView({ block: 'start' });
+    }, [open, embedded]);
+
+    useEffect(() => {
+        if (!open || !embedded) return;
+        const onKey = (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+            const meta = event.metaKey || event.ctrlKey;
+            const back = (meta && event.key === '[') || (event.altKey && event.key === 'ArrowLeft');
+            const forward = (meta && event.key === ']') || (event.altKey && event.key === 'ArrowRight');
+            if (!back && !forward) return;
+            // Keep the surrounding BOM navigation behind this page until it closes.
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (back && !busy) onClose();
+        };
+        window.addEventListener('keydown', onKey, true);
+        return () => window.removeEventListener('keydown', onKey, true);
+    }, [open, embedded, busy, onClose]);
+
+    useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
 
     const rowState = (row: RequestRow): RowState => state[row.id] ?? { include: !row.pending, text: quantityToText(row.suggested) };
     const problem = (row: RequestRow, entry: RowState): boolean => {
@@ -106,14 +137,17 @@ export const ProcurementRequestDialog = ({
 
     const close = () => {
         if (busy) return;
-        setState({});
-        setNote('');
+        if (!embedded) {
+            setState({});
+            setNote('');
+        }
         onClose();
     };
 
     const submit = async () => {
         if (busy || !chosen.length || invalid) return;
         setBusy(true);
+        onBusyChange?.(true);
         try {
             const result = await productionBomApi.createProcurementRequest(bom.id, {
                 kind,
@@ -128,17 +162,20 @@ export const ProcurementRequestDialog = ({
             toast.error(productionBomErrorText(error));
         } finally {
             setBusy(false);
+            onBusyChange?.(false);
         }
     };
 
     return (
         <PopupDialog
             open={open}
+            embedded={embedded}
             onClose={close}
             title={t(`productionBom.procurement.dialogTitle.${kind}`)}
             subtitle={t(`productionBom.procurement.dialogSubtitle.${kind}`, { number: bom.bomNumber })}
             icon={kind === 'PRICE' ? <FileText size={18} /> : <ShoppingCart size={18} />}
             width={760}
+            bodyClassName={embedded ? 'ofi-procurement-request-page' : undefined}
             footer={(
                 <PopupActions start={<span className="ofi-bom-reqdlg__count">{t('productionBom.procurement.selected', { count: chosen.length })}</span>}>
                     <PopupButton onClick={close} disabled={busy}>{t('productionBom.common.cancel')}</PopupButton>
@@ -148,7 +185,7 @@ export const ProcurementRequestDialog = ({
                 </PopupActions>
             )}
         >
-            <div className="ofi-bom-pop ofi-bom-reqdlg">
+            <div ref={pageRef} className="ofi-bom-pop ofi-bom-reqdlg">
                 <p className="ofi-bom-reqdlg__hint">{t(`productionBom.procurement.dialogHint.${kind}`)}</p>
                 {rows.length ? (
                     <div className="ofi-bom-reqdlg__table" role="table">
@@ -160,7 +197,7 @@ export const ProcurementRequestDialog = ({
                                     aria-checked={allOn}
                                     aria-label={t('productionBom.procurement.all')}
                                     className={`ofi-bom-check ofi-nosize${allOn ? ' is-on' : ''}`}
-                                    disabled={!selectable.length}
+                                    disabled={busy || !selectable.length}
                                     onClick={toggleAll}
                                 >
                                     {allOn && <Check />}
@@ -168,7 +205,7 @@ export const ProcurementRequestDialog = ({
                             </span>
                             <span role="columnheader">{t('productionBom.columns.erpCode')}</span>
                             <span role="columnheader">{t('productionBom.columns.name')}</span>
-                            <span role="columnheader" className="is-num">{t(kind === 'ORDER' ? 'productionBom.columns.missing' : 'productionBom.columns.need')}</span>
+                            <span role="columnheader" className="is-num">{t(kind === 'ORDER' ? 'productionBom.columns.missing' : 'productionBom.receipt.remaining')}</span>
                             <span role="columnheader" className="is-num">{t('productionBom.procurement.quantity')}</span>
                         </div>
                         {rows.map((row) => {
@@ -187,7 +224,7 @@ export const ProcurementRequestDialog = ({
                                             aria-checked={entry.include && !row.pending}
                                             aria-label={row.name}
                                             className={`ofi-bom-check ofi-nosize${entry.include && !row.pending ? ' is-on' : ''}`}
-                                            disabled={Boolean(row.pending)}
+                                            disabled={busy || Boolean(row.pending)}
                                             onClick={() => patch(row, { include: !entry.include })}
                                         >
                                             {entry.include && !row.pending && <Check />}
@@ -206,7 +243,7 @@ export const ProcurementRequestDialog = ({
                                             <input
                                                 value={entry.text}
                                                 inputMode="decimal"
-                                                disabled={!entry.include || Boolean(row.pending)}
+                                                disabled={busy || !entry.include || Boolean(row.pending)}
                                                 aria-label={t('productionBom.procurement.quantity')}
                                                 aria-invalid={bad}
                                                 className={bad ? 'is-invalid' : undefined}
@@ -228,6 +265,7 @@ export const ProcurementRequestDialog = ({
                     <span>{t('productionBom.procurement.note')}</span>
                     <textarea
                         value={note}
+                        disabled={busy}
                         rows={2}
                         maxLength={1000}
                         placeholder={t('productionBom.procurement.notePlaceholder')}

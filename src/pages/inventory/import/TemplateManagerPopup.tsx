@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { MacLoading } from '@/components/ui-shared/MacLoading';
 
 import { CheckCircle, ChevronLeft, ChevronRight, Plus, Save01, Trash01, X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
@@ -50,9 +51,12 @@ const toDraft = (template: SupplierOrderTemplate): Draft => ({
 });
 
 const TemplateManagerPopupContent = ({
-    open, onClose, onSaved, openTemplateId, documentType = 'ORDER',
+    open, onClose, onSaved, openTemplateId, documentType = 'ORDER', embedded = false, onBusyChange, initialTemplates,
 }: {
     open: boolean;
+    embedded?: boolean;
+    onBusyChange?: (busy: boolean) => void;
+    initialTemplates?: SupplierOrderTemplate[];
     onClose: () => void;
     /** Welche Vorlage aufgeschlagen werden soll — der Klick in der Werkzeugleiste. */
     openTemplateId?: string | null;
@@ -67,13 +71,18 @@ const TemplateManagerPopupContent = ({
 }) => {
     const preferredTemplateId = usePurchaseTemplateStore((state) => state.selected[documentType]);
     const selectPreferredTemplate = usePurchaseTemplateStore((state) => state.select);
-    const [templates, setTemplates] = useState<SupplierOrderTemplate[]>([]);
-    const [draft, setDraft] = useState<Draft | null>(null);
+    const [templates, setTemplates] = useState<SupplierOrderTemplate[]>(initialTemplates ?? []);
+    const initialIndex = Math.max(0, (initialTemplates ?? []).findIndex((entry) => entry.id === (openTemplateId ?? preferredTemplateId)));
+    const [draft, setDraft] = useState<Draft | null>(() => initialTemplates ? (initialTemplates[initialIndex] ? toDraft(initialTemplates[initialIndex]) : newDraft(1)) : null);
     const [busy, setBusy] = useState(false);
+    useEffect(() => {
+        onBusyChange?.(busy);
+        return () => onBusyChange?.(false);
+    }, [busy, onBusyChange]);
     /** Nach einem gescheiterten Speichern zeigt die Liste, was fehlt. */
     const [showErrors, setShowErrors] = useState(false);
     /** Welche Vorlage gerade dasteht — das Blaettern zaehlt hier. */
-    const [index, setIndex] = useState(0);
+    const [index, setIndex] = useState(initialIndex);
 
     const show = (next: number) => {
         const entry = templates[next];
@@ -103,6 +112,7 @@ const TemplateManagerPopupContent = ({
     };
 
     useEffect(() => {
+        if (initialTemplates) return;
         void reload(openTemplateId ?? undefined);
     }, [open, openTemplateId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -195,22 +205,60 @@ const TemplateManagerPopupContent = ({
         }
     };
 
+    if (embedded) return (
+        <section className="ofi-template-editor">
+            <header className="ofi-page-toolbar">
+                <div><h2>{t('inv.aiImport.templatesTitle')}</h2></div>
+                <div className="ofi-page-toolbar__actions">
+                    {draft?.id && <button type="button" className="ofi-page-button ofi-nosize is-quiet" disabled={busy}
+                        onClick={() => { const found = templates.find((entry) => entry.id === draft.id); if (found) void remove(found); }}>
+                        <Trash01 size={15} />{t('common.delete')}
+                    </button>}
+                    <button type="button" className="ofi-page-button ofi-nosize is-primary" disabled={busy || !draft?.title.trim()} onClick={() => void save()}>
+                        {busy ? <span className="ofi-poi-spin" /> : <Save01 size={15} />}{t('common.save')}
+                    </button>
+                </div>
+            </header>
+            <div className="ofi-template-layout">
+                <nav className="ofi-template-list" aria-label={t('inv.aiImport.templatesTitle')}>
+                    {templates.map((template, at) => <button key={template.id} type="button" disabled={busy}
+                        className={`ofi-template-option ofi-nosize${draft?.id === template.id ? ' is-selected' : ''}`} aria-pressed={draft?.id === template.id} onClick={() => show(at)}>
+                        <span>{template.title}</span>{draft?.id === template.id && <CheckCircle size={15} />}
+                    </button>)}
+                    <button type="button" className="ofi-template-add ofi-nosize" disabled={busy} onClick={startNew}><Plus size={15} />{t('inv.aiImport.templateNew')}</button>
+                </nav>
+                <div className="ofi-template-edit-content">
+                    {draft ? <>
+                        <label className="ofi-template-name">
+                            <span>{t('inv.aiImport.templateName')}</span>
+                            <input value={draft.title} disabled={busy} onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                                placeholder={t('inv.aiImport.templateNamePlaceholder')} maxLength={80} />
+                        </label>
+                        <fieldset className="ofi-template-columns" disabled={busy}>
+                            <TemplateColumnsPanel embedded config={draft.config} documentType={documentType} showErrors={showErrors} onChange={(config) => setDraft({ ...draft, config })} />
+                        </fieldset>
+                    </> : <MacLoading label={t('common.loadingData')} />}
+                </div>
+            </div>
+        </section>
+    );
+
     return (
         <div
-            className="ofi-poi-scrim"
-            style={{ zIndex: 900 }}
-            role="dialog"
-            aria-modal="true"
-            onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+            className={embedded ? 'ofi-inline-tool' : 'ofi-poi-scrim'}
+            style={embedded ? undefined : { zIndex: 900 }}
+            role={embedded ? 'region' : 'dialog'}
+            aria-modal={embedded ? undefined : true}
+            onMouseDown={(event) => { if (!embedded && !busy && event.target === event.currentTarget) onClose(); }}
         >
-            <div className="ofi-poi" style={{ width: 'min(980px, 100%)', height: 'min(720px, 100%)' }}>
+            <div className={embedded ? 'ofi-poi ofi-poi-inline' : 'ofi-poi'} style={embedded ? undefined : { width: 'min(980px, 100%)', height: 'min(720px, 100%)' }}>
                 <div className="ofi-poi-head">
                     <div className="ofi-poi-title">
                         <b>{t('inv.aiImport.templatesTitle')}</b>
                     </div>
-                    <button type="button" className="ofi-poi-x" onClick={onClose} aria-label={t('common.close')}>
+                    {!embedded && <button type="button" className="ofi-poi-x" disabled={busy} onClick={onClose} aria-label={t('common.close')}>
                         <X size={17} />
-                    </button>
+                    </button>}
                 </div>
 
                 <div className="ofi-poi-body">
@@ -333,7 +381,7 @@ const TemplateManagerPopupContent = ({
                 <div className="ofi-poi-foot">
                     <span className="ofi-poi-note">{draft ? templateSummary(draft.config) : ''}</span>
                     <span className="ofi-poi-spacer" />
-                    <button type="button" className="ofi-poi-btn" onClick={onClose}>{t('common.close')}</button>
+                    <button type="button" className="ofi-poi-btn" disabled={busy} onClick={onClose}>{t(embedded ? 'common.back' : 'common.close')}</button>
                     <button
                         type="button"
                         className="ofi-poi-btn is-primary"

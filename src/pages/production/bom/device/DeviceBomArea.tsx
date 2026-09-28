@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Boxes, TriangleAlert } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
@@ -14,24 +14,9 @@ import { EmptyState, LoadingState, Note } from '../bomUi';
 import { NavBar, NavView } from '../NavStack';
 import { useNavKeys, useNavStack, type NavStackHandle } from '../navStackState';
 import { BomDetailView } from './BomDetailView';
-import { BomDocumentsView } from './BomDocumentsView';
-import { BomPurchasesView } from './BomPurchasesView';
-import { BomPurchaseView } from './BomPurchaseView';
-import { BomReceiptView } from './BomReceiptView';
 import { BomRevisionsView, BomRevisionView } from './BomRevisionsView';
 import { BomTasksView } from './BomTasksView';
-import { OrderWizardView } from './OrderWizardView';
-import { RequestWizardView } from './RequestWizardView';
-import {
-    entryOf,
-    MAIN_ALIAS,
-    stackFromParams,
-    viewTitle,
-    writeViewParams,
-    type BomView,
-    type RequestWizardState,
-    type WizardState,
-} from './bomViews';
+import { entryOf, MAIN_ALIAS, stackFromParams, viewTitle, writeViewParams, type BomView } from './bomViews';
 
 /** Die Aufgaben der Stufe BOM — als Knopf in der Leiste, dahinter die Görevlendirme-Karte. */
 export interface BomTasksBundle {
@@ -52,18 +37,7 @@ export interface BomViewContext {
     applyBom: (bom: Bom) => void;
     reload: () => void;
     open: (view: BomView) => void;
-    openOrder: (purchaseOrderId: string, tab?: string) => void;
     tasks: BomTasksBundle | null;
-    /**
-     * «Satın alma» (27.09.2026 abends): der Talep der BOM, aus dem der Einkauf
-     * gerade Belege macht — die Assistenten wählen nur seine Zeilen vor und
-     * hängen die neuen Belege an ihn.
-     */
-    procurement?: { requestId: string; lines: Map<string, number> } | null;
-    /** Wohin ein Assistent nach dem Anlegen zurückführt (Vorgabe: die BOM). */
-    homeKey?: (bomId: string) => string;
-    /** Die Ansicht läuft im Einkauf («Satın alma») — dort, und nur dort, stehen Lieferanten. */
-    purchasing?: boolean;
 }
 
 /**
@@ -76,11 +50,9 @@ export interface BomViewContext {
  * Seit der Hierarchie (gleicher Tag): die Wurzel des Navigationsstapels ist die
  * HAUPT-BOM des Bereichs (BOM-MEK-00001 / BOM-ELK-00001) — gleich als Liste,
  * ohne Kartenwahl; darunter ihre Alt-BOMs als Karten. Weiter geht es in
- * eigenen Ansichten: Alt-BOM › Bestellung anlegen (Fehlend › Lieferanten ›
- * Vorschau › Ergebnis) › Bestellungen › Bestellung › Wareneingang, die
- * Dokumente — und «Görevler» (die Aufgaben der Stufe, vorher eine Glaskarte).
- * Im Entwurf statt der Bestellung: «Fiyat talebi» (Ürünler › Tedarikçiler ›
- * Önizleme › Sonuç), je Lieferant eine Preisanfrage.
+ * eigenen Ansichten: Alt-BOM › Revisionen — und «Görevler» (die Aufgaben der
+ * Stufe, vorher eine Glaskarte). Bestellen, anfragen und annehmen macht der
+ * Einkauf auf «Satın alma»; die BOM stellt dafür nur den Talep.
  */
 export const DeviceBomArea = ({
     deviceId,
@@ -91,7 +63,6 @@ export const DeviceBomArea = ({
     area: TaskArea;
     tasks: BomTasksBundle | null;
 }) => {
-    const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
     const stack = useNavStack<BomView>(() => stackFromParams(params));
     /* Jeder Wechsel der Ansicht geht durch die Wache ungespeicherter Änderungen
@@ -116,8 +87,6 @@ export const DeviceBomArea = ({
     const [error, setError] = useState<{ text: string; unavailable: boolean } | null>(null);
     const [tick, setTick] = useState(0);
     const [overrides, setOverrides] = useState<Map<string, Bom>>(() => new Map());
-    const [wizard, setWizard] = useState<WizardState | null>(null);
-    const [requestWizard, setRequestWizard] = useState<RequestWizardState | null>(null);
 
     useEffect(() => {
         let alive = true;
@@ -159,9 +128,6 @@ export const DeviceBomArea = ({
     const applyBom = useCallback((bom: Bom) => setOverrides((current) => new Map(current).set(bom.id, bom)), []);
     const reload = useCallback(() => setTick((value) => value + 1), []);
     const open = useCallback((view: BomView) => nav.push(entryOf(view)), [nav]);
-    const openOrder = useCallback((purchaseOrderId: string, tab?: string) => {
-        navigate(`/inventory/orders/${encodeURIComponent(purchaseOrderId)}${tab ? `?tab=${tab}` : ''}`);
-    }, [navigate]);
 
     const shell = (children: ReactNode) => (
         <div className="ofi-bom is-area" data-area={area.toLowerCase()}>
@@ -194,7 +160,6 @@ export const DeviceBomArea = ({
         applyBom,
         reload,
         open,
-        openOrder,
         tasks,
     };
 
@@ -210,22 +175,6 @@ export const DeviceBomArea = ({
                 {view.kind === 'tasks' && <BomTasksView context={context} />}
                 {missingBom && <BomMissing context={context} />}
                 {bom && view.kind === 'bom' && <BomDetailView context={context} bom={bom} />}
-                {bom && view.kind === 'wizard' && (
-                    <OrderWizardView context={context} bom={bom} step={view.step} wizard={wizard?.bomId === bom.id ? wizard : null} onWizard={setWizard} />
-                )}
-                {bom && view.kind === 'request' && (
-                    <RequestWizardView
-                        context={context}
-                        bom={bom}
-                        step={view.step}
-                        wizard={requestWizard?.bomId === bom.id ? requestWizard : null}
-                        onWizard={setRequestWizard}
-                    />
-                )}
-                {bom && view.kind === 'purchases' && <BomPurchasesView context={context} bom={bom} />}
-                {bom && view.kind === 'purchase' && <BomPurchaseView context={context} bom={bom} purchaseOrderId={view.purchaseOrderId} />}
-                {bom && view.kind === 'receipt' && <BomReceiptView context={context} bom={bom} purchaseOrderId={view.purchaseOrderId} />}
-                {bom && view.kind === 'documents' && <BomDocumentsView context={context} bom={bom} />}
                 {bom && view.kind === 'revisions' && <BomRevisionsView context={context} bom={bom} />}
                 {bom && view.kind === 'revision' && <BomRevisionView context={context} bom={bom} revision={view.revision} />}
             </NavView>

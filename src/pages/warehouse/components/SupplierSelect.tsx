@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { t } from '@/i18n/translate';
 import { warehouseApi } from '@/lib/api/warehouse';
 import type { WarehouseSupplierOption } from '@/types/warehouse';
+import { readQuery } from '@/lib/api/queryCache';
+import '@/styles/modules/warehouse.css';
 
 import { sameText } from '../warehouseText';
 import { PickerCreateRow, PickerPanel, PickerRow, PickerState, TokenField } from './pickerParts';
@@ -44,12 +46,13 @@ export const SupplierSelect = ({
     useEffect(() => {
         if (!open) return undefined;
         let alive = true;
+        let unsubscribe: (() => void) | undefined;
         const timer = window.setTimeout(() => {
-            warehouseApi.suppliers(query)
-                .then((result) => { if (alive) setItems(result); })
-                .catch(() => { if (alive) setItems([]); });
+            unsubscribe = readQuery(`warehouse:suppliers:${query.trim()}`, () => warehouseApi.suppliers(query), { freshMs: 30_000, tags: ['warehouse', 'catalog'] },
+                (result) => { if (alive) setItems(result); },
+                () => { if (alive) setItems([]); });
         }, query ? 220 : 0);
-        return () => { alive = false; window.clearTimeout(timer); };
+        return () => { alive = false; unsubscribe?.(); window.clearTimeout(timer); };
     }, [open, query]);
 
     const typed = query.trim();
@@ -69,7 +72,7 @@ export const SupplierSelect = ({
     };
 
     return (
-        <>
+        <div className="ofi-wh ofi-wh-supplier-field">
             <TokenField
                 ref={fieldRef}
                 open={open}
@@ -108,6 +111,6 @@ export const SupplierSelect = ({
                     <PickerCreateRow label={t('warehouse.supplier.use', { name: typed })} onCreate={() => pick({ id: null, name: typed })} />
                 )}
             </PickerPanel>
-        </>
+        </div>
     );
 };

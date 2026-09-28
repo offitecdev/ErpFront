@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { FloatingCard } from '@/pages/calendar/components/FloatingCard';
+import { WorkspaceSection } from './WorkspaceSection';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    The app's two popup shapes — first built for the quote module (17.08.2026,
@@ -68,6 +69,7 @@ export type PopupTone = 'neutral' | 'danger' | 'success' | 'warning';
 
 export type PopupDialogProps = {
     open: boolean;
+    embedded?: boolean;
     onClose: () => void;
     title: ReactNode;
     subtitle?: ReactNode;
@@ -90,6 +92,7 @@ export type PopupDialogProps = {
 
 export const PopupDialog = ({
     open,
+    embedded = false,
     onClose,
     title,
     subtitle,
@@ -106,7 +109,7 @@ export const PopupDialog = ({
     children,
 }: PopupDialogProps) => {
     useEffect(() => {
-        if (!open || !closeOnEscape) return;
+        if (!open || !closeOnEscape || embedded) return;
         const onKey = (event: KeyboardEvent) => {
             if (event.key !== 'Escape') return;
             event.stopPropagation();
@@ -115,9 +118,10 @@ export const PopupDialog = ({
         // Capture: runs before a floating card behind the dialog sees the key.
         window.addEventListener('keydown', onKey, true);
         return () => window.removeEventListener('keydown', onKey, true);
-    }, [open, closeOnEscape, onClose]);
+    }, [open, closeOnEscape, onClose, embedded]);
 
     if (!open) return null;
+    if (embedded) return <WorkspaceSection title={title} subtitle={subtitle} icon={icon} footer={footer}><div className={bodyClassName}>{headerActions}{children}</div></WorkspaceSection>;
 
     return createPortal(
         // `data-cal-stacked` — a floating card underneath leaves Escape alone

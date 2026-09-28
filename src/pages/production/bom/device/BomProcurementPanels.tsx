@@ -6,9 +6,10 @@ import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/P
 import { PurchaseCode } from '@/components/ui-shared/PurchaseCode';
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBom';
-import type { Bom, BomGoodsIn, BomProcurementSummary, BomReceiptAllocation } from '@/types/productionBom';
+import type { Bom, BomGoodsIn, BomProcurementSummary } from '@/types/productionBom';
 
 import { fmtQty, shortDate, unitLabel } from '../bomFormat';
+import { EmptyState } from '../bomUi';
 import { ProgressRing } from './BomProcessButton';
 
 /**
@@ -18,6 +19,10 @@ import { ProgressRing } from './BomProcessButton';
  * hat und wie weit er ist («süreçsel bilgilendirme»), und welche Ware bei
  * der Buchung an diese BOM ging («gelen mallar»). Karten mit Seriennummer
  * tragen ein ⓘ — dahinter die Nummern, wie sie ankamen.
+ *
+ * Seit dem 28.09.2026 je ein REITER der BOM (BomTabs): Titel und Zahl stehen
+ * im Reiter, hier nur die Zeile darunter — und ein leerer Zustand, wenn es
+ * (noch) nichts gibt.
  */
 
 const statusTone: Record<BomProcurementSummary['status'], string> = {
@@ -49,7 +54,9 @@ export const BomProcurementSection = ({
 }) => {
     const [busy, setBusy] = useState<string | null>(null);
     const requests = bom.procurement ?? [];
-    if (!requests.length) return null;
+    if (!requests.length) {
+        return <EmptyState icon={<ShoppingCart />} title={t('productionBom.procurement.empty')} hint={t('productionBom.procurement.emptyHint')} />;
+    }
 
     const withdraw = async (request: BomProcurementSummary) => {
         setBusy(request.id);
@@ -65,12 +72,8 @@ export const BomProcurementSection = ({
     };
 
     return (
-        <section className="ofi-bom-group ofi-bom-reqs">
-            <h3 className="ofi-bom-group__title">
-                {t('productionBom.procurement.title')}
-                <span className="ofi-bom-group__count">{requests.length}</span>
-                <span className="ofi-bom-group__meta">{t('productionBom.procurement.titleMeta')}</span>
-            </h3>
+        <section className="ofi-bom-group ofi-bom-reqs" aria-label={t('productionBom.procurement.title')}>
+            <p className="ofi-bom-group__caption">{t('productionBom.procurement.titleMeta')}</p>
             <div className="ofi-bom-group__box is-list">
                 {requests.map((request) => {
                     const { covered, total } = request.progress;
@@ -124,16 +127,14 @@ export const BomGoodsInSection = ({ bom }: { bom: Bom }) => {
     const goods = bom.goodsIn ?? [];
     const [open, setOpen] = useState<BomGoodsIn | null>(null);
     const unitOf = useMemo(() => new Map(bom.lines.map((line) => [line.id, line.unit])), [bom.lines]);
-    if (!goods.length) return null;
+    if (!goods.length) {
+        return <EmptyState icon={<PackageCheck />} title={t('productionBom.goodsIn.empty')} hint={t('productionBom.goodsIn.emptyHint')} />;
+    }
     const total = goods.reduce((sum, entry) => sum + entry.quantity, 0);
 
     return (
-        <section className="ofi-bom-group ofi-bom-goods">
-            <h3 className="ofi-bom-group__title">
-                {t('productionBom.goodsIn.title')}
-                <span className="ofi-bom-group__count">{goods.length}</span>
-                <span className="ofi-bom-group__meta">{t('productionBom.goodsIn.meta', { total: fmtQty(total) })}</span>
-            </h3>
+        <section className="ofi-bom-group ofi-bom-goods" aria-label={t('productionBom.goodsIn.title')}>
+            <p className="ofi-bom-group__caption">{t('productionBom.goodsIn.meta', { total: fmtQty(total) })}</p>
             <div className="ofi-bom-group__box is-list">
                 <div className="ofi-bom-goodsrow is-head">
                     <span>{t('productionBom.goodsIn.date')}</span>
@@ -229,59 +230,3 @@ const GoodsInSerialsDialog = ({ entry, bom, onClose }: { entry: BomGoodsIn | nul
         </PopupDialog>
     );
 };
-
-/* ── Nach dem Wareneingang: wohin die Ware ging ─────────────────────────── */
-
-/**
- * «Mal kabulde projeler arasında en erken teslim tarihli projeye aktarılması
- *  gerekmektedir … direkt otomatik çekmesi.» Nach der Buchung zeigt das
- * Fenster je Karte, welches Projekt sie bekam (frühester Liefertermin zuerst)
- * und was frei blieb — samt Seriennummern.
- */
-export const ReceiptAllocationDialog = ({ allocations, onClose }: { allocations: BomReceiptAllocation[] | null; onClose: () => void }) => (
-    <PopupDialog
-        open={Boolean(allocations?.length)}
-        onClose={onClose}
-        title={t('productionBom.goodsIn.allocTitle')}
-        subtitle={t('productionBom.goodsIn.allocSubtitle')}
-        icon={<PackageCheck size={18} />}
-        tone="success"
-        width={560}
-        footer={(
-            <PopupActions>
-                <PopupButton variant="primary" onClick={onClose}>{t('productionBom.common.close')}</PopupButton>
-            </PopupActions>
-        )}
-    >
-        <div className="ofi-bom-pop ofi-bom-alloc">
-            {(allocations ?? []).map((entry, index) => (
-                <div key={`${entry.productId}:${entry.bomId ?? 'free'}:${index}`} className={`ofi-bom-alloc__row${entry.bomId ? '' : ' is-free'}`}>
-                    <span className="ofi-bom-alloc__what">
-                        <b title={entry.name}>{entry.name}</b>
-                        <small className="ofi-bom-code">{entry.erpCode ?? '—'}</small>
-                    </span>
-                    <span className="ofi-bom-alloc__qty">{fmtQty(entry.quantity)}</span>
-                    <span className="ofi-bom-alloc__where">
-                        {entry.bomId ? (
-                            <>
-                                <b>{[entry.projectNumber, entry.projectName].filter(Boolean).join(' · ') || '—'}</b>
-                                <small>
-                                    {[entry.deviceName, entry.bomNumber].filter(Boolean).join(' · ')}
-                                    {entry.deliveryDate ? ` · ${t('productionBom.device.delivery', { date: shortDate(entry.deliveryDate) })}` : ''}
-                                </small>
-                            </>
-                        ) : (
-                            <>
-                                <b>{t('productionBom.goodsIn.freeStock')}</b>
-                                <small>{t('productionBom.goodsIn.freeStockHint')}</small>
-                            </>
-                        )}
-                        {entry.serials.length > 0 && (
-                            <span className="ofi-bom-alloc__serials">{entry.serials.map((serial) => <code key={serial}>{serial}</code>)}</span>
-                        )}
-                    </span>
-                </div>
-            ))}
-        </div>
-    </PopupDialog>
-);

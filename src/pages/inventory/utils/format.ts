@@ -29,10 +29,10 @@ export const fmtUnitCost = (value?: number | null): string =>
  * "3 × 18.98 = 56.94" gibi okunur ve tutarla çelişirdi; bu yüzden gereken kadar
  * (en çok 4) ondalık gösterilir.
  */
-export const fmtUnitPricePrecise = (value?: number | null): string =>
+export const fmtUnitPricePrecise = (value?: number | null, currency = 'CHF'): string =>
     new Intl.NumberFormat('de-CH', {
         style: 'currency',
-        currency: 'CHF',
+        currency,
         minimumFractionDigits: 2,
         maximumFractionDigits: 4,
     }).format(Number(value) || 0);

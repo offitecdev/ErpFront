@@ -1,0 +1,15 @@
+.ofi-workspace-section {
+    width: 100%; min-width: 0; color: var(--text-primary, #1d1d1f);
+    background: transparent; border: 0; border-radius: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+}
+.ofi-workspace-section__head { display: flex; align-items: center; gap: 10px; padding: 0 0 20px; }
+.ofi-workspace-section__head > span { color: #71717a; }
+.ofi-workspace-section__head h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.4px; }
+.ofi-workspace-section__head p { margin: 4px 0 0; color: #777; font-size: 12px; line-height: 1.5; }
+.ofi-workspace-section__body { min-width: 0; padding: 0; }
+.ofi-workspace-section__foot { padding: 20px 0 0; margin-top: 24px; border-top: 1px solid rgba(128,128,128,.14); }
+.dark .ofi-workspace-section { background: transparent; color: #f5f5f7; }
+@media (max-width: 640px) {
+    .ofi-workspace-section__head { padding-bottom: 16px; }
+}

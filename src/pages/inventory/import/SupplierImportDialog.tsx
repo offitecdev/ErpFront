@@ -1,3 +1,4 @@
+import { MacLoading } from '@/components/ui-shared/MacLoading';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
@@ -17,7 +18,7 @@ import '@/styles/purchaseImport.css';
 import '@/styles/purchaseImportGlass.css';
 
 import type { DraftOrderRow } from '../types';
-import { FileDeck, FileGlyph, ReadingDial } from './FileGlyphs';
+import { FileDeck, FileGlyph } from './FileGlyphs';
 import {
     apiFailure, clipboardFromEvent, clipboardToImportFiles, extractedToDraftRow, fileToBase64,
     glyphKindForFile, isImageFile, isPdfFile, isSheetFile, isSupportedImportFile, isTextFile,
@@ -67,6 +68,8 @@ interface ReviewRow {
 
 export interface SupplierImportDialogProps {
     open: boolean;
+    embedded?: boolean;
+    onBusyChange?: (busy: boolean) => void;
     onClose: () => void;
     /**
      * DIE AKTIVE VORLAGE. Sie kommt von der Bestellseite, wird dort einmal
@@ -94,10 +97,14 @@ export interface SupplierImportDialogProps {
 }
 
 const SupplierImportDialogContent = ({
-    open, onClose, config, template, onApply, calcMode, documentType = 'ORDER', initialFiles,
+    open, onClose, config, template, onApply, calcMode, documentType = 'ORDER', initialFiles, embedded = false, onBusyChange,
 }: SupplierImportDialogProps) => {
     const goodsReceipt = documentType === 'GOODS_RECEIPT';
     const [phase, setPhase] = useState<Phase>('file');
+    useEffect(() => {
+        onBusyChange?.(phase === 'reading');
+        return () => onBusyChange?.(false);
+    }, [phase, onBusyChange]);
     const [step, setStep] = useState(0);
     const [status, setStatus] = useState<AiImportStatus | null>(null);
     const [error, setError] = useState<{ title: string; detail?: string } | null>(null);
@@ -114,7 +121,6 @@ const SupplierImportDialogContent = ({
        des erreichten Schritts zu und bleibt dort stehen, bis der naechste
        Schritt gemeldet wird. Er springt also nie zurueck und behauptet nie
        100 %, solange noch gelesen wird. */
-    const [progress, setProgress] = useState(0);
     /* ── DIE UHR BEIM WARTEN ────────────────────────────────────────────
        Der Zeiger laeuft auf 92 % und bleibt dort, solange das Modell
        schreibt — bei einem dichten Beleg ist das eine Minute und mehr.
@@ -150,22 +156,12 @@ const SupplierImportDialogContent = ({
         return () => window.clearInterval(clock);
     }, [phase]);
 
-    useEffect(() => {
-        if (phase !== 'reading') return;
-        const ceiling = [42, 92, 100][step] ?? 100;
-        const timer = window.setInterval(() => {
-            setProgress((current) => (current >= ceiling
-                ? ceiling
-                : Math.min(ceiling, current + Math.max(0.35, (ceiling - current) * 0.055))));
-        }, 60);
-        return () => window.clearInterval(timer);
-    }, [phase, step]);
 
     /* DIE SPALTEN DER VORLAGE — Name, Art und Zuordnung — sind das Einzige,
        was an das Modell geht (Vorgabe Samet, 11.09.2026: «wir geben dem
        Modell die Vorlage mit den Spaltennamen direkt mit»). Der ERP-Code
        steht nicht darin. */
-    const columns = useMemo(() => templateColumns(config), [config]);
+    const columns = useMemo(() => templateColumns(config, documentType), [config, documentType]);
 
     const pickFiles = useCallback((picked: File[]) => {
         const supported = picked.filter(isSupportedImportFile);
@@ -293,7 +289,6 @@ const SupplierImportDialogContent = ({
         setElapsed(0);
         setError(null);
         setStep(0);
-        setProgress(0);
         try {
             /* TABELLEN GEHEN ALS TEXT. `xlsx` liegt im Bündel ohnehin schon, und
                eine Tabelle als Tabulatortext ist kürzer als die Datei — kürzer
@@ -312,7 +307,7 @@ const SupplierImportDialogContent = ({
                Ein winziger Aufruf VORHER nimmt denselben Weg in
                Millisekunden: danach ist der Keks frisch und der lange
                Aufruf laeuft mit einer Sitzung, die ihn ueberdauert. */
-            await purchaseOrdersApi.aiStatus().catch(() => undefined);
+            const sessionReady = purchaseOrdersApi.aiStatus().catch(() => undefined);
 
             const firstFile = files[0]!;
             const imageSet = files.every(isImageFile);
@@ -336,6 +331,7 @@ const SupplierImportDialogContent = ({
                         : { data: await fileToBase64(await shrinkImageForUpload(firstFile)) };
             setStep(1);
 
+            await sessionReady;
             const result = await purchaseOrdersApi.aiExtract({
                 ...payload,
                 fileName: firstFile.name,
@@ -365,7 +361,7 @@ const SupplierImportDialogContent = ({
 
     const draftRows = useMemo(
         () => rows.filter((row) => row.enabled).map((row) => {
-            const draft = extractedToDraftRow(row.data, config, calcMode);
+            const draft = extractedToDraftRow(row.data, config, calcMode, documentType);
             /* Im Wareneingang zaehlt die Menge so, wie sie auf dem
                Lieferschein steht — leer bleibt leer, statt zur 1 zu werden. */
             const quantityKey = columns.find((column) => column.label === 'quantity')?.key;
@@ -373,7 +369,7 @@ const SupplierImportDialogContent = ({
                 ? { ...draft, quantity: quantityKey ? cellValue(row.data[quantityKey]) : '' }
                 : draft;
         }),
-        [rows, config, calcMode, goodsReceipt, columns],
+        [rows, config, calcMode, goodsReceipt, columns, documentType],
     );
 
     /* ── DIE ANZAHL, GEPRUEFT ───────────────────────────────────────────
@@ -429,13 +425,12 @@ const SupplierImportDialogContent = ({
             <Settings01 size={14} />
             <div>
                 <b>{template ? template.title : t('inv.aiImport.templateFallback')}</b>
-                <span>{templateSummary(config)}</span>
+                <span>{templateSummary(config, documentType)}</span>
             </div>
         </div>
     );
 
     /* Welches Blatt gezeigt wird — PDF rot, Foto blau, Tabelle gruen. */
-    const fileKind = files[0] ? glyphKindForFile(files[0]) : 'file';
 
     const phases = [
         { icon: <Scan size={13} />, label: t('inv.aiImport.phaseText') },
@@ -475,12 +470,13 @@ const SupplierImportDialogContent = ({
 
     const body = (() => {
         if (phase === 'reading') {
+            if (embedded) return <MacLoading label={t('common.loadingData')} detail={elapsed >= 30 ? t('inv.aiImport.stillReading', { seconds: elapsed }) : undefined} />;
             return (
                 <div className="ofi-poi-pane">
                     <div className="ofi-poi-progress">
                         {/* Der Ring, das drehende Blatt und der Prozentwert —
                             eine Auskunft statt eines wartenden Balkens. */}
-                        <ReadingDial kind={fileKind} percent={progress} />
+                        <MacLoading label={phases[step]?.label ?? t("common.loadingData")} />
                         <div className="ofi-poi-phases">
                             {phases.map((entry, index) => (
                                 <div
@@ -493,7 +489,7 @@ const SupplierImportDialogContent = ({
                             ))}
                         </div>
                         <span style={{ fontSize: 11.5, color: 'var(--ofi-cal-muted)' }}>
-                            {t('inv.aiImport.readingNote', { model: status?.model ?? 'gpt-4o-mini' })}
+                            {status?.model ? t('inv.aiImport.readingNote', { model: status.model }) : ''}
                         </span>
                         {/* Erst ab einer halben Minute — vorher waere die Uhr
                             blosse Unruhe. Danach ist sie die Auskunft, dass
@@ -665,7 +661,7 @@ const SupplierImportDialogContent = ({
                             onDragLeave={() => setDragOver(false)}
                             onDrop={onDrop}
                         >
-                            <FileDeck />
+                            {embedded ? <FileGlyph kind="pdf" size={28} /> : <FileDeck />}
                             <b>{t('inv.aiImport.dropHint')}</b>
                             <span>{t('inv.aiImport.fileTypes')}</span>
                             {/* Strg+V gehoert diesem Fenster, solange es eine
@@ -696,19 +692,19 @@ const SupplierImportDialogContent = ({
                     onChange={onFileChange}
                 />
 
-                {settingsStrip}
-                <p className="ofi-poi-note" style={{ marginTop: 10 }}>{t('inv.aiImport.tokenNote')}</p>
+                {!embedded && settingsStrip}
+                {!embedded && <p className="ofi-poi-note" style={{ marginTop: 10 }}>{t('inv.aiImport.tokenNote')}</p>}
             </div>
         );
     })();
 
     return (
-        <div className="ofi-poi-scrim ofi-poi-glass-scrim" role="dialog" aria-modal="true" aria-labelledby="supplier-import-title">
-            <div className="ofi-poi ofi-poi-glass" style={{ height: phase === 'review' ? 'min(720px, 100%)' : 'auto', maxHeight: '100%' }}>
-                <div className="ofi-poi-head">
-                    <div className="ofi-poi-title">
-                        <b id="supplier-import-title">{t('inv.aiImport.title')}</b>
-                        <span>{files.length ? files.map((entry) => entry.name).join(' · ') : t('inv.aiImport.subtitle')}</span>
+        <div className={embedded ? 'ofi-inline-tool' : 'ofi-poi-scrim ofi-poi-glass-scrim'} role={embedded ? 'region' : 'dialog'} aria-modal={embedded ? undefined : true} aria-labelledby="supplier-import-title">
+            <div className={embedded ? 'ofi-import-page' : 'ofi-poi ofi-poi-glass'} hidden={embedded && cameraOpen} style={embedded ? undefined : { height: phase === 'review' ? 'min(720px, 100%)' : 'auto', maxHeight: '100%' }}>
+                <div className={embedded ? 'ofi-page-toolbar' : 'ofi-poi-head'}>
+                    <div className={embedded ? 'ofi-import-page__title' : 'ofi-poi-title'}>
+                        <b id="supplier-import-title">{t(embedded ? 'productionBom.purchasing.pdfImport' : 'inv.aiImport.title')}</b>
+                        <span>{embedded ? template?.title : files.length ? files.map((entry) => entry.name).join(' · ') : t('inv.aiImport.subtitle')}</span>
                     </div>
                     {/* ── DIE DREI SCHRITTE (Vorgabe Samet, 07.09.2026) ────────
                         «Ordnet den Ablauf vielleicht in Schritte — Schritt 1 …»
@@ -716,7 +712,7 @@ const SupplierImportDialogContent = ({
                         Akzentfarbe, die erledigten einen Haken. Zurueck geht es
                         durch Anklicken eines erledigten Schritts — vorwaerts
                         nicht, dafuer ist der Knopf im Fuss da. */}
-                    <div className="ofi-poi-steps" aria-label={t('inv.aiImport.title')}>
+                    {!embedded && <div className="ofi-poi-steps" aria-label={t('inv.aiImport.title')}>
                         {STEPS.map((entry, stepIndex) => {
                             const done = stepIndex < phaseIndex;
                             const active = stepIndex === phaseIndex;
@@ -739,15 +735,15 @@ const SupplierImportDialogContent = ({
                                 </div>
                             );
                         })}
-                    </div>
-                    <button type="button" className="ofi-poi-x" onClick={onClose} aria-label={t('common.close')}>
+                    </div>}
+                    {!embedded && <button type="button" className="ofi-poi-x" disabled={phase === 'reading'} onClick={onClose} aria-label={t('common.close')}>
                         <X size={17} />
-                    </button>
+                    </button>}
                 </div>
 
-                <div className="ofi-poi-body">{body}</div>
+                <div className={embedded ? 'ofi-import-content' : 'ofi-poi-body'}>{body}</div>
 
-                <div className="ofi-poi-foot">
+                <div className={embedded ? 'ofi-page-actions' : 'ofi-poi-foot'}>
                     {phase === 'review' && (
                         <button type="button" className="ofi-poi-btn" onClick={() => { setPhase('file'); setRows([]); }}>
                             <ArrowLeft size={13} />
@@ -777,9 +773,9 @@ const SupplierImportDialogContent = ({
             </div>
             {cameraOpen && (
                 <div
-                    className="ofi-poi-camera-scrim"
-                    role="dialog"
-                    aria-modal="true"
+                    className={embedded ? 'ofi-inline-camera' : 'ofi-poi-camera-scrim'}
+                    role={embedded ? 'region' : 'dialog'}
+                    aria-modal={embedded ? undefined : true}
                     onMouseDown={(event) => { if (event.target === event.currentTarget) setCameraOpen(false); }}
                 >
                     <div className="ofi-poi-camera">

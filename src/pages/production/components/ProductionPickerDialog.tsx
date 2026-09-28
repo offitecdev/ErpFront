@@ -92,6 +92,7 @@ export interface PickerDetails {
 
 export const ProductionPickerDialog = ({
     open,
+    embedded = false,
     initial,
     lines,
     busy = false,
@@ -99,6 +100,7 @@ export const ProductionPickerDialog = ({
     onApply,
 }: {
     open: boolean;
+    embedded?: boolean;
     initial: ProductionSelection | null;
     /** Zeilen einer bestehenden Bestellung — dann folgt bei mehreren Geräten die Zuordnung je Zeile. */
     lines?: PickerLine[];
@@ -311,6 +313,7 @@ export const ProductionPickerDialog = ({
 
     return (
         <PopupDialog
+            embedded={embedded}
             open={open}
             onClose={onClose}
             width={step === 'map' ? 760 : 1180}

@@ -63,22 +63,19 @@ export const nextColumnKey = (columns: TemplateColumn[]): string | null => {
 };
 
 /** Die Spalten, die zaehlen: benannt, getrimmt, hoechstens zwoelf. */
-export const templateColumns = (config: SupplierCalcConfig): TemplateColumn[] =>
+export const templateColumns = (config: SupplierCalcConfig, documentType?: PurchaseTemplateDocumentType): TemplateColumn[] =>
     (config.columns ?? [])
         .filter((column) => column.name.trim())
-        .slice(0, TEMPLATE_MAX_COLUMNS)
+        // A request can add two computed price fields to an existing 12-column template.
+        .slice(0, TEMPLATE_MAX_COLUMNS + (documentType === 'PRICE_REQUEST' ? 2 : 0))
         .map((column) => ({ ...column, name: column.name.trim(), label: column.label ?? null }));
 
 /** Die freien Spalten — ihre Werte werden als eigene Angaben gespeichert. */
 export const unlabeledColumns = (config: SupplierCalcConfig): TemplateColumn[] =>
     templateColumns(config).filter((column) => !column.label);
 
-/**
- * Welche Zuordnungen ein Dokument kennt: eine PREISANFRAGE hat keine Preise,
- * dort gibt es nur Produktname und Menge.
- */
-export const labelsForDocument = (documentType: PurchaseTemplateDocumentType): TemplateLabel[] =>
-    (documentType === 'PRICE_REQUEST' ? ['productName', 'quantity'] : [...TEMPLATE_LABELS]);
+/** Requests retain the supplier's prices in the same document. */
+export const labelsForDocument = (_documentType: PurchaseTemplateDocumentType): TemplateLabel[] => [...TEMPLATE_LABELS];
 
 /** Der Name einer Zuordnung auf dem Bildschirm. */
 export const templateLabelName = (label: TemplateLabel): string => t(`inv.aiImport.label.${label}`);
@@ -122,10 +119,14 @@ export const templateProblemText = (problem: TemplateProblem): string => t(
 export const CALC_REQUIRED_LABELS: TemplateLabel[] = ['productName', 'quantity', 'grossPrice', 'netPrice', 'discount', 'total'];
 
 /** Die fehlenden Zuordnungen für eine Rechenart — leer = sie darf rechnen. */
-export const missingCalcLabels = (config: SupplierCalcConfig, mode: OrderCalcMode): TemplateLabel[] => {
+export const missingCalcLabels = (config: SupplierCalcConfig, mode: OrderCalcMode, documentType?: PurchaseTemplateDocumentType): TemplateLabel[] => {
     if (mode === 'DIRECT') return [];
-    const present = new Set(templateColumns(config).map((column) => column.label).filter(Boolean));
-    return CALC_REQUIRED_LABELS.filter((label) => !present.has(label));
+    const columns = documentType === 'PRICE_REQUEST' ? (config.columns ?? []).filter((column) => column.name.trim()) : templateColumns(config);
+    const present = new Set(columns.map((column) => column.label).filter(Boolean));
+    const required: TemplateLabel[] = documentType === 'PRICE_REQUEST'
+        ? ['productName', 'quantity', mode === 'SUPPLIER' ? 'netPrice' : 'grossPrice']
+        : CALC_REQUIRED_LABELS;
+    return required.filter((label) => !present.has(label));
 };
 
 /** «Schlüssel fehlt: Einzelpreis, Rabatt» — für Toast und Rechenfenster. */
@@ -133,8 +134,8 @@ export const missingCalcLabelsText = (missing: TemplateLabel[]): string =>
     t('inv.orders.calcMode.missingKeys', { keys: missing.map(templateLabelName).join(', ') });
 
 /** Prüft eine Rechenart gegen die Vorlage: null = erlaubt, sonst der Fehlersatz. */
-export const calcModeError = (config: SupplierCalcConfig, mode: OrderCalcMode): string | null => {
-    const missing = missingCalcLabels(config, mode);
+export const calcModeError = (config: SupplierCalcConfig, mode: OrderCalcMode, documentType?: PurchaseTemplateDocumentType): string | null => {
+    const missing = missingCalcLabels(config, mode, documentType);
     return missing.length ? missingCalcLabelsText(missing) : null;
 };
 
@@ -143,8 +144,8 @@ export const calcModeError = (config: SupplierCalcConfig, mode: OrderCalcMode): 
  * Vorlagenliste und im Import-Fenster: wie viele Spalten, und welche
  * Zuordnungen vergeben sind.
  */
-export const templateSummary = (config: SupplierCalcConfig): string => {
-    const columns = templateColumns(config);
+export const templateSummary = (config: SupplierCalcConfig, documentType?: PurchaseTemplateDocumentType): string => {
+    const columns = templateColumns(config, documentType);
     if (!columns.length) return t('inv.aiImport.noColumns');
     const labels = columns
         .map((column) => column.label)
@@ -236,6 +237,22 @@ export const tableColumnsFromTemplate = (
         columns.push({ id: extra.key, key: extra.key, name, type: extra.type, width: extra.width, label: null });
     }
     return columns;
+};
+
+/** Older request templates also expose prices without losing their custom columns. */
+export const withPriceRequestTableColumns = (columns: TableColumn[]): TableColumn[] => {
+    const result = [...columns];
+    for (const field of [
+        { id: 'grossPrice', key: 'stdUnitPrice', label: 'grossPrice' as const },
+        { id: 'lineTotal', key: 'stdAmount', label: 'total' as const },
+    ]) {
+        if (result.some((column) => column.label === field.label)) continue;
+        let key = field.key;
+        let suffix = 1;
+        while (result.some((column) => column.key === key)) key = `${field.key}${suffix++}`;
+        result.push({ ...field, key, name: templateLabelName(field.label), type: 'number', width: 130 });
+    }
+    return result;
 };
 
 /**
@@ -377,10 +394,11 @@ export const extractedToDraftRow = (
     row: AiExtractedRow,
     config: SupplierCalcConfig,
     calcMode: OrderCalcMode = 'DIRECT',
+    documentType?: PurchaseTemplateDocumentType,
 ): DraftOrderRow => {
     const byLabel = new Map<TemplateLabel, string>();
     const extras: Record<string, string> = {};
-    for (const column of templateColumns(config)) {
+    for (const column of templateColumns(config, documentType)) {
         if (column.label) { byLabel.set(column.label, column.key); continue; }
         const value = text(row[column.key]);
         if (value) extras[column.key] = value.slice(0, 240);

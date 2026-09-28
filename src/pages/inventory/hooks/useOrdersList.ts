@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { purchaseOrdersApi } from '@/lib/api/inventory';
 import type { PurchaseOrderRow, PurchaseOrderStatus } from '@/types/inventory';
 import type { PurchaseKind } from '../utils/orderStatus';
@@ -38,10 +38,14 @@ export const useOrdersList = (kind: PurchaseKind) => {
 
     const [reloadTick, setReloadTick] = useState(0);
     const reload = useCallback(() => setReloadTick((tick) => tick + 1), []);
+    const previousQuery = useRef<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        setLoading(true);
+        const queryKey = JSON.stringify([kind, page, debouncedSearch, status, dateFrom, dateTo, debouncedFilters]);
+        // Closing a document refreshes the current list without hiding its rows.
+        if (previousQuery.current !== queryKey) setLoading(true);
+        previousQuery.current = queryKey;
         setError(null);
         purchaseOrdersApi
             .list({

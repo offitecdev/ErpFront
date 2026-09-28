@@ -16,12 +16,14 @@ const PAGE_SIZE = 12;
  */
 export const ArticlePickerModal = ({
     open,
+    embedded = false,
     onClose,
     onPick,
     itemType,
     title,
 }: {
     open: boolean;
+    embedded?: boolean;
     onClose: () => void;
     onPick: (article: ArticleListItem) => void;
     itemType?: ItemType;
@@ -49,20 +51,20 @@ export const ArticlePickerModal = ({
         close();
     };
 
-    return createPortal(
-        <div className="fixed inset-0 z-[130] flex items-center justify-center px-3">
-            <div
+    const content = (
+        <div className={embedded ? 'ofi-inline-tool' : 'fixed inset-0 z-[130] flex items-center justify-center px-3'}>
+            {!embedded && <div
                 className="absolute inset-0 bg-slate-950/30 dark:bg-black/55"
                 onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}
-            />
+            />}
             <section
-                role="dialog"
-                aria-modal="true"
+                role={embedded ? 'region' : 'dialog'}
+                aria-modal={embedded ? undefined : true}
                 /* `.ofi-pop` = die gemeinsame Fensteroberfläche (index.css,
                    "FENSTER-OBERFLÄCHE"): dieselbe Kante, Fläche und Haarlinie
                    wie das Kundenfenster des Kalenders. `rounded-lg` kam vorher
                    als 2px an. */
-                className="ofi-rise-in ofi-pop relative flex max-h-[86vh] w-full max-w-[880px] flex-col overflow-hidden"
+                className={embedded ? 'ofi-inline-picker' : 'ofi-rise-in ofi-pop relative flex max-h-[86vh] w-full max-w-[880px] flex-col overflow-hidden'}
             >
                 <header className="ofi-pop__rule flex items-center justify-between gap-2 border-b px-4 py-3">
                     <h3 className="ofi-pop__title">{title ?? t('inv.productPicker.allTitle')}</h3>
@@ -129,7 +131,7 @@ export const ArticlePickerModal = ({
                     <Pager page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
                 </div>
             </section>
-        </div>,
-        document.body,
+        </div>
     );
+    return embedded ? content : createPortal(content, document.body);
 };

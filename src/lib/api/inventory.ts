@@ -510,8 +510,8 @@ export const purchaseOrdersApi = {
     },
 
     get: async (id: string): Promise<PurchaseOrderRow> => {
-        const res = await apiClient.get(`/inventory/purchase-orders/${id}`);
-        return res.data;
+        const url = `/inventory/purchase-orders/${encodeURIComponent(id)}`;
+        return cachedQuery(url, async () => (await apiClient.get(url)).data, { freshMs: 10_000, staleMs: 0, tags: ['catalog', 'production', 'warehouse'] });
     },
 
     // Çoklu tedarikçi seçiminde tedarikçi başına bir sipariş oluşur.

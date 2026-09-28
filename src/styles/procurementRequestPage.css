@@ -1,0 +1,64 @@
+/* Procurement requests use the BOM page width and its normal scrollport. */
+.ofi-procurement-request-page .ofi-bom-reqdlg__table {
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+}
+.ofi-procurement-request-page .ofi-bom-reqdlg__row.is-head {
+    top: var(--bom-bar-h, 0px);
+}
+.ofi-procurement-request-page .ofi-bom-reqdlg__row.is-on { background: transparent; }
+.ofi-procurement-request-page .ofi-bom-reqdlg__name > b { white-space: normal; }
+#root .ofi-procurement-request-page button.ofi-bom-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    min-height: 0;
+    padding: 0;
+    border: 1.5px solid var(--bom-field-border);
+    border-radius: 4px;
+    background: var(--bom-field);
+    box-shadow: none;
+    color: #fff;
+    cursor: pointer;
+}
+#root .ofi-procurement-request-page button.ofi-bom-check.is-on { border-color: var(--bom-accent); background: var(--bom-accent); }
+#root .ofi-procurement-request-page button.ofi-bom-check:disabled { cursor: default; opacity: .45; }
+#root .ofi-procurement-request-page button.ofi-bom-check:focus-visible { outline: 2px solid var(--bom-ring); outline-offset: 2px; }
+#root .ofi-procurement-request-page .ofi-bom-reqdlg__qty > input,
+#root .ofi-procurement-request-page .ofi-bom-reqdlg__note textarea {
+    min-height: 0;
+    border: 1px solid var(--bom-field-border);
+    border-radius: 6px;
+    background: var(--bom-field);
+    box-shadow: none;
+    color: var(--bom-text);
+    font: inherit;
+    font-size: 13px;
+}
+#root .ofi-procurement-request-page .ofi-bom-reqdlg__qty > input {
+    width: 88px;
+    height: 32px;
+    padding: 0 8px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+#root .ofi-procurement-request-page .ofi-bom-reqdlg__note textarea {
+    width: 100%;
+    min-height: 68px;
+    padding: 8px 10px;
+    font-weight: 400;
+    resize: vertical;
+}
+#root .ofi-procurement-request-page .ofi-bom-reqdlg__qty > input:focus,
+#root .ofi-procurement-request-page .ofi-bom-reqdlg__note textarea:focus {
+    border-color: var(--bom-accent);
+    outline: 2px solid var(--bom-ring);
+    outline-offset: 1px;
+}
+#root .ofi-procurement-request-page .ofi-bom-reqdlg__qty > input.is-invalid { border-color: var(--bom-danger); }
+#root .ofi-procurement-request-page input:disabled,
+#root .ofi-procurement-request-page textarea:disabled { opacity: .55; }
