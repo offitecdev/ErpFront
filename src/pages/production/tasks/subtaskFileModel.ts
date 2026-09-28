@@ -1,7 +1,7 @@
 import { t } from '@/i18n/translate';
 import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
 
-import { isSubtaskCompleted, SUBTASK_FILE_ACCEPT, SUBTASK_FILE_MAX_BYTES } from './taskModel';
+import { isSubtaskCompleted, SUBTASK_FILE_MAX_BYTES } from './taskModel';
 
 /* Dateien an Unteraufgaben (28.09.2026) — was die Oberflächen teilen. */
 
@@ -27,10 +27,9 @@ export const isPdf = (file: { type: string }): boolean => file.type === 'applica
 export const isImage = (file: { type: string }): boolean => file.type.startsWith('image/');
 
 /** Vor dem Senden prüfen, was der Server ohnehin prüft — die Meldung kommt sofort. */
-export const fileProblem = (file: File, pdfOnly = false): string | null => {
-    if (pdfOnly ? !isPdf(file) : !SUBTASK_FILE_ACCEPT.split(',').includes(file.type)) {
-        return t(pdfOnly ? 'productionTasks.complete.pdfOnly' : 'productionTasks.files.badType');
-    }
+export const fileProblem = (file: File): string | null => {
+    // Nur PDF (28.09.2026) — wie der Server.
+    if (!isPdf(file)) return t('productionTasks.files.badType');
     if (file.size > SUBTASK_FILE_MAX_BYTES) return t('productionTasks.files.tooLarge');
     return null;
 };

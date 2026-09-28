@@ -133,16 +133,10 @@ export const TemplateEditor = ({
         onChange(removeSection(draft, target));
         if (section?.key === target) onArea(draft.sections.find((entry) => entry.key !== target)?.key ?? '');
     };
-    const requestRemoveSection = (target: TaskArea) => {
-        const count = taskCountIn(target);
-        if (count) setRemoval({ area: target, count });
-        else dropSection(target);
-    };
-    const requestRemoveStage = (target: TaskArea, stage: TaskStage) => {
-        const count = taskCountIn(target, stage);
-        if (count) setRemoval({ area: target, stage, count });
-        else onChange(removeStage(draft, target, stage));
-    };
+    // Entfernen fragt immer nach — auch ohne Aufgaben (28.09.2026: «always show a warning»).
+    const requestRemoveSection = (target: TaskArea) => setRemoval({ area: target, count: taskCountIn(target) });
+    const requestRemoveStage = (target: TaskArea, stage: TaskStage) =>
+        setRemoval({ area: target, stage, count: taskCountIn(target, stage) });
     const confirmRemoval = () => {
         if (!removal) return;
         if (removal.stage) onChange(removeStage(draft, removal.area, removal.stage));
@@ -483,8 +477,8 @@ export const TemplateEditor = ({
                 title={removal?.stage ? t('productionTasks.template.removeStageTitle') : t('productionTasks.template.removeSectionTitle')}
                 subtitle={removal
                     ? removal.stage
-                        ? t('productionTasks.template.removeStageText', { name: removalStage ? stageLabel(removalStage) : '', count: removal.count })
-                        : t('productionTasks.template.removeSectionText', { name: removalSection ? sectionLabel(removalSection) : '', count: removal.count })
+                        ? t(removal.count ? 'productionTasks.template.removeStageText' : 'productionTasks.template.removeStageEmpty', { name: removalStage ? stageLabel(removalStage) : '', count: removal.count })
+                        : t(removal.count ? 'productionTasks.template.removeSectionText' : 'productionTasks.template.removeSectionEmpty', { name: removalSection ? sectionLabel(removalSection) : '', count: removal.count })
                     : undefined}
                 icon={<Trash2 size={18} />}
                 tone="danger"

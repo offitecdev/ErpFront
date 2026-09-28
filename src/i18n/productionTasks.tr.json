@@ -32,7 +32,8 @@
       "retry": "Tekrar dene",
       "revert": "Geri al",
       "save": "Kaydet",
-      "saving": "Kaydediliyor…"
+      "saving": "Kaydediliyor…",
+      "remove": "Kaldır"
     },
     "check": {
       "areaOpen": "Bu bölümün toplamı tutmuyor",
@@ -117,7 +118,7 @@
       "ALREADY_COMPLETED": "Bu alt görev zaten tamamlandı.",
       "DOCUMENT_REQUIRED": "Önce en az bir PDF yükleyin — belge zorunlu.",
       "FILE_REQUIRED": "Dosya alınamadı.",
-      "FILE_TYPE": "Yalnızca PDF dosyaları ve fotoğraflar eklenebilir.",
+      "FILE_TYPE": "Yalnızca PDF dosyaları eklenebilir.",
       "FILE_TOO_LARGE": "Dosya çok büyük (en fazla {{max}} MB).",
       "FILES_TOO_MANY": "Bir alt görevde en fazla {{max}} dosya olabilir.",
       "FILE_NOT_FOUND": "Dosya bulunamadı.",
@@ -184,7 +185,9 @@
       "startDate": "Başlangıç tarihi",
       "dueDate": "Termin tarihi",
       "dueBeforeStart": "Termin tarihi başlangıç tarihinden önce.",
-      "peopleHintDevice": "Bu kişiler bu cihazda görevlendirilir ve bildirim alır."
+      "peopleHintDevice": "Bu kişiler bu cihazda görevlendirilir ve bildirim alır.",
+      "deleteTitle": "Görev silinsin mi?",
+      "deleteText": "{{code}} «{{name}}» görevi ve alt görevleri silinecek."
     },
     "subtask": {
       "title": "Alt görevler",
@@ -210,7 +213,9 @@
       "needsPdf": "{{status}} — PDF gerekli",
       "expand": "{{code}} alt görevlerini göster",
       "collapse": "{{code}} alt görevlerini gizle",
-      "showFiles": "Dosyaları göster"
+      "showFiles": "Dosyaları göster",
+      "removeTitle": "Alt görev silinsin mi?",
+      "removeText": "«{{name}}» alt görevi bu görevden kaldırılacak."
     },
     "dates": {
       "from": "{{date}} itibarıyla",
@@ -270,7 +275,9 @@
       "removeStageText_other": "«{{name}}» aşaması {{count}} göreviyle birlikte bu şablondan kaldırılacak.",
       "nameInUse": "Bu ad kullanılıyor",
       "nameRequired": "Ad gerekli",
-      "sectionFull": "Bu bölümde ağırlık kalmadı — görevleri zaten %100 ediyor. Önce bir görevin ağırlığını düşürün."
+      "sectionFull": "Bu bölümde ağırlık kalmadı — görevleri zaten %100 ediyor. Önce bir görevin ağırlığını düşürün.",
+      "removeStageEmpty": "«{{name}}» aşaması bu şablondan kaldırılacak.",
+      "removeSectionEmpty": "«{{name}}» bölümü bu şablondan kaldırılacak."
     },
     "templates": {
       "clearSearch": "Aramayı temizle",
@@ -311,11 +318,13 @@
       "remove": "{{name}} dosyasını kaldır",
       "today": "bugün {{time}}",
       "yesterday": "dün {{time}}",
-      "badType": "Yalnızca PDF dosyaları ve fotoğraflar eklenebilir.",
+      "badType": "Yalnızca PDF dosyaları eklenebilir.",
       "tooLarge": "Dosya çok büyük (en fazla 25 MB).",
       "needPdf": "PDF zorunlu",
       "count_one": "{{count}} dosya",
-      "count_other": "{{count}} dosya"
+      "count_other": "{{count}} dosya",
+      "removeTitle": "Dosya silinsin mi?",
+      "removeText": "«{{name}}», «{{subtask}}» alt görevinden kaldırılacak. Bu işlem geri alınamaz."
     },
     "complete": {
       "button": "Görevi tamamla",
@@ -339,7 +348,6 @@
       "dropTitle": "PDF dosyasını buraya bırakın",
       "note": "Kısa not",
       "optional": "(isteğe bağlı)",
-      "pdfOnly": "Buraya yalnızca PDF eklenebilir.",
       "completedBy": "{{name}} tamamladı · {{when}}",
       "done": "Alt görev tamamlandı.",
       "subtasksRow": "Alt görevler tamamlandı",
@@ -358,10 +366,8 @@
       "open": "{{stage}} dosyalarını aç",
       "count_one": "{{count}} dosya",
       "count_other": "{{count}} dosya",
-      "summary_one": "{{count}} dosya · {{pdf}} PDF · {{image}} görsel",
-      "summary_other": "{{count}} dosya · {{pdf}} PDF · {{image}} görsel",
       "none": "Henüz dosya yok",
-      "dropTitle": "Dosyaları buraya bırakın, sonra görevi ve alt görevi seçin",
+      "dropTitle": "PDF dosyalarını buraya bırakın, sonra görevi ve alt görevi seçin",
       "noSubtasks": "Dosyalar alt görevlere eklenir — bu aşamada henüz alt görev yok.",
       "task": "Görev",
       "subtask": "Alt görev",
@@ -371,10 +377,6 @@
       "upload_other": "{{count}} dosya yükle",
       "uploaded_one": "{{count}} dosya «{{name}}» alt görevine eklendi.",
       "uploaded_other": "{{count}} dosya «{{name}}» alt görevine eklendi.",
-      "kind": "Dosya türü",
-      "all": "Tümü",
-      "pdf": "PDF",
-      "image": "Görsel",
       "allTasks": "Tüm görevler",
       "allSubtasks": "Tüm alt görevler",
       "empty": "Bu filtrelere uyan dosya yok.",
@@ -392,7 +394,18 @@
       "legendNo": "Yükleme yok",
       "historyCapped": "Aralığın son {{max}} günü gösteriliyor",
       "noPeople": "Bu aşamaya henüz kimse atanmadı.",
-      "notAssigned": "atanmamış"
+      "notAssigned": "atanmamış",
+      "pager": "Günler arasında gezin",
+      "prevDays_one": "Önceki gün",
+      "prevDays_other": "Önceki {{count}} gün",
+      "nextDays_one": "Sonraki gün",
+      "nextDays_other": "Sonraki {{count}} gün",
+      "unstageTitle": "Dosya listeden çıkarılsın mı?",
+      "unstageText": "«{{name}}» yüklenmeyecek.",
+      "legendFree": "O gün görev yok",
+      "cellFree": "Bu gün görev yok",
+      "legendUpcoming": "Henüz gelmemiş görev günü",
+      "cellUpcoming": "{{name}} · {{day}} henüz gelmedi"
     }
   }
 }

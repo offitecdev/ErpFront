@@ -73,7 +73,7 @@ export const CompleteSubtaskDialog = ({
     const upload = async (files: File[]) => {
         setUploading(true);
         for (const file of files) {
-            const problem = fileProblem(file, true);
+            const problem = fileProblem(file);
             if (problem) { toast.error(`${file.name}: ${problem}`); continue; }
             if (!(await actions.upload(task, subtask, file))) break;
         }

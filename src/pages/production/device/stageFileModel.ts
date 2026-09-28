@@ -24,12 +24,61 @@ export const shiftDay = (day: string, by: number): string => {
     return dayKey(new Date(y, m - 1, d + by));
 };
 
+/**
+ * Die Tage einer Aufgabe (28.09.2026): vom Beginn (sonst dem Tag des Anlegens
+ * — «start date, default is the created at») bis zum Termin; ohne Termin offen.
+ */
+const taskWindow = (task: ProductionTask): { start: string | null; end: string | null } => ({
+    start: task.startDate ?? task.createdAt ?? null,
+    end: task.dueDate ?? null,
+});
+
+/**
+ * Der Beginn der ersten Aufgabe der Stufe — dort beginnt die Dateihistorie
+ * (28.09.2026: «starting date of the file history should be the starting date
+ * of the first task»). null, wenn keine Aufgabe einen Tag trägt.
+ */
+export const firstTaskStart = (tasks: readonly ProductionTask[]): string | null =>
+    tasks.reduce<string | null>((first, task) => {
+        const { start } = taskWindow(task);
+        return start && (!first || start < first) ? start : first;
+    }, null);
+
+/**
+ * Muss `personId` an `day` hochladen? Nur an Tagen, die in einer ihrer
+ * Aufgaben der Stufe liegen (28.09.2026: «the assigned person won't upload
+ * files for the days that aren't in the days of their task»).
+ */
+export const dutyChecker = (tasks: readonly ProductionTask[]) => {
+    const windows = new Map<string, Array<{ start: string | null; end: string | null }>>();
+    for (const task of tasks) {
+        const window = taskWindow(task);
+        for (const id of task.assigneeIds) windows.set(id, [...(windows.get(id) ?? []), window]);
+    }
+    return (personId: string, day: string): boolean =>
+        (windows.get(personId) ?? []).some(({ start, end }) => (!start || day >= start) && (!end || day <= end));
+};
+
+/** Der späteste Termin der Aufgaben der Stufe — bis dahin reicht die Historie. */
+export const lastTaskDue = (tasks: readonly ProductionTask[]): string | null =>
+    tasks.reduce<string | null>((last, task) => (task.dueDate && (!last || task.dueDate > last) ? task.dueDate : last), null);
+
+/** Wie viele Tage von `from` bis `to` (beide `YYYY-MM-DD`). */
+export const dayDiff = (from: string, to: string): number => {
+    const utc = (day: string) => { const [y, m, d] = day.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+    return Math.round((utc(to) - utc(from)) / 86_400_000);
+};
+
 /** Höchstens so viele Tage zeigt die Historie — sonst wird die Tabelle unlesbar. */
 export const HISTORY_MAX_DAYS = 62;
 
-/** Die Tage von `from` bis `to` (höchstens bis heute), die jüngsten `HISTORY_MAX_DAYS`. */
+/**
+ * Die Tage von `from` bis `to`, die jüngsten `HISTORY_MAX_DAYS`. Auch Tage
+ * nach heute (28.09.2026: «the due date is 30 but I only see 28») — bis zum
+ * Termin der Aufgaben.
+ */
 export const daysBetween = (from: string, to: string): string[] => {
-    const last = to && to < localToday() ? to : localToday();
+    const last = to || localToday();
     const days: string[] = [];
     for (let day = last; (!from || day >= from) && days.length < HISTORY_MAX_DAYS; day = shiftDay(day, -1)) days.push(day);
     return days.reverse();

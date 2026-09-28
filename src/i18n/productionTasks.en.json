@@ -32,7 +32,8 @@
       "retry": "Try again",
       "revert": "Revert",
       "save": "Save",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "remove": "Remove"
     },
     "check": {
       "areaOpen": "The total of this section doesn't add up",
@@ -117,7 +118,7 @@
       "ALREADY_COMPLETED": "This subtask is already completed.",
       "DOCUMENT_REQUIRED": "Upload at least one PDF first — the document is required.",
       "FILE_REQUIRED": "No file was received.",
-      "FILE_TYPE": "Only PDF files and photos can be added.",
+      "FILE_TYPE": "Only PDF files can be added.",
       "FILE_TOO_LARGE": "The file is too large (max. {{max}} MB).",
       "FILES_TOO_MANY": "A subtask can hold at most {{max}} files.",
       "FILE_NOT_FOUND": "File not found.",
@@ -184,7 +185,9 @@
       "startDate": "Start date",
       "dueDate": "Due date",
       "dueBeforeStart": "The due date is before the start date.",
-      "peopleHintDevice": "These people are assigned on this device and notified."
+      "peopleHintDevice": "These people are assigned on this device and notified.",
+      "deleteTitle": "Delete the task?",
+      "deleteText": "The task {{code}} “{{name}}” and its subtasks will be deleted."
     },
     "subtask": {
       "title": "Subtasks",
@@ -210,7 +213,9 @@
       "needsPdf": "{{status}} — needs a PDF",
       "expand": "Show the subtasks of {{code}}",
       "collapse": "Hide the subtasks of {{code}}",
-      "showFiles": "Show files"
+      "showFiles": "Show files",
+      "removeTitle": "Delete the subtask?",
+      "removeText": "The subtask “{{name}}” will be removed from this task."
     },
     "dates": {
       "from": "from {{date}}",
@@ -270,7 +275,9 @@
       "removeStageText_other": "The stage “{{name}}” and its {{count}} tasks will be removed from this template.",
       "nameInUse": "Name already in use",
       "nameRequired": "Name required",
-      "sectionFull": "No weight left in this section — its tasks already add up to 100%. Lower a task's weight first."
+      "sectionFull": "No weight left in this section — its tasks already add up to 100%. Lower a task's weight first.",
+      "removeStageEmpty": "The stage “{{name}}” will be removed from this template.",
+      "removeSectionEmpty": "The section “{{name}}” will be removed from this template."
     },
     "templates": {
       "clearSearch": "Clear search",
@@ -311,11 +318,13 @@
       "remove": "Remove {{name}}",
       "today": "today {{time}}",
       "yesterday": "yesterday {{time}}",
-      "badType": "Only PDF files and photos can be added.",
+      "badType": "Only PDF files can be added.",
       "tooLarge": "The file is too large (max. 25 MB).",
       "needPdf": "A PDF is required",
       "count_one": "{{count}} file",
-      "count_other": "{{count}} files"
+      "count_other": "{{count}} files",
+      "removeTitle": "Delete the file?",
+      "removeText": "“{{name}}” will be removed from “{{subtask}}”. This cannot be undone."
     },
     "complete": {
       "button": "Complete the task",
@@ -339,7 +348,6 @@
       "dropTitle": "Drop the PDF file here",
       "note": "Short note",
       "optional": "(optional)",
-      "pdfOnly": "Only a PDF can be added here.",
       "completedBy": "Completed by {{name}} · {{when}}",
       "done": "Subtask completed.",
       "subtasksRow": "Subtasks completed",
@@ -358,10 +366,8 @@
       "open": "Open the {{stage}} files",
       "count_one": "{{count}} file",
       "count_other": "{{count}} files",
-      "summary_one": "{{count}} file · {{pdf}} PDF · {{image}} images",
-      "summary_other": "{{count}} files · {{pdf}} PDF · {{image}} images",
       "none": "No files yet",
-      "dropTitle": "Drop files here, then choose the task and subtask",
+      "dropTitle": "Drop PDF files here, then choose the task and subtask",
       "noSubtasks": "Files belong to subtasks — this stage has none yet.",
       "task": "Task",
       "subtask": "Subtask",
@@ -371,10 +377,6 @@
       "upload_other": "Upload {{count}} files",
       "uploaded_one": "{{count}} file added to “{{name}}”.",
       "uploaded_other": "{{count}} files added to “{{name}}”.",
-      "kind": "File type",
-      "all": "All",
-      "pdf": "PDF",
-      "image": "Image",
       "allTasks": "All tasks",
       "allSubtasks": "All subtasks",
       "empty": "No files match these filters.",
@@ -392,7 +394,18 @@
       "legendNo": "Nothing uploaded",
       "historyCapped": "Showing the last {{max}} days of the range",
       "noPeople": "No one is assigned to this stage yet.",
-      "notAssigned": "not assigned"
+      "notAssigned": "not assigned",
+      "pager": "Browse days",
+      "prevDays_one": "Previous day",
+      "prevDays_other": "Previous {{count}} days",
+      "nextDays_one": "Next day",
+      "nextDays_other": "Next {{count}} days",
+      "unstageTitle": "Remove the file from the list?",
+      "unstageText": "“{{name}}” will not be uploaded.",
+      "legendFree": "No task that day",
+      "cellFree": "No task on this day",
+      "legendUpcoming": "Task day still to come",
+      "cellUpcoming": "{{name}} · {{day}} is still to come"
     }
   }
 }

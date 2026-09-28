@@ -1002,10 +1002,15 @@ body > :not(#root) .ofi-ptk-task__open {
 body > :not(#root) select.ofi-ptk-status-pill.is-select {
     -webkit-appearance: none;
     appearance: none;
-    width: auto;
+    /* So breit wie der gewählte Stand (28.09.2026: «too wide») — nicht wie der
+       längste Eintrag der Liste; ohne `field-sizing` eine feste Breite. */
+    width: 118px;
+    max-width: 100%;
     height: 24px;
     min-height: 0;
     padding: 0 24px 0 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     border: 0;
     border-radius: 12px !important;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12' fill='none' stroke='%238e8e93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 5 2l2.5 2.5M2.5 7.5 5 10l2.5-2.5'/%3E%3C/svg%3E");
@@ -1328,7 +1333,8 @@ body > :not(#root) input[type="checkbox"].ofi-ptk-check:disabled { cursor: defau
     pointer-events: auto;
     animation: ofi-ptk-float-in 260ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
-.ofi-ptk-float.is-open { width: min(1280px, 100%); }
+/* Auf: die ganze freie Breite der Stufe (28.09.2026: «should fill all the remaining width»). */
+.ofi-ptk-float.is-open { align-self: stretch; width: 100%; }
 .dark .ofi-ptk-float {
     --float-surface: rgba(37, 39, 45, 0.76);
     --float-edge: rgba(255, 255, 255, 0.18);
@@ -2283,3 +2289,39 @@ body > :not(#root) .ofi-ptk-drop__pick:hover { text-decoration: underline; }
 /* Wer ohne Aufgabe hochgeladen hat (etwa die Verwaltung): darunter, abgesetzt, ohne rotes X. */
 .ofi-ptk-history tr:not(.is-extra) + tr.is-extra > * { border-top: 1px dashed var(--ptk-border); }
 .ofi-ptk-history tr.is-extra > th[scope="row"] { color: var(--ptk-secondary); }
+@supports (field-sizing: content) {
+    #root .ofi-ptk select.ofi-ptk-status-pill.is-select:not([multiple]):not([size]),
+    body > :not(#root) select.ofi-ptk-status-pill.is-select { width: auto; field-sizing: content; }
+}
+
+/* Unter der Historie: links die Legende, rechts unten das Blättern (28.09.2026). */
+.ofi-ptk-history__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.ofi-ptk-history__foot > .ofi-ptk-history__legend { margin: 0; }
+.ofi-ptk-pager { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.ofi-ptk-pager__range { min-width: 96px; color: var(--ptk-secondary); font-size: 12px; font-weight: 500; text-align: center; font-variant-numeric: tabular-nums; }
+#root .ofi-ptk .ofi-ptk-pager__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--ptk-ctl-border);
+    border-radius: 8px !important;
+    background: var(--ptk-surface);
+    box-shadow: var(--ptk-shadow);
+    color: var(--ptk-text);
+    cursor: pointer;
+}
+#root .ofi-ptk .ofi-ptk-pager__btn:hover:not(:disabled) { background: var(--ptk-fill); }
+#root .ofi-ptk .ofi-ptk-pager__btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+#root .ofi-ptk .ofi-ptk-pager__btn:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: 1px; }
+.ofi-ptk-pager__btn > svg { width: 15px; height: 15px; }
+/* Ein Tag ohne Aufgabe der Person (28.09.2026): kein X — die Zelle bleibt leer, leicht getönt. */
+.ofi-ptk-history td.is-free { background: repeating-linear-gradient(135deg, transparent 0 6px, var(--ptk-hairline) 6px 7px); }
+.ofi-ptk-daydot.is-free { background: repeating-linear-gradient(135deg, transparent 0 3px, var(--ptk-border) 3px 4px); box-shadow: inset 0 0 0 1px var(--ptk-border); }
+/* Ein Aufgabentag, der noch kommt: ein leerer Ring (28.09.2026). */
+.ofi-ptk-daydot.is-upcoming { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ptk-muted); }
+.ofi-ptk-history td > .ofi-ptk-daydot.is-upcoming { vertical-align: middle; }

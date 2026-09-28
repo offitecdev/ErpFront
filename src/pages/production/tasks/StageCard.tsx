@@ -22,7 +22,6 @@ import {
     needsPdfFirst,
     subtaskCode,
     subtaskSectionWeight,
-    subtaskStatuses,
     TASK_LIMITS,
     TASK_STATUSES,
     taskProgress,
@@ -87,7 +86,7 @@ const StatusCell = ({
 }: {
     status: TaskStatus;
     busy?: boolean;
-    /** Die angebotenen Stände (eine Unteraufgabe mit «Approval»: offen, in Arbeit, wartet auf Freigabe). */
+    /** Die angebotenen Stände — «wartet auf Freigabe» steht nie in der Liste, nur als aktueller Wert. */
     options?: readonly TaskStatus[];
     /** «Document» ohne PDF: fertig melden geht noch nicht (28.09.2026). */
     needsPdf?: boolean;
@@ -103,8 +102,13 @@ const StatusCell = ({
             aria-label={t('productionTasks.table.status')}
             onChange={(event) => onChange(event.target.value as TaskStatus)}
         >
-            {(options.includes(status) ? options : [...options, status]).map((entry) => {
-                const blocked = needsPdf && (entry === 'DONE' || entry === 'PENDING') && entry !== status;
+            {/* Ein Stand ausserhalb der Liste (etwa «wartet auf Freigabe») steht nur im
+                geschlossenen Menü — in der Liste erscheint er nicht (28.09.2026). */}
+            {!options.includes(status) && (
+                <option value={status} hidden>{t(`productionTasks.status.${status}`)}</option>
+            )}
+            {options.map((entry) => {
+                const blocked = needsPdf && entry === 'DONE' && entry !== status;
                 return (
                     <option key={entry} value={entry} disabled={blocked}>
                         {blocked
@@ -521,10 +525,18 @@ export const StageCard = ({
                                                     <StatusCell
                                                         status={subtask.status}
                                                         busy={busyTaskId === task.id}
-                                                        options={subtaskStatuses(subtask)}
                                                         needsPdf={needsPdfFirst(subtask)}
                                                         onChange={statusEditable && onSubtaskStatus && !completed
-                                                            ? (next) => onSubtaskStatus(task, subtask, next)
+                                                            ? (next) => {
+                                                                // «Approval»: erledigt heisst für die Leute «wartet auf
+                                                                // Freigabe»; die Verwaltung schliesst im Fenster ab.
+                                                                if (next === 'DONE' && subtask.requiresApproval) {
+                                                                    if (subtaskActions?.isAdmin) setCompleting({ taskId: task.id, subtaskId: subtask.id });
+                                                                    else if (subtask.status !== 'PENDING') onSubtaskStatus(task, subtask, 'PENDING');
+                                                                    return;
+                                                                }
+                                                                onSubtaskStatus(task, subtask, next);
+                                                            }
                                                             : undefined}
                                                     />
                                                 </span>

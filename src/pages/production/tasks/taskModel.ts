@@ -252,13 +252,6 @@ export const orderTasks = <T extends Pick<ProductionTask, 'area' | 'stage'>>(tas
 /** Offen, in Arbeit, erledigt — in dieser Reihenfolge im Menü. */
 export const TASK_STATUSES: readonly TaskStatus[] = ['TODO', 'IN_PROGRESS', 'DONE'];
 
-/**
- * Was das Aufklappmenü einer Unteraufgabe anbietet (28.09.2026): mit
- * «Approval» heisst fertig «wartet auf Freigabe» — erledigt macht sie erst
- * «Complete the task» der Verwaltung.
- */
-export const subtaskStatuses = (subtask: Pick<TaskSubtask, 'requiresApproval'>): readonly TaskStatus[] =>
-    (subtask.requiresApproval ? ['TODO', 'IN_PROGRESS', 'PENDING'] : TASK_STATUSES);
 
 /**
  * Der Fortschritt einer Aufgabe aus ihren Unteraufgaben (28.09.2026):
@@ -288,8 +281,8 @@ export const pendingApprovals = (tasks: ReadonlyArray<{ subtasks: ReadonlyArray<
 /** Fertig melden (erledigt bzw. wartet auf Freigabe) geht mit «Document» erst mit einem PDF. */
 export const needsPdfFirst = (subtask: TaskSubtask): boolean => subtask.requiresDocument && !hasSubtaskDocument(subtask);
 
-/** Was an eine Unteraufgabe darf — wie der Server: PDF und Fotos, höchstens 25 MB. */
-export const SUBTASK_FILE_ACCEPT = 'application/pdf,image/jpeg,image/png,image/webp,image/heic';
+/** Was an eine Unteraufgabe darf — wie der Server: nur PDF, höchstens 25 MB. */
+export const SUBTASK_FILE_ACCEPT = 'application/pdf';
 export const SUBTASK_FILE_MAX_BYTES = 25 * 1024 * 1024;
 
 /** Der Stand einer Aufgabe aus dem ihrer Unteraufgaben — wortgleich mit dem Server. */

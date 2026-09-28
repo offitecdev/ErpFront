@@ -7,7 +7,7 @@ import type { ProductionTask, TaskArea, TaskSectionStage, TaskStatus, TaskSubtas
 
 import type { PersonNames } from '../tasks/PeopleCell';
 import { StageCard } from '../tasks/StageCard';
-import { isImage, isPdf, type SubtaskActions } from '../tasks/subtaskFileModel';
+import type { SubtaskActions } from '../tasks/subtaskFileModel';
 import { StageFilesCard } from './StageFilesCard';
 import { stageFilesOf } from './stageFileModel';
 import { formatPercent, initialsOf, roundPercent, stageLabel } from '../tasks/taskModel';
@@ -136,20 +136,22 @@ export const StageTasksFloat = ({
     useGrow(filesRef, filesFromRef, filesOpen);
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        // Escape aus einem Bestätigungsfenster (Portal) schliesst nur dieses.
+        if (!event.currentTarget.contains(event.target as Node)) return;
         if (event.key === 'Escape' && open) {
             event.stopPropagation();
             toggle(false);
         }
     };
     const onFilesKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        // Escape aus einem Bestätigungsfenster (Portal) schliesst nur dieses.
+        if (!event.currentTarget.contains(event.target as Node)) return;
         if (event.key === 'Escape' && filesOpen) {
             event.stopPropagation();
             toggleFiles(false);
         }
     };
     const files = showFiles ? stageFilesOf(tasks) : [];
-    const pdfCount = files.filter((entry) => isPdf(entry.file)).length;
-    const imageCount = files.filter((entry) => isImage(entry.file)).length;
 
     const stageName = stageLabel(stage);
     const weight = roundPercent(tasks.reduce((sum, task) => sum + task.weight, 0));
@@ -245,7 +247,7 @@ export const StageTasksFloat = ({
                                 <b>{t('productionTasks.stageFiles.title')}</b>
                                 <small>
                                     {files.length
-                                        ? t('productionTasks.stageFiles.summary', { count: files.length, pdf: pdfCount, image: imageCount })
+                                        ? t('productionTasks.stageFiles.count', { count: files.length })
                                         : t('productionTasks.stageFiles.none')}
                                 </small>
                             </span>

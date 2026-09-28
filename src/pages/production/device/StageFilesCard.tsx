@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Check, FileStack, History, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, FileStack, History, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 import { t } from '@/i18n/translate';
 import type { ProductionTask } from '@/types/productionTasks';
@@ -9,11 +10,20 @@ import type { ProductionTask } from '@/types/productionTasks';
 import { FileDropZone } from '../tasks/FileDropZone';
 import type { PersonNames } from '../tasks/PeopleCell';
 import { FileCard } from '../tasks/FileCard';
-import { fileProblem, formatMoment, isImage, isPdf, type SubtaskActions } from '../tasks/subtaskFileModel';
+import { fileProblem, formatMoment, type SubtaskActions } from '../tasks/subtaskFileModel';
 import { formatDay, localToday, SUBTASK_FILE_ACCEPT, subtaskCode } from '../tasks/taskModel';
-import { daysBetween, HISTORY_MAX_DAYS, shiftDay, stageFilesOf, type StageFile } from './stageFileModel';
+import {
+    dayDiff,
+    daysBetween,
+    dutyChecker,
+    firstTaskStart,
+    lastTaskDue,
+    HISTORY_MAX_DAYS,
+    shiftDay,
+    stageFilesOf,
+    type StageFile,
+} from './stageFileModel';
 
-type Kind = 'all' | 'pdf' | 'image';
 type Tab = 'files' | 'history';
 
 /** Der Wochentag kurz, in der Sprache der Oberfläche. */
@@ -49,13 +59,21 @@ export const StageFilesCard = ({
     onClose: () => void;
 }) => {
     const [tab, setTab] = useState<Tab>('files');
-    const [kind, setKind] = useState<Kind>('all');
+    // Entfernen fragt immer nach (28.09.2026: «always show a warning»).
+    const [removing, setRemoving] = useState<StageFile | null>(null);
+    const [unstaging, setUnstaging] = useState<File | null>(null);
     const [taskId, setTaskId] = useState('');
     const [subtaskId, setSubtaskId] = useState('');
     const [personId, setPersonId] = useState('');
-    // Zeitraum: die letzten sieben Tage bis heute.
-    const [from, setFrom] = useState(() => shiftDay(localToday(), -6));
-    const [to, setTo] = useState(localToday);
+    /* Die Grenzen des Zeitraums (28.09.2026): vom Beginn der ersten Aufgabe der
+       Stufe bis zum spätesten Termin — nie davor («shouldn't go older than the
+       first task's starting date»). Ohne Termin endet er heute. */
+    const today = localToday();
+    const minDay = firstTaskStart(tasks);
+    const maxDay = lastTaskDue(tasks) ?? (minDay && minDay > today ? minDay : today);
+    const clampDay = (day: string) => (minDay && day < minDay ? minDay : day > maxDay ? maxDay : day);
+    const [from, setFrom] = useState(() => minDay ?? shiftDay(maxDay, -6));
+    const [to, setTo] = useState(() => maxDay);
     // Ein Klick in der Historie: genau ein Tag einer Person.
     const [cellDay, setCellDay] = useState<string | null>(null);
     const [pending, setPending] = useState<File[]>([]);
@@ -69,8 +87,7 @@ export const StageFilesCard = ({
         ? entry.day === cellDay
         : (!from || entry.day >= from) && (!to || entry.day <= to));
     const shown = all.filter((entry) =>
-        (kind === 'all' || (kind === 'pdf' ? isPdf(entry.file) : isImage(entry.file)))
-        && (!taskId || entry.task.id === taskId)
+        (!taskId || entry.task.id === taskId)
         && (!subtaskId || entry.subtask.id === subtaskId)
         && (!personId || entry.file.uploadedById === personId)
         && inRange(entry));
@@ -92,6 +109,7 @@ export const StageFilesCard = ({
     const personName = (id: string) => filterPeople.find((person) => person.id === id)?.name ?? names.get(id)?.name ?? '—';
 
     const days = useMemo(() => daysBetween(from, to), [from, to]);
+    const isDutyDay = useMemo(() => dutyChecker(tasks), [tasks]);
     const uploadsByPersonDay = useMemo(() => {
         const counts = new Map<string, number>();
         for (const entry of all) {
@@ -148,17 +166,32 @@ export const StageFilesCard = ({
         if (!left.length) toast.success(t('productionTasks.stageFiles.uploaded', { count: pending.length, name: targetSubtask.name }));
     };
 
+    /* Blättern in der Historie (28.09.2026): der Zeitraum rückt um seine eigene
+       Länge vor oder zurück — innerhalb der Grenzen der Stufe. */
+    const span = from && to ? Math.min(HISTORY_MAX_DAYS, Math.max(1, dayDiff(from, to) + 1)) : 7;
+    const pageEnd = to && to < maxDay ? to : maxDay;
+    const page = (direction: -1 | 1) => {
+        let end = shiftDay(pageEnd, direction * span);
+        if (end > maxDay) end = maxDay;
+        let start = shiftDay(end, -(span - 1));
+        if (minDay && start < minDay) {
+            start = minDay;
+            const stretched = shiftDay(minDay, span - 1);
+            end = stretched < maxDay ? stretched : maxDay;
+        }
+        setFrom(start);
+        setTo(end);
+        setCellDay(null);
+    };
+
     const openCell = (person: string, day: string) => {
         setPersonId(person);
         setCellDay(day);
         setTaskId('');
         setSubtaskId('');
-        setKind('all');
         setTab('files');
     };
 
-    const counts = { all: all.length, pdf: all.filter((entry) => isPdf(entry.file)).length, image: all.filter((entry) => isImage(entry.file)).length };
-    const today = localToday();
 
     return (
         <section className="ofi-ptk-card ofi-ptk-stagefiles" aria-label={t('productionTasks.stageFiles.region', { stage: stageName })}>
@@ -213,10 +246,10 @@ export const StageFilesCard = ({
                             <MacDatePicker
                                 className="is-field-sm"
                                 value={from}
-                                max={to || undefined}
-                                clearable
+                                min={minDay ?? undefined}
+                                max={to || maxDay}
                                 ariaLabel={t('productionTasks.stageFiles.from')}
-                                onChange={(day) => { setFrom(day); setCellDay(null); }}
+                                onChange={(day) => { setFrom(clampDay(day || minDay || from)); setCellDay(null); }}
                             />
                         </div>
                         <div className="ofi-ptk-field is-date">
@@ -224,10 +257,10 @@ export const StageFilesCard = ({
                             <MacDatePicker
                                 className="is-field-sm"
                                 value={to}
-                                min={from || undefined}
-                                clearable
+                                min={from || minDay || undefined}
+                                max={maxDay}
                                 ariaLabel={t('productionTasks.stageFiles.to')}
-                                onChange={(day) => { setTo(day); setCellDay(null); }}
+                                onChange={(day) => { setTo(clampDay(day || maxDay)); setCellDay(null); }}
                             />
                         </div>
                     </div>
@@ -258,7 +291,7 @@ export const StageFilesCard = ({
                                                         className="ofi-ptk-tray__drop ofi-nosize"
                                                         aria-label={t('productionTasks.files.remove', { name: file.name })}
                                                         disabled={uploading}
-                                                        onClick={() => setPending((current) => current.filter((entry) => entry !== file))}
+                                                        onClick={() => setUnstaging(file)}
                                                     >
                                                         <X aria-hidden />
                                                     </button>
@@ -313,20 +346,6 @@ export const StageFilesCard = ({
                         )}
 
                         <div className="ofi-ptk-stagefiles__filters">
-                            <div className="ofi-ptk-seg" role="group" aria-label={t('productionTasks.stageFiles.kind')}>
-                                {(['all', 'pdf', 'image'] as const).map((entry) => (
-                                    <button
-                                        key={entry}
-                                        type="button"
-                                        aria-pressed={kind === entry}
-                                        className="ofi-ptk-seg__btn ofi-nosize"
-                                        onClick={() => setKind(entry)}
-                                    >
-                                        {t(`productionTasks.stageFiles.${entry}`)}
-                                        <span className="ofi-ptk-seg__share">{counts[entry]}</span>
-                                    </button>
-                                ))}
-                            </div>
                             <label className="ofi-ptk-fselect">
                                 <span className="sr-only">{t('productionTasks.stageFiles.task')}</span>
                                 <select value={taskId} onChange={(event) => { setTaskId(event.target.value); setSubtaskId(''); }}>
@@ -372,7 +391,7 @@ export const StageFilesCard = ({
                                         meta={[entry.code, entry.file.uploadedByName, formatMoment(entry.file.uploadedAt)].filter(Boolean).join(' · ')}
                                         load={() => actions.loadFile(entry.task, entry.subtask, entry.file)}
                                         onOpen={() => actions.openFile(entry.task, entry.subtask, entry.file)}
-                                        onRemove={actions.isAdmin ? () => void actions.removeFile(entry.task, entry.subtask, entry.file) : undefined}
+                                        onRemove={actions.isAdmin ? () => setRemoving(entry) : undefined}
                                     />
                                 ))}
                             </div>
@@ -399,17 +418,30 @@ export const StageFilesCard = ({
                                 </thead>
                                 <tbody>
                                     {historyRows.map((person) => {
-                                        const total = days.reduce((sum, day) => sum + (uploadsByPersonDay.get(`${person.id}|${day}`) ? 1 : 0), 0);
+                                        // Nur die Tage ihrer Aufgaben zählen — an den übrigen gibt es kein rotes X.
+                                        // Gezählt wird bis heute — ein kommender Tag ist noch nicht versäumt.
+                                        const dutyDays = person.duty ? days.filter((day) => day <= today && isDutyDay(person.id, day)) : [];
+                                        const total = dutyDays.filter((day) => uploadsByPersonDay.has(`${person.id}|${day}`)).length;
                                         return (
                                             <tr key={person.id} className={person.duty ? '' : 'is-extra'}>
                                                 <th scope="row">
                                                     {person.name}
-                                                    <small>{person.duty ? `${total}/${days.length}` : t('productionTasks.stageFiles.notAssigned')}</small>
+                                                    <small>{person.duty ? `${total}/${dutyDays.length}` : t('productionTasks.stageFiles.notAssigned')}</small>
                                                 </th>
                                                 {days.map((day) => {
                                                     const count = uploadsByPersonDay.get(`${person.id}|${day}`) ?? 0;
                                                     // Ohne Pflicht zum Hochladen: ein Tag ohne Datei bleibt leer.
-                                                    if (!count && !person.duty) return <td key={day} />;
+                                                    if (!count && !(person.duty && isDutyDay(person.id, day))) {
+                                                        return <td key={day} className="is-free" title={t('productionTasks.stageFiles.cellFree')} />;
+                                                    }
+                                                    // Ein Aufgabentag, der noch kommt: ein leerer Ring statt X.
+                                                    if (!count && day > today) {
+                                                        return (
+                                                            <td key={day} title={t('productionTasks.stageFiles.cellUpcoming', { name: person.name, day: formatDay(day) })}>
+                                                                <span className="ofi-ptk-daydot is-upcoming" aria-hidden />
+                                                            </td>
+                                                        );
+                                                    }
                                                     const label = count
                                                         ? t('productionTasks.stageFiles.cellYes', { name: person.name, day: formatDay(day), count })
                                                         : t('productionTasks.stageFiles.cellNo', { name: person.name, day: formatDay(day) });
@@ -436,16 +468,73 @@ export const StageFilesCard = ({
                                 </tbody>
                             </table>
                         </div>
-                        <p className="ofi-ptk-history__legend">
-                            <span><span className="ofi-ptk-daydot is-yes" aria-hidden><Check /></span>{t('productionTasks.stageFiles.legendYes')}</span>
-                            <span><span className="ofi-ptk-daydot is-no" aria-hidden><X /></span>{t('productionTasks.stageFiles.legendNo')}</span>
-                            {days.length >= HISTORY_MAX_DAYS && <span>{t('productionTasks.stageFiles.historyCapped', { max: HISTORY_MAX_DAYS })}</span>}
-                        </p>
+                        <div className="ofi-ptk-history__foot">
+                            <p className="ofi-ptk-history__legend">
+                                <span><span className="ofi-ptk-daydot is-yes" aria-hidden><Check /></span>{t('productionTasks.stageFiles.legendYes')}</span>
+                                <span><span className="ofi-ptk-daydot is-no" aria-hidden><X /></span>{t('productionTasks.stageFiles.legendNo')}</span>
+                                <span><span className="ofi-ptk-daydot is-upcoming" aria-hidden />{t('productionTasks.stageFiles.legendUpcoming')}</span>
+                                <span><span className="ofi-ptk-daydot is-free" aria-hidden />{t('productionTasks.stageFiles.legendFree')}</span>
+                                {days.length >= HISTORY_MAX_DAYS && <span>{t('productionTasks.stageFiles.historyCapped', { max: HISTORY_MAX_DAYS })}</span>}
+                            </p>
+                            {/* Unten rechts: zwischen den Tagen blättern. */}
+                            <nav className="ofi-ptk-pager" aria-label={t('productionTasks.stageFiles.pager')}>
+                                <button
+                                    type="button"
+                                    className="ofi-ptk-pager__btn ofi-nosize"
+                                    aria-label={t('productionTasks.stageFiles.prevDays', { count: span })}
+                                    title={t('productionTasks.stageFiles.prevDays', { count: span })}
+                                    disabled={Boolean(minDay && from <= minDay)}
+                                    onClick={() => page(-1)}
+                                >
+                                    <ChevronLeft aria-hidden />
+                                </button>
+                                <span className="ofi-ptk-pager__range">
+                                    {days.length ? `${formatDay(days[0]).slice(0, 5)} – ${formatDay(days[days.length - 1]).slice(0, 5)}` : '—'}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="ofi-ptk-pager__btn ofi-nosize"
+                                    disabled={pageEnd >= maxDay}
+                                    aria-label={t('productionTasks.stageFiles.nextDays', { count: span })}
+                                    title={t('productionTasks.stageFiles.nextDays', { count: span })}
+                                    onClick={() => page(1)}
+                                >
+                                    <ChevronRight aria-hidden />
+                                </button>
+                            </nav>
+                        </div>
                     </>
                 ) : (
                     <p className="ofi-ptk-card__empty">{t('productionTasks.stageFiles.noPeople')}</p>
                 )}
             </div>
+
+            <ConfirmDialog
+                open={removing !== null}
+                tone="danger"
+                title={t('productionTasks.files.removeTitle')}
+                message={removing ? t('productionTasks.files.removeText', { name: removing.file.name, subtask: `${removing.code} · ${removing.subtask.name}` }) : undefined}
+                confirmLabel={t('productionTasks.actions.delete')}
+                cancelLabel={t('productionTasks.actions.cancel')}
+                onCancel={() => setRemoving(null)}
+                onConfirm={() => {
+                    if (removing) void actions.removeFile(removing.task, removing.subtask, removing.file);
+                    setRemoving(null);
+                }}
+            />
+            <ConfirmDialog
+                open={unstaging !== null}
+                tone="danger"
+                title={t('productionTasks.stageFiles.unstageTitle')}
+                message={unstaging ? t('productionTasks.stageFiles.unstageText', { name: unstaging.name }) : undefined}
+                confirmLabel={t('productionTasks.actions.remove')}
+                cancelLabel={t('productionTasks.actions.cancel')}
+                onCancel={() => setUnstaging(null)}
+                onConfirm={() => {
+                    setPending((current) => current.filter((entry) => entry !== unstaging));
+                    setUnstaging(null);
+                }}
+            />
         </section>
     );
 };

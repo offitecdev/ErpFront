@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { CheckCircle2, ImageIcon, Loader2, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { t } from '@/i18n/translate';
 import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
 
@@ -87,6 +88,8 @@ export const SubtaskDetail = ({
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
+    // Entfernen fragt immer nach (28.09.2026).
+    const [removing, setRemoving] = useState<TaskSubtaskFile | null>(null);
     const completed = isSubtaskCompleted(subtask);
     const mayUpload = canUploadTo(actions, task, subtask);
 
@@ -114,7 +117,7 @@ export const SubtaskDetail = ({
                             key={file.id}
                             file={file}
                             onOpen={() => actions.openFile(task, subtask, file)}
-                            onRemove={canRemoveFile(actions, task, subtask, file) ? () => void actions.removeFile(task, subtask, file) : undefined}
+                            onRemove={canRemoveFile(actions, task, subtask, file) ? () => setRemoving(file) : undefined}
                         />
                     ))}
                     {mayUpload && (
@@ -161,6 +164,19 @@ export const SubtaskDetail = ({
                     )}
                 </div>
             )}
+            <ConfirmDialog
+                open={removing !== null}
+                tone="danger"
+                title={t('productionTasks.files.removeTitle')}
+                message={removing ? t('productionTasks.files.removeText', { name: removing.name, subtask: subtask.name }) : undefined}
+                confirmLabel={t('productionTasks.actions.delete')}
+                cancelLabel={t('productionTasks.actions.cancel')}
+                onCancel={() => setRemoving(null)}
+                onConfirm={() => {
+                    if (removing) void actions.removeFile(task, subtask, removing);
+                    setRemoving(null);
+                }}
+            />
         </div>
     );
 };

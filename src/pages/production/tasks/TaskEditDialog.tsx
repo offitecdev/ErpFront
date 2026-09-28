@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, Info, ListChecks, Plus, Trash2, X } from 'lucide-react';
 
+import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
@@ -141,6 +142,8 @@ export const TaskEditDialog = ({
         const text = subtaskWeights[subtask.id] ?? '';
         return Boolean(text.trim()) && parsePercent(text) === null;
     });
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [removingSubtask, setRemovingSubtask] = useState<TaskSubtask | null>(null);
     const remainingFor = (id: string) =>
         Math.max(0, Math.round((100 - subtaskWeightSum(subtasks.filter((entry) => entry.id !== id))) * 100) / 100);
     const datesReversed = withDates && Boolean(startDate && dueDate && startDate > dueDate);
@@ -215,10 +218,12 @@ export const TaskEditDialog = ({
             subtitle={location}
             icon={<ListChecks size={18} />}
             width={780}
+            // Solange eine Bestätigung offen ist, gehört Escape ihr.
+            closeOnEscape={!confirmDelete && removingSubtask === null}
             footer={(
                 <PopupActions
                     start={onDelete ? (
-                        <PopupButton variant="danger" onClick={onDelete}>
+                        <PopupButton variant="danger" onClick={() => setConfirmDelete(true)}>
                             <Trash2 size={14} />
                             {t('productionTasks.task.delete')}
                         </PopupButton>
@@ -352,7 +357,7 @@ export const TaskEditDialog = ({
                                                 className="ofi-ptk-toolbtn is-danger ofi-nosize"
                                                 title={t('productionTasks.subtask.remove')}
                                                 aria-label={t('productionTasks.subtask.remove')}
-                                                onClick={() => setSubtasks((current) => current.filter((entry) => entry.id !== subtask.id))}
+                                                onClick={() => setRemovingSubtask(subtask)}
                                             >
                                                 <X aria-hidden />
                                             </button>
@@ -496,6 +501,31 @@ export const TaskEditDialog = ({
                 {/* Enter in einem Feld übernimmt — wie «Tamam». */}
                 <button type="submit" hidden aria-hidden tabIndex={-1} />
             </form>
+            {/* Löschen fragt immer nach (28.09.2026: «always show a warning»). */}
+            <ConfirmDialog
+                open={confirmDelete}
+                tone="danger"
+                title={t('productionTasks.task.deleteTitle')}
+                message={t('productionTasks.task.deleteText', { code: task.code, name: task.name })}
+                confirmLabel={t('productionTasks.actions.delete')}
+                cancelLabel={t('productionTasks.actions.cancel')}
+                onCancel={() => setConfirmDelete(false)}
+                onConfirm={() => { setConfirmDelete(false); onDelete?.(); }}
+            />
+            <ConfirmDialog
+                open={removingSubtask !== null}
+                tone="danger"
+                title={t('productionTasks.subtask.removeTitle')}
+                message={removingSubtask ? t('productionTasks.subtask.removeText', { name: removingSubtask.name || '—' }) : undefined}
+                confirmLabel={t('productionTasks.actions.delete')}
+                cancelLabel={t('productionTasks.actions.cancel')}
+                onCancel={() => setRemovingSubtask(null)}
+                onConfirm={() => {
+                    const target = removingSubtask;
+                    setRemovingSubtask(null);
+                    if (target) setSubtasks((current) => current.filter((entry) => entry.id !== target.id));
+                }}
+            />
         </PopupDialog>
     );
 };
