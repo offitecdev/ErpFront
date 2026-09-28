@@ -67,7 +67,7 @@ export const TemplateLoadDialog = ({
             footer={(
                 <PopupActions
                     start={(
-                        <Link className="ofi-ptk-link" to="/production/task-templates" onClick={onClose}>
+                        <Link className="ofi-ptk-link" to="/production/templates/tasks" onClick={onClose}>
                             {t('productionTasks.device.manageTemplates')}
                         </Link>
                     )}

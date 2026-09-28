@@ -5,12 +5,13 @@ import { toast } from 'sonner';
 import { PurchaseCode } from '@/components/ui-shared/PurchaseCode';
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBom';
-import type { Bom } from '@/types/productionBom';
+import type { Bom, BomReceiptAllocation } from '@/types/productionBom';
 
 import { fmtQty } from '../bomFormat';
 import { EmptyState, Note } from '../bomUi';
 import { NavBar } from '../NavStack';
 import type { BomViewContext } from './DeviceBomArea';
+import { ReceiptAllocationDialog } from './BomProcurementPanels';
 
 interface LineEntry {
     quantityText: string;
@@ -32,6 +33,7 @@ interface LineEntry {
  */
 export const BomReceiptView = ({ context, bom, purchaseOrderId }: { context: BomViewContext; bom: Bom; purchaseOrderId: string }) => {
     const { nav } = context;
+    const [allocations, setAllocations] = useState<BomReceiptAllocation[] | null>(null);
     const purchase = bom.purchases.find((entry) => entry.purchaseOrderId === purchaseOrderId) ?? null;
     const [entries, setEntries] = useState<Record<number, LineEntry>>({});
     const [busy, setBusy] = useState(false);
@@ -86,7 +88,9 @@ export const BomReceiptView = ({ context, bom, purchaseOrderId }: { context: Bom
             if (result.bom) context.applyBom(result.bom);
             toast.success(t('productionBom.receipt.done'));
             setEntries({});
-            nav.back();
+            // «En erken teslim tarihli projeye» (27.09.2026 abends): zeigen, wohin die Ware ging.
+            if (result.allocations?.length) setAllocations(result.allocations);
+            else nav.back();
         } catch (error) {
             toast.error(productionBomErrorText(error));
         } finally {
@@ -203,6 +207,13 @@ export const BomReceiptView = ({ context, bom, purchaseOrderId }: { context: Bom
                     </div>
                 )}
             </div>
+            <ReceiptAllocationDialog
+                allocations={allocations}
+                onClose={() => {
+                    setAllocations(null);
+                    nav.back();
+                }}
+            />
         </>
     );
 };

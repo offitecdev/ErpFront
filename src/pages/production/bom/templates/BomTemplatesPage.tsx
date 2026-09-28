@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Boxes, Plus, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -38,7 +38,8 @@ const NEW = 'new';
  * (`?t=` / `?t=new`); gespeichert wird ausdrücklich (Knopf oder ⌘S), wer
  * ungespeichert geht, wird gefragt.
  */
-export const BomTemplatesPage = () => {
+/** `tabs`: die grauen Reiter der Seite «Şablonlar» (28.09.2026) — sie stehen statt des Titels. */
+export const BomTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
     useLanguageTick();
     const [params, setParams] = useSearchParams();
     const [list, setList] = useState<BomTemplateSummary[] | null>(null);
@@ -234,7 +235,7 @@ export const BomTemplatesPage = () => {
     return (
         <div className="ofi-bom is-page">
             <header className="ofi-bom-head">
-                <h1 className="ofi-bom-head__title">{t('productionBom.templates.title')}</h1>
+                {tabs ?? <h1 className="ofi-bom-head__title">{t('productionBom.templates.title')}</h1>}
                 {list && <span className="ofi-bom-head__count">{t('productionBom.templates.count', { count: list.length })}</span>}
                 <div className="ofi-bom-head__actions">
                     {canEdit && list && !hasExamples && (

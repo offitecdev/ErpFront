@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type React from 'react';
 import dayjs from 'dayjs';
 
+import { DeliveryNoteButton } from '@/components/orders/DeliveryNoteButton';
 import { OrderConfirmationButton } from '@/components/orders/OrderConfirmationButton';
 import { t } from '@/i18n/translate';
 import type { MyOrderDetailDto } from '@/types/billing';
@@ -74,18 +75,30 @@ export const OrderOverviewTab = memo(({ order, stages, onOpenStage }: {
                 <Card
                     title={t('projects.order')}
                     actions={(
-                        <OrderConfirmationButton
-                            order={{
-                                id: order.id,
-                                orderNumber: order.orderNumber,
-                                tenderId: tender?.id ?? null,
-                                orderDate: order.orderDate ?? null,
-                                createdAt: order.createdAt,
-                                confirmationNote: order.confirmationNote ?? null,
-                                confirmationValidUntil: order.confirmationValidUntil ?? null,
-                                createdBy: order.createdBy ?? null,
-                            }}
-                        />
+                        <span className="inline-flex items-center gap-2">
+                            <OrderConfirmationButton
+                                order={{
+                                    id: order.id,
+                                    orderNumber: order.orderNumber,
+                                    tenderId: tender?.id ?? null,
+                                    orderDate: order.orderDate ?? null,
+                                    createdAt: order.createdAt,
+                                    confirmationNote: order.confirmationNote ?? null,
+                                    confirmationValidUntil: order.confirmationValidUntil ?? null,
+                                    createdBy: order.createdBy ?? null,
+                                }}
+                            />
+                            {/* Lieferschein — derselbe Knopf wie auf der Projektübersicht. */}
+                            <DeliveryNoteButton
+                                order={{
+                                    id: order.id,
+                                    orderNumber: order.orderNumber,
+                                    tenderId: tender?.id ?? null,
+                                    cancelledAt: order.cancelledAt ?? null,
+                                }}
+                                projectNumber={order.project?.projectName || null}
+                            />
+                        </span>
                     )}
                 >
                     <div className="divide-y divide-slate-100 text-sm">

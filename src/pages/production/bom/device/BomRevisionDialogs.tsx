@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowRight, CheckCircle2, FilePen, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -169,6 +169,8 @@ export const OrderActionCard = ({
     kept,
     onKeep,
     done,
+    showSupplier,
+    footer,
 }: {
     action: BomOrderAction;
     /** Nur in der Vorschau: der Einkauf lässt eine Minderung beim Lieferanten stehen. */
@@ -176,6 +178,14 @@ export const OrderActionCard = ({
     onKeep?: (keep: boolean) => void;
     /** In der Geschichte: was geschah (Vergangenheit, ohne die Anleitung). */
     done?: boolean;
+    /**
+     * Den Lieferanten zeigt nur der Einkauf («Satın alma»). In der BOM steht er
+     * nie — auch nicht für die Administratorrolle (27.09.2026 abends: «etkilenen
+     * siparişlerde revizyonlarda biz tedarikçiyi bile görmeyelim»).
+     */
+    showSupplier?: boolean;
+    /** Knöpfe unter der Karte (Einkauf: Bestellung öffnen, Änderungsblatt). */
+    footer?: ReactNode;
 }) => {
     const shown = kept && action.canKeep ? 'KEEP' : action.action;
     const revision = action.orderRevision ?? 0;
@@ -183,7 +193,8 @@ export const OrderActionCard = ({
         <div className={`ofi-bom-revorder is-${shown.toLowerCase()}`}>
             <div className="ofi-bom-revorder__head">
                 <b className="ofi-bom-code is-large"><PurchaseCode value={action.referenceNumber} /></b>
-                <span className="ofi-bom-revorder__supplier">{action.supplierName || '—'}</span>
+                {/* Der Lieferant nur im Einkauf (27.09.2026 abends: «tedarikçi ve fiyatlar gözükmesin»). */}
+                {showSupplier && action.supplierName && <span className="ofi-bom-revorder__supplier">{action.supplierName}</span>}
                 <PurchaseStatus status={action.status} />
                 <span className={`ofi-bom-revaction is-${shown.toLowerCase()}`}>
                     {t(`productionBom.revision.${done ? 'actionDone' : 'action'}.${shown}`, { revision })}
@@ -207,6 +218,7 @@ export const OrderActionCard = ({
                     </li>
                 ))}
             </ul>
+            {footer && <div className="ofi-bom-revorder__foot">{footer}</div>}
             {onKeep && action.canKeep && action.action !== 'CANCEL' && (
                 <div className="ofi-bom-revorder__choice" role="radiogroup" aria-label={t('productionBom.revision.choiceLabel')}>
                     <button type="button" role="radio" aria-checked={!kept} className={`ofi-nosize${!kept ? ' is-on' : ''}`} onClick={() => onKeep(false)}>

@@ -185,8 +185,9 @@ const WRITE_TAGS: Record<string, string[]> = {
     // BOM (27.09.2026): Wareneingang, Reservierung und «Stoktan düş» schreiben ins Depo;
     // Bestellungen, Preisanfragen und Revisionen der BOM schreiben Lieferantenbestellungen.
     production: ['production', 'warehouse', 'catalog'],
-    // Depo (26.09.2026): eigene Tabellen, eigener Bereich.
-    warehouse: ['warehouse'],
+    // Depo (26.09.2026): eigene Tabellen, eigener Bereich. Seit dem 28.09.2026
+    // bucht «Ürün ekle» den Wareneingang der BOM-Bestellungen mit.
+    warehouse: ['warehouse', 'production', 'catalog'],
     articles: ['catalog'],
     tenders: ['catalog', 'customers', 'tender', 'calendar'],
     'sales-orders': ['catalog', 'customers', 'tender', 'calendar'],

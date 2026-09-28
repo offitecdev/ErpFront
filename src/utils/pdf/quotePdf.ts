@@ -14,6 +14,7 @@ import { tenderApi } from '@/lib/api/tender';
 import { resolveConfirmationValidUntil } from '@/lib/orderConfirmation';
 import { parsePaymentStages } from '@/lib/paymentSchedule';
 import { buildTree, flattenTenderTreeForPdf } from '@/pages/sales/detail/tenderDetailUtils';
+import { selectedSiteAddress } from '@/pages/sales/detail/utils/tenderAddress.utils';
 import { discountDisplayName, seedTotalDiscounts } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
 import { buildSimpleTenderLines } from '@/pages/sales/detail/utils/tenderLine.utils';
 import { attachPdfPositionImages } from '@/pages/sales/detail/utils/tenderPdfImages.utils';
@@ -132,6 +133,8 @@ export async function buildQuotePdf(
         validUntil: tender.validUntil,
         customerName: tender.customerName || '',
         customerAddress: tender.customerAddress,
+        // Projekt- ODER Lieferadresse — nur die auf der Offerte gewählte.
+        siteAddress: selectedSiteAddress(tender),
         customerEmail: tender.customerEmail,
         customerPhone: tender.customerPhone,
         createdByName: tender.createdByName,

@@ -38,6 +38,7 @@ export const DocumentProductCell = ({
     onCommitText,
     autoFocus,
     readOnly,
+    onOpenAllProducts,
 }: {
     value: string;
     /** Die Zeile hängt an einem Artikel — dann gilt die strengere Regel. */
@@ -47,6 +48,11 @@ export const DocumentProductCell = ({
     onCommitText: (next: string) => void;
     autoFocus?: boolean;
     readOnly?: boolean;
+    /**
+     * «Mehr suchen …» — öffnet den grossen Produktwähler des Aufrufers mit dem
+     * getippten Text. Ohne ihn fehlt die Zeile (Rechnung, Nachtrag).
+     */
+    onOpenAllProducts?: (search: string) => void;
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [anchor, setAnchor] = useState<HTMLInputElement | null>(null);
@@ -124,10 +130,17 @@ export const DocumentProductCell = ({
                             setOpen(false);
                             if (name.trim() !== value.trim()) onCommitText(name);
                         }}
-                        /* Der Beleg hat keinen grossen Produktwähler — die Zeile
-                           «Alle Produkte …» bliebe hier ohne Ziel. */
-                        hideAllProducts
-                        onOpenAllProducts={() => setOpen(false)}
+                        /* Rechnung und Nachtrag haben keinen grossen
+                           Produktwähler — dort fehlt «Mehr suchen …». */
+                        hideAllProducts={!onOpenAllProducts}
+                        onOpenAllProducts={(search) => {
+                            // Der getippte Suchtext wird NICHT zur Zeile: der
+                            // grosse Wähler übernimmt ihn als Suche.
+                            takenRef.current = true;
+                            setDraft(null);
+                            setOpen(false);
+                            onOpenAllProducts?.(search);
+                        }}
                     />
                 </Suspense>
             )}

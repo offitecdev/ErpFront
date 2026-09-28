@@ -7,6 +7,7 @@ import type {
     WarehouseCatalog,
     WarehouseCategory,
     WarehouseExport,
+    WarehouseGoodsIn,
     WarehouseGroup,
     WarehouseImportDetail,
     WarehouseImportList,
@@ -66,14 +67,26 @@ export const warehouseApi = {
     update: async (id: string, input: WarehouseProductInput): Promise<WarehouseProductDetail> =>
         (await apiClient.patch(`/warehouse/products/${id}`, input)).data,
     remove: async (id: string): Promise<void> => { await apiClient.delete(`/warehouse/products/${id}`); },
-    /** «Ürün ekle» — Bestand ± n (Karten ohne Seriennummernpflicht; negativ = Scan zurück). */
-    receive: async (id: string, quantity: number): Promise<WarehouseProduct> =>
-        (await apiClient.post(`/warehouse/products/${id}/receive`, { quantity })).data,
+    /**
+     * «Ürün ekle» — Bestand ± n (Karten ohne Seriennummernpflicht; negativ = Scan zurück).
+     * `goodsIn` (28.09.2026): die Stücke sind Wareneingang wartender Bestellungen
+     * (`code` = der gelesene Barcode); `undo` nennt die Buchungen, die eine Rücknahme zurücknimmt.
+     */
+    receive: async (
+        id: string,
+        quantity: number,
+        options: { goodsIn?: boolean; code?: string | null; undo?: Array<{ receiptId: string; quantity: number }> } = {},
+    ): Promise<WarehouseProduct & { goodsIn?: WarehouseGoodsIn | null }> =>
+        (await apiClient.post(`/warehouse/products/${id}/receive`, { quantity, ...options })).data,
 
-    addSerial: async (productId: string, input: WarehouseSerialInput): Promise<{ serial: WarehouseSerial; product: WarehouseProduct }> =>
+    addSerial: async (
+        productId: string,
+        input: WarehouseSerialInput,
+    ): Promise<{ serial: WarehouseSerial; product: WarehouseProduct; goodsIn?: WarehouseGoodsIn | null }> =>
         (await apiClient.post(`/warehouse/products/${productId}/serials`, input)).data,
-    removeSerial: async (id: string): Promise<{ product: WarehouseProduct | null }> =>
-        (await apiClient.delete(`/warehouse/serials/${id}`)).data,
+    /** `receiptId`: die Nummer kam eben als Wareneingang — die Bestellung gibt sie mit zurück. */
+    removeSerial: async (id: string, options: { receiptId?: string | null } = {}): Promise<{ product: WarehouseProduct | null }> =>
+        (await apiClient.delete(`/warehouse/serials/${id}`, options.receiptId ? { params: { receipt: options.receiptId } } : undefined)).data,
 
     /** Scan: Seriennummer, Barcode, Herstellerbarcode oder ERP-Code. */
     lookup: async (code: string): Promise<WarehouseLookup> =>

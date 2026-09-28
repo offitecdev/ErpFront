@@ -72,6 +72,18 @@ interface OrderPdfStrings {
     revision: string;
     revisionWas: string;
     revisionRemoved: string;
+    /** Hinweis auf der Bestellung: die Änderungen stehen auf dem eigenen Blatt (27.09.2026 abends). */
+    revisionSeeNotice: string;
+    /** Das eigene Blatt je Revision («Bestelländerung»). */
+    changeTitle: string;
+    changeIntro: string;
+    changeClosing: string;
+    changePos: string;
+    changeBefore: string;
+    changeAfter: string;
+    changeKind: string;
+    changeReceived: string;
+    changeKinds: Record<'added' | 'removed' | 'increased' | 'decreased' | 'edited', string>;
 }
 
 const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
@@ -108,6 +120,16 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         revision: 'Revizyon',
         revisionWas: 'Rev. {n} ile değişti — önceki: {before}',
         revisionRemoved: 'Revizyon {n} ile iptal edilen pozisyonlar',
+        revisionSeeNotice: 'Revizyon {n} ile yapılan değişiklikler ayrı «Sipariş Revizyonu» belgesinde listelenmiştir.',
+        changeTitle: 'Sipariş Revizyonu',
+        changeIntro: '{number} numaralı siparişimizde aşağıdaki pozisyonlar değişmiştir (Revizyon {n}). Burada listelenmeyen tüm pozisyonlar ve koşullar değişmeden geçerlidir.\n\nDeğişiklikleri yazılı olarak onaylamanızı ve teslim tarihine olası etkilerini bize bildirmenizi rica ederiz.',
+        changeClosing: 'İlginiz için teşekkür ederiz.\n\nSaygılarımızla\nOffiTec Ekibi',
+        changePos: 'Poz.',
+        changeBefore: 'Önceki',
+        changeAfter: 'Yeni',
+        changeKind: 'Değişiklik',
+        changeReceived: 'teslim alınan: {q}',
+        changeKinds: { added: 'Yeni pozisyon', removed: 'İptal edildi', increased: 'Artırıldı', decreased: 'Azaltıldı', edited: 'Birim değişti' },
     },
     de: {
         // BELGE ALMANCADA "BESTELLUNG"DUR (kullanıcı isteği 2026-08-03; arada
@@ -143,6 +165,16 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         revision: 'Revision',
         revisionWas: 'Geändert mit Rev. {n} — bisher: {before}',
         revisionRemoved: 'Mit Revision {n} stornierte Positionen',
+        revisionSeeNotice: 'Die Änderungen der Revision {n} stehen in der separaten «Bestelländerung».',
+        changeTitle: 'Bestelländerung',
+        changeIntro: 'zu unserer Bestellung {number} haben sich die folgenden Positionen geändert (Revision {n}). Alle hier nicht aufgeführten Positionen und Konditionen bleiben unverändert gültig.\n\nBitte bestätigen Sie uns die Änderung schriftlich und teilen Sie uns allfällige Auswirkungen auf den Liefertermin mit.',
+        changeClosing: 'Wir danken Ihnen für die Bearbeitung.\n\nFreundliche Grüsse\nDas OffiTec Team',
+        changePos: 'Pos.',
+        changeBefore: 'Bisher',
+        changeAfter: 'Neu',
+        changeKind: 'Änderung',
+        changeReceived: 'bereits geliefert: {q}',
+        changeKinds: { added: 'Neue Position', removed: 'Entfällt', increased: 'Erhöht', decreased: 'Reduziert', edited: 'Einheit geändert' },
     },
     en: {
         docTitle: 'Purchase Order',
@@ -174,6 +206,16 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         revision: 'Revision',
         revisionWas: 'Changed in rev. {n} — previously: {before}',
         revisionRemoved: 'Items cancelled in revision {n}',
+        revisionSeeNotice: 'The changes of revision {n} are listed in the separate «Order change» document.',
+        changeTitle: 'Order Change',
+        changeIntro: 'the following items of our purchase order {number} have changed (revision {n}). All items and conditions not listed here remain unchanged.\n\nPlease confirm the change in writing and let us know of any impact on the delivery date.',
+        changeClosing: 'Thank you for processing this change.\n\nKind regards\nThe OffiTec Team',
+        changePos: 'Pos.',
+        changeBefore: 'Previous',
+        changeAfter: 'New',
+        changeKind: 'Change',
+        changeReceived: 'already delivered: {q}',
+        changeKinds: { added: 'New item', removed: 'Cancelled', increased: 'Increased', decreased: 'Reduced', edited: 'Unit changed' },
     },
 };
 
@@ -843,18 +885,13 @@ export async function buildOrderPdfBytes(
     // Die Tabelle traegt ihre Titel in Grossbuchstaben (Referenz).
     const upper = (label: string) => label.toLocaleUpperCase(captionLocale(label, lang));
 
-    /* BOM-REVISION (27.09.2026, Vorgabe Samet: «aynı numara, revizyon +1 …
-       PDF'te «Revizyon 1» ve değişen satırlar işaretli»): dieselbe Nummer, dazu
-       die Revision in Karte und Titel; geänderte Positionen tragen ihren
-       früheren Wert, stornierte stehen unter den Summen. */
+    /* BOM-REVISION: dieselbe Nummer, die Revision in Karte und Titel. WAS sich
+       änderte, steht seit dem 27.09.2026 abends auf einem EIGENEN Blatt
+       (buildOrderRevisionPdfBytes — Samet: «siparişlerde revizyonlar varsa o
+       pdf ayrı olsun, orada değişiklikler de yazsın»); die Bestellung selbst
+       zeigt ihren heutigen Stand und verweist darauf. */
     const revision = order.bomOrigin?.revision && order.bomOrigin.revision.number > 0 ? order.bomOrigin.revision : null;
-    const revisionOf = new Map((revision?.changes ?? []).filter((line) => line.after > 0).map((line) => [line.bomLineId, line]));
-    const items: PdfItem[] = order.items.map((item) => {
-        const change = revision ? revisionOf.get(String((item as { bomLineId?: unknown }).bomLineId ?? '')) : undefined;
-        if (!change || !revision) return item;
-        const before = `${fmtQty(change.before)}${change.unitBefore ? ` ${change.unitBefore}` : ''}`;
-        return { ...item, revisionNote: L.revisionWas.replace('{n}', String(revision.number)).replace('{before}', before) };
-    });
+    const items: PdfItem[] = order.items;
 
     // ── Seite 1: Karte, Adressen, Titel, Anschreiben ─────────────────────────
     const letterEnd = drawCoverPage(doc, order, settings, L, revision);
@@ -938,34 +975,17 @@ export async function buildOrderPdfBytes(
     }
     drawTotals(doc, y, order, fmt, L, hasGrossRow, hasVatRow, fees);
 
-    // Mit der Revision stornierte Positionen — der Lieferant soll sehen, was wegfällt.
-    const removed = (revision?.changes ?? []).filter((line) => line.after <= 0);
-    if (revision && removed.length) {
-        const lineH = 4.2;
+    // Eine revidierte Bestellung verweist auf ihr eigenes Änderungsblatt.
+    if (revision) {
         let ry = y + totalsBlockHeight + 7;
-        if (ry + 6 + removed.length * lineH > CONTENT_BOTTOM) {
+        if (ry > CONTENT_BOTTOM) {
             doc.addPage();
             ry = CONTENT_TOP_REST;
         }
-        doc.setFont(FONT, 'bold');
-        doc.setFontSize(8.2);
-        doc.setTextColor(...COLOR_NAVY);
-        doc.text(L.revisionRemoved.replace('{n}', String(revision.number)), ML, ry);
-        ry += 5;
         doc.setFont(FONT, 'normal');
-        doc.setFontSize(7.6);
-        for (const line of removed) {
-            if (ry > CONTENT_BOTTOM) {
-                doc.addPage();
-                ry = CONTENT_TOP_REST;
-            }
-            doc.setTextColor(...COLOR_TEXT);
-            const name = doc.splitTextToSize(oneLine(line.name), CONTENT_W - 40)[0] as string;
-            doc.text(name, ML, ry);
-            doc.setTextColor(...COLOR_CAPTION);
-            doc.text(`${fmtQty(line.before)}${line.unitBefore ? ` ${line.unitBefore}` : ''} → 0`, ML + CONTENT_W, ry, { align: 'right' });
-            ry += lineH;
-        }
+        doc.setFontSize(7.8);
+        doc.setTextColor(...COLOR_CAPTION);
+        doc.text(doc.splitTextToSize(L.revisionSeeNotice.replace('{n}', String(revision.number)), CONTENT_W) as string[], ML, ry);
     }
 
     // ── Antet & alt bilgi dekorasyonu (tüm sayfalar) ─────────────────────────
@@ -986,6 +1006,193 @@ export async function exportOrderPdf(
 ): Promise<void> {
     const bytes = await buildOrderPdfBytes(order, settings, lang);
     downloadPdf(bytes, `${localizePurchaseCode(order.referenceNumber, lang)}.pdf`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BESTELLÄNDERUNG — EIGENES BLATT JE REVISION (27.09.2026 abends, Vorgabe Samet)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Eine geänderte Position, wie die Revision sie festhielt (BomOrderActionLine). */
+export interface OrderRevisionChange {
+    index: number;
+    bomLineId: string;
+    code: string | null;
+    name: string;
+    unitBefore: string | null;
+    unitAfter: string | null;
+    before: number;
+    after: number;
+    received: number;
+}
+
+export interface OrderRevisionInput {
+    number: number;
+    createdAt: string | null;
+    changes: OrderRevisionChange[];
+}
+
+type RevisionChangeKind = 'added' | 'removed' | 'increased' | 'decreased' | 'edited';
+
+const revisionKindOf = (line: OrderRevisionChange): RevisionChangeKind => {
+    if (line.before <= 1e-9) return 'added';
+    if (line.after <= 1e-9) return 'removed';
+    if (line.after > line.before + 1e-9) return 'increased';
+    if (line.after < line.before - 1e-9) return 'decreased';
+    return 'edited';
+};
+
+/** «SP-2026-010_Rev1.pdf» — der Code in der Sprache des Dokuments. */
+export const orderRevisionPdfFileName = (referenceNumber: string, revision: number, lang: OrderPdfLang): string =>
+    `${localizePurchaseCode(referenceNumber, lang)}_Rev${revision}.pdf`;
+
+/**
+ * «Siparişlerde revizyonlar varsa o pdf ayrı olsun, orada değişiklikler de
+ *  yazsın — bunlar değişti diyerek.» Die Bestellung selbst druckt ihren
+ * heutigen Stand; WAS sich mit einer Revision änderte, steht auf diesem
+ * eigenen Blatt: dieselbe Nummer mit «Rev. n», ein kurzes Anschreiben und
+ * eine Tabelle Position · Bisher · Neu · Änderung (neu, erhöht, reduziert,
+ * entfällt). Wie auf der Bestellung steht unser ERP-Code nie darauf.
+ */
+export async function buildOrderRevisionPdfBytes(
+    sourceOrder: PurchaseOrderRow,
+    settings: PdfCompanySettings,
+    lang: OrderPdfLang = 'de',
+    revisionInput: OrderRevisionInput | null = null,
+): Promise<Uint8Array> {
+    const origin = sourceOrder.bomOrigin?.revision;
+    const revision: OrderRevisionInput | null = revisionInput
+        ?? (origin && origin.number > 0 ? { number: origin.number, createdAt: origin.createdAt, changes: origin.changes as OrderRevisionChange[] } : null);
+    if (!revision) throw new Error('Diese Bestellung hat keine Revision.');
+    const order = { ...sourceOrder, referenceNumber: localizePurchaseCode(sourceOrder.referenceNumber, lang) };
+    const L = I18N[lang];
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    doc.setProperties({ title: `${order.referenceNumber} · Rev. ${revision.number}` });
+    doc.viewerPreferences({ DisplayDocTitle: true });
+    await registerFonts(doc);
+    doc.setCharSpace(0);
+    const logo = await loadLogo(doc);
+    const wave = await loadHeaderWave(WAVE_W, WAVE_H);
+
+    // ── Karte, Absender & Lieferant, Titel ──────────────────────────────────
+    const rows = ([
+        [L.orderNumber, order.referenceNumber, true],
+        [L.revision, [String(revision.number), fmtDateShort(revision.createdAt)].filter(Boolean).join(' · '), true],
+        [L.orderDate, fmtDateShort(order.createdAt), false],
+        [L.quoteNumber, oneLine(order.quoteNumber || ''), false],
+        [L.project, oneLine(order.projectName || ''), false],
+        [L.supplier, oneLine(order.supplierName), false],
+    ] as CardRow[]).filter(([, value]) => value.trim().length > 0);
+    const cardBottom = drawInfoCard(doc, ML, CONTENT_TOP_FIRST, rows);
+    const addrBottom = drawSenderAndSupplier(doc, order, settings);
+    const titleY = Math.max(cardBottom, addrBottom) + 12;
+    drawDocTitle(doc, L.changeTitle, `${order.referenceNumber} · Rev. ${revision.number}`, titleY);
+
+    // ── Anschreiben (kurz) ──────────────────────────────────────────────────
+    let y = titleY + 7.9;
+    const letterLh = FS_LETTER * PT_MM * LETTER_LHF;
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_LETTER);
+    doc.setTextColor(...COLOR_TEXT_2);
+    const intro = `${L.greeting}\n\n${L.changeIntro.replace('{number}', order.referenceNumber).replace('{n}', String(revision.number))}`;
+    const introLines = intro
+        .split('\n')
+        .flatMap((line) => (line.trim() ? (doc.splitTextToSize(line, CONTENT_W) as string[]) : ['']));
+    doc.text(introLines, ML, y, { lineHeightFactor: LETTER_LHF });
+    y += (introLines.length - 1) * letterLh + 9;
+
+    // ── Die Tabelle der Änderungen ──────────────────────────────────────────
+    const X_POS = ML;
+    const X_ITEM = ML + 11;
+    const X_BEFORE_R = ML + 128;
+    const X_AFTER_R = ML + 152;
+    const X_CHANGE = ML + 158;
+    const ITEM_W = X_BEFORE_R - 26 - X_ITEM;
+    const upper = (label: string) => label.toLocaleUpperCase(captionLocale(label, lang));
+    const drawHead = (top: number): number => {
+        doc.setFont(FONT, 'bold');
+        doc.setFontSize(6.8);
+        doc.setTextColor(...COLOR_COLUMN_HEAD);
+        doc.text(upper(L.changePos), X_POS, top);
+        doc.text(upper(L.colDesc), X_ITEM, top);
+        doc.text(upper(L.changeBefore), X_BEFORE_R, top, { align: 'right' });
+        doc.text(upper(L.changeAfter), X_AFTER_R, top, { align: 'right' });
+        doc.text(upper(L.changeKind), X_CHANGE, top);
+        doc.setFillColor(...COLOR_RULE);
+        doc.rect(ML, top + 2.2, CONTENT_W, 0.3, 'F');
+        return top + 7.2;
+    };
+    if (y > CONTENT_BOTTOM - 30) {
+        doc.addPage();
+        y = CONTENT_TOP_REST;
+    }
+    y = drawHead(y);
+    const qty = (value: number, unit: string | null) => `${fmtQty(value)}${unit ? ` ${unit}` : ''}`;
+    const tone: Record<RevisionChangeKind, readonly [number, number, number]> = {
+        added: [31, 138, 59],
+        removed: [215, 0, 21],
+        increased: COLOR_NAVY,
+        decreased: COLOR_NAVY,
+        edited: COLOR_TEXT_2,
+    };
+    const changes = [...revision.changes].sort((a, b) => a.index - b.index);
+    changes.forEach((line, rowIndex) => {
+        const kind = revisionKindOf(line);
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(8.4);
+        const nameLines = (doc.splitTextToSize(oneLine(line.name), ITEM_W) as string[]).slice(0, 3);
+        const note = line.received > 1e-9 ? L.changeReceived.replace('{q}', qty(line.received, line.unitAfter || line.unitBefore)) : '';
+        const h = Math.max(1, nameLines.length) * 3.9 + (note ? 3.6 : 0) + 3.4;
+        if (y + h > CONTENT_BOTTOM) {
+            doc.addPage();
+            y = drawHead(CONTENT_TOP_REST);
+        }
+        doc.setTextColor(...COLOR_POS);
+        doc.text(String(line.index + 1), X_POS, y);
+        doc.setTextColor(...COLOR_TEXT);
+        doc.text(nameLines, X_ITEM, y, { lineHeightFactor: 1.35 });
+        if (note) {
+            doc.setFontSize(7.2);
+            doc.setTextColor(...COLOR_CAPTION);
+            doc.text(note, X_ITEM, y + nameLines.length * 3.9 - 0.3);
+            doc.setFontSize(8.4);
+        }
+        doc.setTextColor(...COLOR_CAPTION);
+        doc.text(kind === 'added' ? '—' : qty(line.before, line.unitBefore), X_BEFORE_R, y, { align: 'right' });
+        doc.setFont(FONT, 'bold');
+        doc.setTextColor(...COLOR_TEXT);
+        doc.text(kind === 'removed' ? '0' : qty(line.after, line.unitAfter), X_AFTER_R, y, { align: 'right' });
+        doc.setTextColor(...tone[kind]);
+        doc.text(L.changeKinds[kind], X_CHANGE, y);
+        y += h;
+        if (rowIndex < changes.length - 1) {
+            doc.setFillColor(...COLOR_HAIRLINE);
+            doc.rect(ML, y - 3.4 + 0.9, CONTENT_W, HAIRLINE_W, 'F');
+        }
+    });
+    doc.setFillColor(...COLOR_RULE);
+    doc.rect(ML, y - 2.2, CONTENT_W, 0.3, 'F');
+
+    // ── Schluss ─────────────────────────────────────────────────────────────
+    y += 6;
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_LETTER);
+    doc.setTextColor(...COLOR_TEXT_2);
+    const closing = L.changeClosing
+        .split('\n')
+        .flatMap((line) => (line.trim() ? (doc.splitTextToSize(line, CONTENT_W) as string[]) : ['']));
+    if (y + closing.length * letterLh > CONTENT_BOTTOM) {
+        doc.addPage();
+        y = CONTENT_TOP_REST;
+    }
+    doc.text(closing, ML, y, { lineHeightFactor: LETTER_LHF });
+
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        drawPageHeader(doc, logo, wave, settings);
+        drawPageFooter(doc, i, pageCount, L, order, settings);
+    }
+    return new Uint8Array(doc.output('arraybuffer'));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

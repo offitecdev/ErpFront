@@ -15,9 +15,12 @@ type ProductPickerPopupProps = {
     total: number;
     currentPage: number;
     onPageChange: (page: number) => void;
-    onCreateManualProduct: () => void;
-    onCreateStockArticle: () => void;
+    /** Leer = der Aufrufer kennt keinen dieser Wege (Lieferschein) — die Knöpfe fehlen dann. */
+    onCreateManualProduct?: () => void;
+    onCreateStockArticle?: () => void;
     onSelectArticle: (article: ArticleQuickPick) => void;
+    /** Stapelhöhe — über einem PopupDialog (z 750) muss die Karte höher liegen. */
+    z?: number;
 };
 
 /**
@@ -38,6 +41,7 @@ export const ProductPickerPopup = ({
     onCreateManualProduct,
     onCreateStockArticle,
     onSelectArticle,
+    z,
 }: ProductPickerPopupProps) => {
     // "No results" only after a completed fetch — while loading we show the hint.
     const isEmpty = !loading && items.length === 0;
@@ -52,6 +56,7 @@ export const ProductPickerPopup = ({
             title={t('tenders.product_add')}
             subtitle={t('tenders.stock_product_select_info_tender_kopyalanir')}
             width={640}
+            z={z}
             footer={total > PRODUCT_PICKER_PAGE_SIZE ? (
                 <div className="ofi-tp-pager" style={{ paddingTop: 0 }}>
                     <span>{from}–{to} / {total}</span>
@@ -97,10 +102,12 @@ export const ProductPickerPopup = ({
                     <div className="px-4 py-8 text-center">
                         <div className="text-[13px] font-semibold" style={{ color: 'var(--ofi-cal-text)' }}>{t('tenders.product_not_found')}</div>
                         <div className="mt-1 text-[12px]" style={{ color: 'var(--ofi-cal-muted)' }}>{t('tenders.bu_product_only_bu_tender_icin_yazabilir_veya')}</div>
-                        <div className="mt-4 flex flex-wrap justify-center gap-2">
-                            <PopupButton onClick={onCreateManualProduct} icon={<File05 size={14} />}>{t('tenders.create_tender_only_product')}</PopupButton>
-                            <PopupButton variant="primary" onClick={onCreateStockArticle} icon={<Package size={14} />}>{t('tenders.productu_to_stock_add')}</PopupButton>
-                        </div>
+                        {(onCreateManualProduct || onCreateStockArticle) && (
+                            <div className="mt-4 flex flex-wrap justify-center gap-2">
+                                {onCreateManualProduct && <PopupButton onClick={onCreateManualProduct} icon={<File05 size={14} />}>{t('tenders.create_tender_only_product')}</PopupButton>}
+                                {onCreateStockArticle && <PopupButton variant="primary" onClick={onCreateStockArticle} icon={<Package size={14} />}>{t('tenders.productu_to_stock_add')}</PopupButton>}
+                            </div>
+                        )}
                     </div>
                 ) : (
                     items.map((article) => (

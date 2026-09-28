@@ -77,6 +77,43 @@ export const addressesEqual = (a?: string | null, b?: string | null) => {
 };
 
 
+/**
+ * ── PROJEKT- ODER LIEFERADRESSE AUF DEM BELEG (Vorgabe Samet 28.09.2026) ─────
+ * «Sadece teslim veya projeden biri, hangisi seçildiyse o olmalı — teklifte de
+ * irsaliyede de.» Neben der Hauptadresse kennt die Offerte eine abweichende
+ * Projekt- und eine abweichende Lieferadresse; auf Offerte, Auftragsbestätigung
+ * und Lieferschein kommt davon GENAU EINE — die gewählte.
+ *
+ * «Gewählt» heisst dasselbe wie das Häkchen im Adressblock: die gespeicherte
+ * Anschrift weicht von der Hauptadresse ab. Seit diesem Tag schliessen sich die
+ * Häkchen «Projekt» und «Lieferung» aus; eine ältere Offerte mit beiden druckt
+ * die Projektadresse.
+ */
+export type TenderSiteAddressKind = 'INSTALLATION' | 'DELIVERY';
+
+export type TenderSiteAddress = { kind: TenderSiteAddressKind; address: string };
+
+/** Das Gegenstück, das beim Anhaken zurück auf die Hauptadresse fällt. */
+export const exclusiveAddressSlot = (slot: TenderAddressTarget): TenderSiteAddressKind | null => {
+    if (slot === 'INSTALLATION') return 'DELIVERY';
+    if (slot === 'DELIVERY') return 'INSTALLATION';
+    return null;
+};
+
+export const selectedSiteAddress = (tender: {
+    customerAddress?: string | null;
+    installationAddress?: string | null;
+    deliveryAddress?: string | null;
+}): TenderSiteAddress | null => {
+    const main = String(tender.customerAddress ?? '').trim();
+    const pick = (kind: TenderSiteAddressKind, value?: string | null): TenderSiteAddress | null => {
+        const stored = String(value ?? '').trim();
+        if (!stored || addressesEqual(stored, main)) return null;
+        return { kind, address: stored };
+    };
+    return pick('INSTALLATION', tender.installationAddress) ?? pick('DELIVERY', tender.deliveryAddress);
+};
+
 export const locationKindOf = (loc: CustomerLocationDto): 'INSTALLATION' | 'DELIVERY' | 'BILLING' => {
     const kind = loc.kind ?? 'INSTALLATION';
     if (kind === 'BILLING') return 'BILLING';

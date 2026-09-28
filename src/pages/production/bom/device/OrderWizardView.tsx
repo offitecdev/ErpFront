@@ -19,6 +19,7 @@ import {
     predictedNumber,
     supplierGroupKey,
     viewKey,
+    restrictWizard,
     wizardFromProposal,
     wizardGroups,
     wizardInput,
@@ -120,6 +121,8 @@ export const OrderWizardView = ({
     onWizard: (next: WizardState | null) => void;
 }) => {
     const { nav } = context;
+    // Aus einem Talep der BOM (Satın alma): nur seine Zeilen, die Belege hängen an ihm.
+    const requestLines = context.procurement?.lines ?? null;
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
     const [supplierFor, setSupplierFor] = useState<string | null>(null);
@@ -132,10 +135,10 @@ export const OrderWizardView = ({
         if (!needsProposal) return undefined;
         let alive = true;
         productionBomApi.proposal(bom.id)
-            .then((proposal) => { if (alive) { onWizard(wizardFromProposal(proposal)); setError(null); } })
+            .then((proposal) => { if (alive) { onWizard(restrictWizard(wizardFromProposal(proposal), requestLines)); setError(null); } })
             .catch((failure) => { if (alive) setError(productionBomErrorText(failure)); });
         return () => { alive = false; };
-    }, [bom.id, needsProposal, onWizard]);
+    }, [bom.id, needsProposal, onWizard, requestLines]);
 
     const lines = wizard?.proposal.lines ?? [];
     const orderable = lines.filter((line) => !line.block);
@@ -166,12 +169,12 @@ export const OrderWizardView = ({
         if (!wizard || creating) return;
         setCreating(true);
         try {
-            const result = await productionBomApi.createOrders(bom.id, wizardInput(wizard));
+            const result = await productionBomApi.createOrders(bom.id, wizardInput(wizard), context.procurement?.requestId ?? null);
             context.applyBom(result.bom);
             onWizard({ ...wizard, result: { created: result.created, failed: result.failed } });
             result.failed.forEach((entry) => toast.error(t('productionBom.wizard.failed', { supplier: entry.supplierName })));
             // Das Ergebnis steht direkt über der BOM: zurück führt zu ihr, nicht in einen alten Entwurf.
-            nav.popTo(viewKey({ kind: 'bom', bomId: bom.id }));
+            nav.popTo(context.homeKey?.(bom.id) ?? viewKey({ kind: 'bom', bomId: bom.id }));
             nav.push(entryOf({ kind: 'wizard', bomId: bom.id, step: 4 }));
         } catch (failure) {
             toast.error(productionBomErrorText(failure));

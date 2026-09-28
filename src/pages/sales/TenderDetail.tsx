@@ -63,6 +63,7 @@ import {
     addressesEqual,
     EMPTY_TENDER_ADDRESS_FORM,
     EMPTY_TENDER_CUSTOMER_FORM,
+    exclusiveAddressSlot,
     formatLocationAddress,
     locationKindOf,
     type TenderAddressCreateForm,
@@ -1034,10 +1035,19 @@ export const TenderDetail = () => {
                 setCustomerLocations(rows);
                 // A freshly created address is by definition "another" address for
                 // its slot, so that slot stays open on the picker showing it.
-                setCustomAddrSlots((prev) => ({ ...prev, [addrTarget]: true }));
-                if (addrTarget === 'INSTALLATION') handleTenderMetaChange({ installationAddress: formatted });
-                else if (addrTarget === 'DELIVERY') handleTenderMetaChange({ deliveryAddress: formatted });
-                else handleTenderMetaChange({ billingAddress: formatted, billingSameAsInstallation: false });
+                // Projekt und Lieferung schliessen sich aus (28.09.2026): die
+                // andere der beiden fällt auf die Hauptadresse zurück.
+                const released = exclusiveAddressSlot(addrTarget);
+                const releasedTicked = released !== null && customAddrSlots[released];
+                setCustomAddrSlots((prev) => (released
+                    ? { ...prev, [addrTarget]: true, [released]: false }
+                    : { ...prev, [addrTarget]: true }));
+                const mainAddress = String(detail?.tender.customerAddress ?? '').trim() || null;
+                if (addrTarget === 'INSTALLATION') {
+                    handleTenderMetaChange({ installationAddress: formatted, ...(releasedTicked ? { deliveryAddress: mainAddress } : {}) });
+                } else if (addrTarget === 'DELIVERY') {
+                    handleTenderMetaChange({ deliveryAddress: formatted, ...(releasedTicked ? { installationAddress: mainAddress } : {}) });
+                } else handleTenderMetaChange({ billingAddress: formatted, billingSameAsInstallation: false });
             }
             toast.success(t('crm.addressSaved'));
             setAddrModalOpen(false);
@@ -1406,11 +1416,21 @@ export const TenderDetail = () => {
         return { billingAddress: value, billingSameAsInstallation: false };
     };
     const handleUseCustomAddress = (slot: TenderAddressSlot, checked: boolean) => {
-        setCustomAddrSlots((prev) => ({ ...prev, [slot]: checked }));
-        setPendingAddrId((prev) => ({ ...prev, [slot]: null }));
+        // PROJEKT ODER LIEFERUNG, nie beide (Vorgabe Samet 28.09.2026: auf
+        // Offerte und Lieferschein steht nur die EINE gewählte Anschrift). Wer
+        // das eine anhakt, gibt das andere an die Hauptadresse zurück.
+        const other = checked ? exclusiveAddressSlot(slot) : null;
+        const release = other !== null && customAddrSlots[other] ? other : null;
+        setCustomAddrSlots((prev) => (release
+            ? { ...prev, [slot]: checked, [release]: false }
+            : { ...prev, [slot]: checked }));
+        setPendingAddrId((prev) => (release
+            ? { ...prev, [slot]: null, [release]: null }
+            : { ...prev, [slot]: null }));
         // Unticked, the slot follows the Hauptadresse again — so the address it
         // was pointed at is replaced right away instead of lingering unseen.
         if (!checked) handleAddressPick(slotPatch(slot, customerMainAddress || null));
+        else if (release) handleAddressPick(slotPatch(release, customerMainAddress || null));
     };
     const slotLabel: Record<TenderAddressSlot, string> = {
         INSTALLATION: t('tenders.adresse_kurz_projekt'),

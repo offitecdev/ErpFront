@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Info, ListChecks, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,7 +54,8 @@ const NEW = 'new';
  * gewählte Vorlage steht in der Adresse (`?t=`), eine neue als `?t=new`.
  * Der Rahmen ist der des Depos (schmale Leiste, keine Kopfleiste).
  */
-export const TaskTemplatesPage = () => {
+/** `tabs`: die grauen Reiter der Seite «Şablonlar» (28.09.2026) — sie stehen statt des Titels. */
+export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
     useLanguageTick();
     const [params, setParams] = useSearchParams();
     const canEdit = useAuthStore((state) => state.isSystemAdmin);
@@ -284,7 +285,7 @@ export const TaskTemplatesPage = () => {
     return (
         <div className="ofi-ptk is-templates">
             <header className="ofi-ptk-head">
-                <h1 className="ofi-ptk-head__title">{t('productionTasks.templates.title')}</h1>
+                {tabs ?? <h1 className="ofi-ptk-head__title">{t('productionTasks.templates.title')}</h1>}
                 {list && <span className="ofi-ptk-head__count">{t('productionTasks.templates.count', { count: list.length })}</span>}
                 <div className="ofi-ptk-head__actions">
                     {canEdit && (

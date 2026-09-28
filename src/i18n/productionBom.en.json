@@ -1,7 +1,11 @@
 {
   "nav": {
     "productionBomTemplates": "BOM templates",
-    "productionSettings": "Production settings"
+    "productionSettings": "Production settings",
+    "productionPurchasing": "Purchasing",
+    "productionCosting": "Costing",
+    "productionTemplates": "Templates",
+    "productionSettingsMenu": "Settings"
   },
   "productionBom": {
     "common": {
@@ -61,7 +65,8 @@
       "minimum": "Min. order",
       "order": "Order",
       "quantity": "Quantity",
-      "note": "Note"
+      "note": "Note",
+      "received": "Received"
     },
     "templates": {
       "title": "BOM templates",
@@ -235,7 +240,8 @@
       "saved": "Saved",
       "saveFirst": "Save first",
       "invalidQuantity": "Every line needs a quantity above 0.",
-      "unsavedText": "The changes in {{number}} are not saved. They are lost if you leave without saving."
+      "unsavedText": "The changes in {{number}} are not saved. They are lost if you leave without saving.",
+      "confirmedQty": "{{count}} confirmed"
     },
     "wizard": {
       "title": "Create orders",
@@ -493,7 +499,12 @@
       "REVISION_NOT_FOUND": "This revision does not exist.",
       "REASON_REQUIRED": "The reason for the revision is required.",
       "REVISION_NO_CHANGES": "The revision changes nothing — change lines first or discard the revision.",
-      "REVISION_CONFLICT": "The BOM changed in the meantime — please reload."
+      "REVISION_CONFLICT": "The BOM changed in the meantime — please reload.",
+      "KIND_INVALID": "Invalid request type",
+      "NOT_FOUND": "Not found",
+      "REQUEST_NOT_FOUND": "Request not found",
+      "REQUEST_IN_PROGRESS": "Purchasing is already working on this request — it cannot be withdrawn",
+      "REQUEST_MISMATCH": "The request does not belong to this action"
     },
     "tasks": {
       "title": "Tasks",
@@ -657,7 +668,252 @@
         "CANCEL": "Cancellation to clarify",
         "KEEP": "Left as it was"
       },
-      "orderPill": "Order Rev.{{revision}}"
+      "orderPill": "Order Rev.{{revision}}",
+      "openOrder": "Open order",
+      "changePdf": "Change notice PDF (rev. {{revision}})",
+      "changePdfTitle": "Document for the supplier: only the items changed with rev. {{revision}}"
+    },
+    "process": {
+      "title": "Process",
+      "titleMain": "Process · all sub BOMs",
+      "now": "Now: {{step}}",
+      "allDone": "Process complete",
+      "remaining_one": "{{count}} step left after this",
+      "remaining_other": "{{count}} steps left after this",
+      "lastStep": "Last step",
+      "optional": "Optional",
+      "skipped": "Skipped",
+      "step": {
+        "list": "List",
+        "price": "Price request",
+        "approve": "BOM approval",
+        "orderRequest": "Purchase request",
+        "purchasing": "Purchasing",
+        "confirmed": "Supplier confirmation",
+        "received": "Goods in · reserved",
+        "completed": "BOM completed",
+        "consumed": "Consumed from stock"
+      },
+      "hint": {
+        "list": "Lines are added, quantities set",
+        "price": "Optional: ask purchasing for prices before approval",
+        "approve": "BOM is approved — final, changes via revision",
+        "orderRequest": "Missing lines are sent to purchasing as a request",
+        "purchasing": "Accounting places the orders — done when nothing is missing",
+        "confirmed": "Suppliers confirm the orders",
+        "received": "Goods arrive and are reserved for the project with the earliest delivery date",
+        "completed": "Everything reserved — BOM completed",
+        "consumed": "Reservations are consumed from stock when the project ends"
+      },
+      "open": "Show process"
+    },
+    "procurement": {
+      "priceButton": "Request prices",
+      "priceButtonTitle": "Ask purchasing for prices — purchasing chooses suppliers and prices",
+      "orderButton": "Purchase request",
+      "orderButtonTitle": "Send the missing lines to purchasing as an order request",
+      "allRequested": "All missing lines are with purchasing",
+      "dialogTitle": {
+        "PRICE": "Request prices",
+        "ORDER": "Send purchase request"
+      },
+      "dialogSubtitle": {
+        "PRICE": "{{number}} · goes to purchasing as a request",
+        "ORDER": "{{number}} · missing lines go to purchasing"
+      },
+      "dialogHint": {
+        "PRICE": "Pick products and quantities only. Purchasing (accounting) chooses suppliers and prices; the request appears on Production › Purchasing.",
+        "ORDER": "What is neither in stock nor on order is requested — never less. Purchasing chooses suppliers and prices."
+      },
+      "send": {
+        "PRICE": "Send price request",
+        "ORDER": "Send purchase request"
+      },
+      "selected": "{{count}} lines selected",
+      "all": "Select all",
+      "quantity": "Requested qty",
+      "pending": "{{number}} waiting in purchasing",
+      "minQty": "At least {{min}}",
+      "nothing": {
+        "PRICE": "This BOM has no lines",
+        "ORDER": "Nothing missing — all in stock or on order"
+      },
+      "note": "Note to purchasing",
+      "notePlaceholder": "Optional — e.g. urgency, preferred brand",
+      "created": {
+        "PRICE": "Price request {{number}} sent to purchasing",
+        "ORDER": "Purchase request {{number}} sent to purchasing"
+      },
+      "title": "Purchase requests",
+      "titleMeta": "Purchasing tracks suppliers and prices",
+      "status": {
+        "OPEN": "Waiting",
+        "IN_PROGRESS": "In purchasing",
+        "DONE": "Done",
+        "CANCELLED": "Cancelled"
+      },
+      "kind": {
+        "PRICE": "Price request",
+        "ORDER": "Purchase request"
+      },
+      "linesCount_one": "{{count}} line",
+      "linesCount_other": "{{count}} lines",
+      "progressTitle": {
+        "PRICE": "Lines with a price request",
+        "ORDER": "Lines ordered"
+      },
+      "progress": {
+        "PRICE": "{{done}}/{{total}} priced",
+        "ORDER": "{{done}}/{{total}} ordered"
+      },
+      "withdraw": "Withdraw",
+      "withdrawn": "{{number}} withdrawn",
+      "fromRequestNote": "Quantity from the purchase request"
+    },
+    "goodsIn": {
+      "title": "Goods received",
+      "meta": "{{total}} in total — allocated to the earliest delivery date",
+      "date": "Date",
+      "quantity": "Quantity",
+      "source": "Source",
+      "fromStock": "Warehouse entry",
+      "serialsOf": "{{name}} — serial numbers",
+      "serialsTitle": "Received serial numbers",
+      "bom": "BOM",
+      "by": "Received by",
+      "serialCount_one": "{{count}} serial number",
+      "serialCount_other": "{{count}} serial numbers",
+      "reserved": "Reserved in this BOM",
+      "moved": "No longer on this line",
+      "allocTitle": "Goods received",
+      "allocSubtitle": "Allocated automatically to the projects with the earliest delivery date",
+      "freeStock": "Free stock",
+      "freeStockHint": "No waiting demand — free in the warehouse"
+    },
+    "purchasing": {
+      "title": "Purchasing",
+      "back": "Requests",
+      "search": "Search request, project, product, supplier",
+      "sideNote": "Requests from the BOMs land here. Only accounting and administrators see suppliers and prices.",
+      "empty": {
+        "feed": {
+          "all": "No requests yet",
+          "open": "No open requests",
+          "done": "No completed requests",
+          "cancelled": "No cancelled requests"
+        }
+      },
+      "emptyHint": {
+        "feed": "Requests sent from a BOM («Request prices» or «Purchase request») appear here in one list; price requests and orders stay inside their request as operations."
+      },
+      "bomDocuments": "BOM operations",
+      "createRequests": "Create price requests",
+      "createOrders": "Create orders",
+      "readOnly": "You can view — acting needs accounting/administrator rights.",
+      "fact": {
+        "project": "Project",
+        "delivery": "Delivery date",
+        "deliveryHint": "Priority: earliest delivery",
+        "bom": "BOM",
+        "requested": "Requested"
+      },
+      "lines": "Requested lines",
+      "missingNow": "Missing now",
+      "state": "Status",
+      "lineAsked": "Price requested",
+      "lineOrdered": "Ordered",
+      "lineOpen": "Waiting",
+      "received": "Received",
+      "noRequestsYet": "No price request created yet",
+      "noOrdersYet": "No order created yet",
+      "action": {
+        "close": "Mark as done",
+        "reopen": "Reopen",
+        "cancel": "Cancel",
+        "closeDone": "{{number}} marked as done",
+        "reopenDone": "{{number}} reopened",
+        "cancelDone": "{{number}} cancelled",
+        "closeTitle": "Mark {{number}} as done?",
+        "cancelTitle": "Cancel {{number}}?",
+        "closeText": "The request leaves the open list; its operations stay as they are.",
+        "cancelText": "The request is cancelled and shows as cancelled in the BOM. Operations are not deleted."
+      },
+      "statusFilter": "Status",
+      "status": {
+        "open": "Open",
+        "done": "Done",
+        "cancelled": "Cancelled",
+        "all": "All"
+      },
+      "costingHint": "Planned and actual material cost",
+      "revisionNoOrders": "Affected no order",
+      "lastActivity": "Last activity",
+      "pageRange": "{{from}}–{{to}} of {{total}}",
+      "prevPage": "Previous page",
+      "nextPage": "Next page",
+      "revisionOrders_one": "Affected {{count}} order",
+      "revisionOrders_other": "Affected {{count}} orders",
+      "documentsOf": {
+        "PRICE": "Price requests of this request",
+        "ORDER": "Orders of this request"
+      },
+      "confirmedOf": "{{done}}/{{total}} confirmed",
+      "receiveNow": "Goods receipt",
+      "requestsSent": "{{count}} price requests"
+    },
+    "costing": {
+      "title": "Costing",
+      "search": "Search project",
+      "projects": "Projects",
+      "empty": "No project with a BOM yet",
+      "emptyHint": "As soon as a device has a BOM, its material cost is calculated here.",
+      "plan": "Planned material cost",
+      "forecast": "Actual cost (forecast)",
+      "diff": "Difference to plan",
+      "missingPrice_one": "{{count}}/{{total}} item has no purchase price",
+      "missingPrice_other": "{{count}}/{{total}} items have no purchase price",
+      "allPriced": "All {{total}} items have a purchase price",
+      "actualLines_one": "{{count}}/{{total}} item with an actual order price",
+      "actualLines_other": "{{count}}/{{total}} items with an actual order price",
+      "diffHint": "{{percent}} — on items with an actual price",
+      "noCompare": "Waiting for confirmed order prices to compare",
+      "projectTotal": "Project total",
+      "deviceTotal": "Machine total",
+      "planShort": "Plan",
+      "forecastShort": "Actual (forecast)",
+      "diffShort": "Difference",
+      "item": "Material",
+      "quantity": "Quantity",
+      "unitPrice": "Purchase price",
+      "planTotal": "Plan total",
+      "actualTotal": "Actual total",
+      "fromQuote": "quote",
+      "fromQuoteTitle": "No purchase price on the card — from the best price quote",
+      "noPrice": "no price",
+      "actualUnitTitle": "Order unit price: {{price}}",
+      "position": "Pos. {{number}}",
+      "note": "Plan: purchase price on the warehouse card (else the best price quote). Actual: price in confirmed orders. Forecast: actual price, else plan. Currencies are never converted.",
+      "sideNote": "Only accounting and administrators see prices."
+    },
+    "orderDoc": {
+      "label": "Document",
+      "order": "Order",
+      "revision": "Change rev. {{n}}"
+    },
+    "hub": {
+      "settingsTab": "Production settings",
+      "accessTab": "Authorization",
+      "access": {
+        "templatesTitle": "Who sees the templates",
+        "templatesIntro": "The task template and BOM template tabs only appear for the roles switched on here. The Administrator role always sees everything.",
+        "role": "Role",
+        "always": "Always",
+        "people_one": "{{count}} person",
+        "people_other": "{{count}} people",
+        "note": "The change applies to people with the role from their next sign-in or page reload. New roles and other page rights: «Manage roles».",
+        "manageRoles": "Manage roles",
+        "saveFailed": "Could not save «{{role}}»"
+      }
     }
   }
 }

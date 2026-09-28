@@ -2127,6 +2127,101 @@ body > :not(#root) .ofi-wh-pop table.ofi-wh-table > tbody > tr.is-bad > td { bac
     #root .ofi-wh .ofi-wh-serialcount > b { animation: none !important; }
 }
 
+/* ── 13.11 Wareneingang aus «Ürün ekle» (28.09.2026) ────────
+   «Hiç sormadan, proje teslim tarihi en önce olan ürünün siparişine otomatik
+    çeksin stoktan.» Die Meldung nennt die Bestellung (grün, mit «Geri al»),
+   die Zeile trägt die Bestellungen als Marken, das «+N» lässt sich tippen.
+   Das Fenster ist ein Portal: Knöpfe und Felder brauchen den Zwilling
+   `body > :not(#root)` gegen die Regeln der Schale. */
+.ofi-wh-notice.is-receipt {
+    align-items: flex-start;
+    border-color: color-mix(in srgb, var(--wh-success) 32%, transparent);
+    background: var(--wh-success-soft);
+}
+.ofi-wh-notice.is-receipt > svg { margin-top: 1px; color: var(--wh-success); }
+.ofi-wh-notice.is-receipt > .ofi-wh-btn { flex: none; align-self: center; }
+.ofi-wh-notice.is-receipt .ofi-wh-notice__text { gap: 6px; }
+.ofi-wh-receipt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-wh-receipt > b {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 6px;
+    font-weight: 600;
+    color: var(--wh-text);
+}
+.ofi-wh-receipt__code { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--wh-success); }
+.ofi-wh-receipt > span { font-size: 11.5px; color: var(--wh-secondary); }
+
+.ofi-wh-sessionrow__orders { display: flex; flex-wrap: wrap; gap: 5px; }
+.ofi-wh-orderchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    height: 22px;
+    padding: 0 8px 0 6px;
+    border-radius: 999px;
+    background: var(--wh-success-soft);
+    color: var(--wh-success);
+    font-size: 11.5px;
+    white-space: nowrap;
+    animation: ofi-wh-in 200ms ease both;
+}
+.ofi-wh-orderchip > svg { flex: none; width: 13px; height: 13px; }
+.ofi-wh-orderchip > b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-wh-orderchip > span { color: var(--wh-text); opacity: 0.8; font-variant-numeric: tabular-nums; }
+.ofi-wh-snchip__text > small.ofi-wh-snchip__order { color: var(--wh-success); font-weight: 600; opacity: 1; }
+
+/* «+N» zum Tippen: sieht aus wie die Zählmarke, ist ein Feld. */
+.ofi-wh-addqty {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-width: 46px;
+    height: 28px;
+    padding: 0 10px 0 9px;
+    border-radius: 999px;
+    background: var(--wh-accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    cursor: text;
+    transition: box-shadow 120ms ease, background-color 120ms ease;
+}
+.ofi-wh-addqty.is-zero { background: var(--wh-fill-strong); color: var(--wh-secondary); }
+.ofi-wh-addqty > span { flex: none; }
+.ofi-wh-addqty:focus-within { box-shadow: 0 0 0 3px var(--wh-ring); }
+#root .ofi-wh-addqty > input,
+body > :not(#root) .ofi-wh-addqty > input {
+    width: auto;
+    min-width: 2ch;
+    max-width: 9ch;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0 !important;
+    outline: none;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+    field-sizing: content;
+}
+#root .ofi-wh-addqty > input:focus,
+body > :not(#root) .ofi-wh-addqty > input:focus { outline: none; box-shadow: none !important; }
+.dark .ofi-wh-addqty:not(.is-zero),
+html.dark .ofi-wh-addqty:not(.is-zero) { color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+    .ofi-wh-orderchip,
+    .ofi-wh-addqty { animation: none !important; transition: none !important; }
+}
+
 /* ── 12. Schmale Fenster ──────────────────────────────────── */
 @media (max-width: 1100px) {
     .ofi-wh-form { grid-template-columns: minmax(0, 1fr); }

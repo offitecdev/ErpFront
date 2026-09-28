@@ -68,6 +68,10 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
 
     const pdfLang = 'de' as const;
     const fileName = supplierPdfFileName(localizePurchaseCode(order.referenceNumber, pdfLang), active, multi);
+    /* Eine revidierte BOM-Bestellung geht MIT ihrem Änderungsblatt hinaus (27.09.2026 abends:
+       «siparişlerde revizyonlar varsa o pdf ayrı olsun … bunlar değişti diyerek»). */
+    const revisionNumber = !priceRequest && order.bomOrigin?.revision && order.bomOrigin.revision.number > 0 ? order.bomOrigin.revision.number : 0;
+    const revisionFileName = revisionNumber ? `${localizePurchaseCode(order.referenceNumber, pdfLang)}_Rev${revisionNumber}.pdf` : null;
     const mailState = active ? (active.emailSentAt ? 'SENT' : 'NOT_SENT') : stageMailState(order);
     const sentAt = active ? active.emailSentAt : order.emailSentAt;
     const isResend = Boolean(sentAt);
@@ -208,17 +212,25 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
             const bytes = priceRequest
                 ? await (await import('@/utils/pdf/priceRequestPdf')).buildPriceRequestPdfBytes(target, settings, pdfLang)
                 : await (await import('@/utils/pdf/orderPdf')).buildOrderPdfBytes(target, settings, pdfLang);
+            const revisionBytes = revisionFileName
+                ? await (await import('@/utils/pdf/orderPdf')).buildOrderRevisionPdfBytes(target, settings, pdfLang)
+                : null;
             const result = await purchaseOrdersApi.sendMail(order.id, {
                 to: to.trim() || undefined,
                 ccEmails: cc.map((person) => person.email).filter((email): email is string => Boolean(email)),
                 subject: subject.trim(),
                 message,
                 ...(active ? { supplierIndex: activeIndex } : {}),
-                attachments: [{
-                    filename: fileName,
-                    contentType: 'application/pdf',
-                    contentBase64: bytesToBase64(bytes),
-                }],
+                attachments: [
+                    {
+                        filename: fileName,
+                        contentType: 'application/pdf',
+                        contentBase64: bytesToBase64(bytes),
+                    },
+                    ...(revisionBytes && revisionFileName
+                        ? [{ filename: revisionFileName, contentType: 'application/pdf', contentBase64: bytesToBase64(revisionBytes) }]
+                        : []),
+                ],
             });
             onOrderChanged(result.order);
             // `preview` = ohne SMTP-Einstellung: die Mail ist NICHT hinausgegangen.
@@ -413,6 +425,12 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
                         <File05 size={16} />
                         <span>{fileName}</span>
                     </span>
+                    {revisionFileName && (
+                        <span className="ofi-mail-file" title={t('productionBom.orderDoc.revision', { n: revisionNumber })}>
+                            <File05 size={16} />
+                            <span>{revisionFileName}</span>
+                        </span>
+                    )}
                 </div>
 
                 <footer className="ofi-mail-foot">

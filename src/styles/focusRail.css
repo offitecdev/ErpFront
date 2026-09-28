@@ -168,8 +168,13 @@ html.dark #root .ofi-rail-slim__tools button.ofi-hdr-ctl[aria-expanded="true"] {
     transform-origin: top right;
 }
 
+/* Der Firmenwechsel (Produktionsfirma, 27.09.2026): nur das Firmenzeichen,
+   wie in der Kopfleiste — ohne Kürzel, Namen und Pfeil. */
+#root .ofi-rail-slim__tools .ofi-tsw-toolbar-symbol { display: block !important; }
+#root .ofi-rail-slim__tools .ofi-tsw-btn :is(.ofi-tsw-mono, .ofi-tsw-btn__label, .ofi-tsw-btn__caret) { display: none !important; }
+
 /* Die Menüs gehen nach RECHTS auf, unten bündig mit ihrem Knopf. */
-#root .ofi-rail--slim :is(.ofi-lang-menu, .ofi-profile-menu) {
+#root .ofi-rail--slim :is(.ofi-lang-menu, .ofi-profile-menu, .ofi-tsw) {
     top: auto !important;
     right: auto !important;
     bottom: 0 !important;
@@ -230,5 +235,5 @@ html.ofi-focus-nav .ofi-nc {
 @media (prefers-reduced-motion: reduce) {
     #root .ofi-rail { transition: none; }
     .ofi-rail-tip,
-    #root .ofi-rail--slim :is(.ofi-lang-menu, .ofi-profile-menu) { animation: none !important; }
+    #root .ofi-rail--slim :is(.ofi-lang-menu, .ofi-profile-menu, .ofi-tsw) { animation: none !important; }
 }

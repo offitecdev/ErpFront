@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { FilePen, History, TriangleAlert } from 'lucide-react';
+import { ExternalLink, FileDiff, FilePen, History, TriangleAlert } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBom';
-import type { Bom, BomRevisionDetail, BomRevisionSummary } from '@/types/productionBom';
+import { usePdfSettings } from '@/store/pdfSettingsStore';
+import type { Bom, BomOrderAction, BomRevisionDetail, BomRevisionSummary } from '@/types/productionBom';
 
 import { fmtQty, shortDate, unitLabel } from '../bomFormat';
 import { Dash, EmptyState, LoadingState } from '../bomUi';
@@ -11,6 +12,45 @@ import { NavBar, NavLinkRow } from '../NavStack';
 import { changeCounts, type ChangeCounts } from './bomRevision';
 import { OrderActionCard, RevisionChangesTable } from './BomRevisionDialogs';
 import type { BomViewContext } from './DeviceBomArea';
+import { openOrderRevisionPdf } from './revisionPdf';
+
+/** Im Einkauf unter jeder betroffenen Bestellung: öffnen und — wenn sie beim Lieferanten revidiert wurde — ihr Änderungsblatt. */
+const RevisionOrderButtons = ({ context, bomId, action }: { context: BomViewContext; bomId: string; action: BomOrderAction }) => {
+    const settings = usePdfSettings();
+    const [busy, setBusy] = useState(false);
+    const revised = action.action === 'REVISE' && (action.orderRevision ?? 0) > 0;
+    return (
+        <>
+            <button
+                type="button"
+                className="ofi-bom-btn is-small is-quiet ofi-nosize"
+                onClick={() => context.open({ kind: 'purchase', bomId, purchaseOrderId: action.purchaseOrderId })}
+            >
+                <ExternalLink />
+                {t('productionBom.revision.openOrder')}
+            </button>
+            {revised && (
+                <button
+                    type="button"
+                    className="ofi-bom-btn is-small ofi-nosize"
+                    disabled={busy}
+                    title={t('productionBom.revision.changePdfTitle', { revision: action.orderRevision ?? 0 })}
+                    onClick={async () => {
+                        setBusy(true);
+                        try {
+                            await openOrderRevisionPdf(action.purchaseOrderId, action.orderRevision ?? 0, settings);
+                        } finally {
+                            setBusy(false);
+                        }
+                    }}
+                >
+                    {busy ? <span className="ofi-bom-spinner is-small" /> : <FileDiff />}
+                    {t('productionBom.revision.changePdf', { revision: action.orderRevision ?? 0 })}
+                </button>
+            )}
+        </>
+    );
+};
 
 /** «+2 yeni · 1 artış · 1 çıkarıldı» — nur, was vorkommt. */
 export const ChangeChips = ({ counts }: { counts: ChangeCounts }) => {
@@ -166,7 +206,15 @@ export const BomRevisionView = ({ context, bom, revision }: { context: BomViewCo
                                     <span className="ofi-bom-group__count">{detail.orderActions.length}</span>
                                 </h3>
                                 <div className="ofi-bom-revdialog__orders">
-                                    {detail.orderActions.map((action) => <OrderActionCard key={action.purchaseOrderId} action={action} done />)}
+                                    {detail.orderActions.map((action) => (
+                                        <OrderActionCard
+                                            key={action.purchaseOrderId}
+                                            action={action}
+                                            done
+                                            showSupplier={Boolean(context.purchasing)}
+                                            footer={context.purchasing ? <RevisionOrderButtons context={context} bomId={bom.id} action={action} /> : undefined}
+                                        />
+                                    ))}
                                 </div>
                             </section>
                         )}

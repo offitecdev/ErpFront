@@ -23,7 +23,7 @@ import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/P
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBom';
 import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
-import type { Bom, BomLine, BomProduct, BomTemplate, BomUnit } from '@/types/productionBom';
+import type { Bom, BomLine, BomProcurementKind, BomProduct, BomTemplate, BomUnit } from '@/types/productionBom';
 
 import { BomLinesTable, type BomTableMode, type BomTableRow } from '../BomLinesTable';
 import { fmtQty, parseQuantityText, quantityToText, shortDate, unitLabel } from '../bomFormat';
@@ -36,6 +36,10 @@ import { diffDraft, draftOfRevisionLine } from './bomRevision';
 import { DiscardRevisionDialog, RevisionApproveDialog, StartRevisionDialog } from './BomRevisionDialogs';
 import { ChangeChips } from './BomRevisionsView';
 import { BomUnsavedDialog } from './BomUnsavedDialog';
+import { BomProcessButton } from './BomProcessButton';
+import { BomGoodsInSection, BomProcurementSection } from './BomProcurementPanels';
+import { pendingLineIds } from './bomProcess';
+import { ProcurementRequestDialog } from './ProcurementRequestDialog';
 import { entryOf } from './bomViews';
 import type { BomViewContext } from './DeviceBomArea';
 import { SubBomTree } from './SubBomTree';
@@ -149,6 +153,9 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
     const [ask, setAsk] = useState<Ask>(null);
     const [inserting, setInserting] = useState(false);
     const [addingSub, setAddingSub] = useState(false);
+    /* «Bom'da sadece sipariş ve fiyat talep istekleri oluşsun» (27.09.2026 abends):
+       die BOM stellt einen Talep an den Einkauf — ohne Lieferant, ohne Preis. */
+    const [requesting, setRequesting] = useState<BomProcurementKind | null>(null);
 
     const serverLines = useMemo(
         () => (draftRevision ? draftRevision.lines.map(draftOfRevisionLine) : bom.lines.map(draftOf)),
@@ -232,14 +239,18 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
     const mode: BomTableMode = consumed ? 'consumed' : isDraft || revising ? 'draft' : 'active';
     // In der Revision: an jeder Zeile, was sie gegenüber der geltenden Fassung ändert (auch ungespeichert).
     const diff = useMemo(() => (revising ? diffDraft(bom.lines, lines) : null), [revising, bom.lines, lines]);
+    // «Mal kabul gelse … bomda yazsa, sadece sayısal»: was bei Eingängen an jede Zeile ging.
+    const receivedByLine = new Map<string, number>();
+    for (const entry of bom.goodsIn ?? []) {
+        if (entry.lineId) receivedByLine.set(entry.lineId, (receivedByLine.get(entry.lineId) ?? 0) + entry.quantity);
+    }
     const rows = isDraft || revising
         ? lines.map((line) => ({ ...draftRow(line), change: diff?.marks.get(line.key) ?? null }))
-        : bom.lines.map(rowOf);
-    const orders = bom.purchases.filter((purchase) => purchase.kind === 'ORDER');
-    const requests = bom.purchases.filter((purchase) => purchase.kind === 'REQUEST');
-    const documents = bom.purchases.length + bom.purchases.filter((purchase) => purchase.quoteFile).length
-        + bom.purchases.reduce((sum, purchase) => sum + purchase.revisions.filter((entry) => entry.quoteFile).length, 0);
+        : bom.lines.map((line) => ({ ...rowOf(line), received: receivedByLine.get(line.id) ?? 0 }));
     const missingLines = bom.counts.missing;
+    // Was fehlt und noch in keinem offenen Sipariş talebi steht.
+    const orderPending = pendingLineIds(bom, 'ORDER');
+    const requestableMissing = bom.lines.filter((line) => line.coverage.missing > 1e-9 && !orderPending.has(line.id)).length;
     const subs = isMain ? data.subs.map((sub) => context.bomOf(sub.id) ?? sub) : [];
     const parent = !isMain && bom.parentBomId ? context.bomOf(bom.parentBomId) : null;
     const delivery = data.project.deliveryDate;
@@ -286,6 +297,8 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                     <>
                         <StatusPill status={bom.status} consumed={consumed} />
                         {showRevision && <RevisionPill revision={bom.revision} draft={draftRevision?.revision ?? null} />}
+                        {/* DER WEG — immer oben, als gläserner Knopf: ein Klick zeigt die Stationen. */}
+                        {(!container || subs.length > 0) && <BomProcessButton bom={bom} subs={subs} />}
                     </>
                 )}
                 subtitle={(
@@ -364,11 +377,11 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                             type="button"
                                             className="ofi-bom-btn ofi-nosize"
                                             disabled={!bom.lines.length || busy !== null || dirty || saving}
-                                            title={dirty ? t('productionBom.detail.saveFirst') : t('productionBom.request.buttonTitle')}
-                                            onClick={() => context.open({ kind: 'request', bomId: bom.id, step: 1 })}
+                                            title={dirty ? t('productionBom.detail.saveFirst') : t('productionBom.procurement.priceButtonTitle')}
+                                            onClick={() => setRequesting('PRICE')}
                                         >
                                             <FileText />
-                                            {t('productionBom.request.button')}
+                                            {t('productionBom.procurement.priceButton')}
                                         </button>
                                         <button
                                             type="button"
@@ -395,10 +408,10 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                             className="ofi-bom-btn ofi-nosize"
                                             disabled={!lines.length || busy !== null || dirty || saving}
                                             title={dirty ? t('productionBom.detail.saveFirst') : t('productionBom.revision.requestTitle')}
-                                            onClick={() => context.open({ kind: 'request', bomId: bom.id, step: 1 })}
+                                            onClick={() => setRequesting('PRICE')}
                                         >
                                             <FileText />
-                                            {t('productionBom.request.button')}
+                                            {t('productionBom.procurement.priceButton')}
                                         </button>
                                         <button
                                             type="button"
@@ -423,12 +436,15 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                         )}
                                         <button
                                             type="button"
-                                            className={`ofi-bom-btn ofi-nosize${missingLines > 0 ? ' is-primary' : ''}`}
-                                            disabled={missingLines === 0}
-                                            onClick={() => context.open({ kind: 'wizard', bomId: bom.id, step: 1 })}
+                                            className={`ofi-bom-btn ofi-nosize${requestableMissing > 0 ? ' is-primary' : ''}`}
+                                            disabled={requestableMissing === 0}
+                                            title={requestableMissing === 0
+                                                ? t(missingLines > 0 ? 'productionBom.procurement.allRequested' : 'productionBom.wizard.allOrdered')
+                                                : t('productionBom.procurement.orderButtonTitle')}
+                                            onClick={() => setRequesting('ORDER')}
                                         >
                                             <ShoppingCart />
-                                            {t('productionBom.detail.order')}
+                                            {t('productionBom.procurement.orderButton')}
                                         </button>
                                         <button
                                             type="button"
@@ -526,26 +542,15 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                             {bom.status === 'APPROVED' && !consumed && (
                                 <NavLinkRow
                                     icon={<ShoppingCart />}
-                                    label={t('productionBom.detail.order')}
-                                    detail={missingLines > 0 ? t('productionBom.device.cardMissing', { count: missingLines }) : t('productionBom.wizard.allOrdered')}
-                                    tone={missingLines > 0 ? 'warn' : 'ok'}
-                                    disabled={missingLines === 0}
-                                    onClick={() => context.open({ kind: 'wizard', bomId: bom.id, step: 1 })}
+                                    label={t('productionBom.procurement.orderButton')}
+                                    detail={requestableMissing > 0
+                                        ? t('productionBom.device.cardMissing', { count: requestableMissing })
+                                        : missingLines > 0 ? t('productionBom.procurement.allRequested') : t('productionBom.wizard.allOrdered')}
+                                    tone={requestableMissing > 0 ? 'warn' : 'ok'}
+                                    disabled={requestableMissing === 0 || !canEdit}
+                                    onClick={() => setRequesting('ORDER')}
                                 />
                             )}
-                            <NavLinkRow
-                                icon={<ShoppingCart />}
-                                label={t('productionBom.detail.orders')}
-                                detail={requests.length ? `${t('productionBom.purchases.order')} ${orders.length} · ${t('productionBom.purchases.request')} ${requests.length}` : undefined}
-                                count={bom.purchases.length}
-                                onClick={() => context.open({ kind: 'purchases', bomId: bom.id })}
-                            />
-                            <NavLinkRow
-                                icon={<FileText />}
-                                label={t('productionBom.detail.documents')}
-                                count={documents}
-                                onClick={() => context.open({ kind: 'documents', bomId: bom.id })}
-                            />
                             {showRevision && (
                                 <NavLinkRow
                                     icon={<History />}
@@ -565,18 +570,6 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                     </div>
                 )}
 
-                {/* Im Entwurf: die Preisanfragen der BOM, gleich zu öffnen. */}
-                {isDraft && !container && requests.length > 0 && (
-                    <div className="ofi-bom-links is-draft">
-                        <NavLinkRow
-                            icon={<FileText />}
-                            label={t('productionBom.request.links')}
-                            detail={[...new Set(requests.map((request) => request.supplierName).filter(Boolean))].join(' · ')}
-                            count={requests.length}
-                            onClick={() => context.open({ kind: 'purchases', bomId: bom.id })}
-                        />
-                    </div>
-                )}
 
                 {!canEdit && <Note>{t('productionBom.device.readOnly')}</Note>}
                 {consumed && <Note>{t('productionBom.detail.consumedHint')}</Note>}
@@ -613,7 +606,8 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                         onUnit={(key, unit: BomUnit) => patchLine(key, { unit })}
                         onNote={(key, note) => patchLine(key, { note })}
                         onRemove={(key) => change(lines.filter((line) => line.key !== key))}
-                        onOpenOrder={(purchaseOrderId) => context.open({ kind: 'purchase', bomId: bom.id, purchaseOrderId })}
+                        hideSupplier
+                        numericOnly
                         footer={editable ? (
                             <ProductSearch
                                 variant="row"
@@ -664,6 +658,10 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                     </section>
                 )}
 
+                {/* Was beim Einkauf liegt und was schon ankam — nur der Weg, ohne Lieferant und Preis. */}
+                {!container && <BomProcurementSection bom={bom} canEdit={canEdit} onChanged={(next) => context.applyBom(next)} />}
+                {!container && <BomGoodsInSection bom={bom} />}
+
                 {isMain && (
                     <SubBomTree
                         main={bom}
@@ -701,6 +699,18 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                         context.applyBom(sub);
                         context.reload();
                         context.open({ kind: 'bom', bomId: sub.id });
+                    }}
+                />
+            )}
+            {requesting && (
+                <ProcurementRequestDialog
+                    open
+                    bom={bom}
+                    kind={requesting}
+                    onClose={() => setRequesting(null)}
+                    onDone={(next) => {
+                        setRequesting(null);
+                        context.applyBom(next);
                     }}
                 />
             )}

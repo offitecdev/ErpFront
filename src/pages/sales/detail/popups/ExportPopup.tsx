@@ -13,6 +13,7 @@ import type { PdfLang, TenderPdfTotals } from '@/utils/pdf/tenderPdfModern';
 
 import { flattenTenderTreeForPdf } from '../tenderDetailUtils';
 import { attachPdfPositionImages } from '../utils/tenderPdfImages.utils';
+import { selectedSiteAddress } from '../utils/tenderAddress.utils';
 import { parseClosingImages } from '../utils/tenderProduct.utils';
 import { TenderDialog } from './shell/TenderPopupShell';
 
@@ -116,6 +117,8 @@ export const ExportPopup = ({ open, onClose, tenderId, tenderNumber, tree, grand
                     validUntil: detail.tender.validUntil,
                     customerName: detail.tender.customerName || '',
                     customerAddress: detail.tender.customerAddress,
+                    // Projekt- ODER Lieferadresse — nur die gewählte (28.09.2026).
+                    siteAddress: selectedSiteAddress(detail.tender),
                     customerEmail: detail.tender.customerEmail,
                     customerPhone: detail.tender.customerPhone,
                     createdByName: detail.tender.createdByName,

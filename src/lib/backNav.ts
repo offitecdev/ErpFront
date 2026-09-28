@@ -99,12 +99,11 @@ const MAIN_PAGES: Record<string, string> = {
     '/inventory/suppliers': 'nav.suppliers',
 
     '/production/orders': 'nav.productionOrders',
-    '/production/lines': 'nav.productionLines',
-    '/production/panels': 'nav.panels',
-    '/production/panel-models': 'nav.panelModels',
-    '/production/task-templates': 'nav.productionTaskTemplates',
-    '/production/bom-templates': 'nav.productionBomTemplates',
-    '/production/settings': 'nav.productionSettings',
+    '/production/templates/tasks': 'nav.productionTaskTemplates',
+    '/production/templates/bom': 'nav.productionBomTemplates',
+    '/production/settings': 'nav.productionSettingsMenu',
+    '/production/settings/access': 'nav.productionSettingsMenu',
+    '/production/purchasing': 'nav.productionPurchasing',
 
     '/warehouse/products': 'nav.warehouseProducts',
     '/warehouse/settings': 'nav.warehouseSettings',

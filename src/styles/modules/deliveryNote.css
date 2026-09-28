@@ -1,0 +1,221 @@
+/* ── LIEFERSCHEIN (28.09.2026) ─────────────────────────────────────────────
+   Knopf auf der Auftragskarte + Erfassungsfenster. Das Fenster ist ein
+   PopupDialog (Portal unter <body>), darum hängen die Regeln an KEINER
+   #root-Kette. Farben ausschliesslich aus den --ofi-cal-* Werten, damit der
+   Dunkelmodus eine einzige Variablenumstellung bleibt. */
+
+/* Der Knopf: dieselbe Form wie das Verkaufs-PDF daneben (30 px, 6 px Radius,
+   eine Haarlinie, 140 ms), aber GRAPHIT statt Blau — die Farbe sagt schon vor
+   dem Klick, welcher Beleg herauskommt: Blau = Auftragsbestätigung,
+   Bernstein = Nachtrag, Graphit = Lieferschein. */
+#root .ofi-ls-btn,
+body > :not(#root) .ofi-ls-btn {
+    display: inline-flex;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid #d6d9e0;
+    border-radius: 6px !important;
+    background: linear-gradient(135deg, #ffffff, #f1f3f6);
+    padding: 0 11px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: #3a3f4b;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+#root .ofi-ls-btn:hover:not(:disabled),
+body > :not(#root) .ofi-ls-btn:hover:not(:disabled) {
+    border-color: #3a3f4b;
+    background: linear-gradient(135deg, #4a505d, #2f333c);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(47, 51, 60, 0.28);
+}
+#root .ofi-ls-btn:disabled,
+body > :not(#root) .ofi-ls-btn:disabled {
+    border-color: var(--ofi-cal-border);
+    background: transparent;
+    color: var(--ofi-cal-faint);
+    cursor: default;
+}
+.dark #root .ofi-ls-btn {
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    color: #d4d7de;
+}
+.dark #root .ofi-ls-btn:hover:not(:disabled) {
+    border-color: #6b7280;
+    background: linear-gradient(135deg, #4a505d, #2f333c);
+    color: #fff;
+}
+#root .ofi-ls-btn--lg {
+    height: 38px;
+    gap: 9px;
+    padding: 0 16px;
+    font-size: 13.5px;
+}
+#root .ofi-ls-btn--lg svg { width: 17px; height: 17px; }
+
+/* ── Fenster ─────────────────────────────────────────────────────────────── */
+.ofi-ls { display: grid; gap: 16px; }
+.ofi-ls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ofi-ls-numberbox {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    border-radius: 6px;
+    padding: 0 12px;
+    background: var(--ofi-cal-surface-2);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.ofi-ls-addr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ofi-ls-addr__box {
+    min-width: 0;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ofi-cal-text);
+    white-space: pre-line;
+}
+.ofi-ls-addr__label {
+    margin-bottom: 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-ls-hint { margin-top: 6px; font-size: 11px; color: var(--ofi-cal-muted); white-space: normal; }
+
+/* Projekt- ODER Lieferadresse — nur wenn beide an der Offerte hängen. */
+.ofi-ls-seg {
+    display: inline-flex;
+    gap: 2px;
+    margin-bottom: 6px;
+    border-radius: 7px;
+    padding: 2px;
+    background: var(--ofi-cal-hover);
+    white-space: normal;
+}
+.ofi-ls-seg__item {
+    height: 24px;
+    border-radius: 5px;
+    padding: 0 10px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+    transition: background-color 140ms ease, color 140ms ease;
+}
+.ofi-ls-seg__item.is-active {
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.18);
+}
+
+/* ── Tabellen (Liste und Erfassung) ─────────────────────────────────────── */
+.ofi-ls-tablewrap {
+    overflow-x: auto;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 8px;
+}
+.ofi-ls-table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--ofi-cal-text); }
+.ofi-ls-table th {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface-2);
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+}
+.ofi-ls-table td { padding: 7px 10px; border-bottom: 1px solid var(--ofi-cal-line); vertical-align: middle; }
+.ofi-ls-table tbody tr:last-child td { border-bottom: 0; }
+.ofi-ls-table.is-edit td { padding-top: 5px; padding-bottom: 5px; }
+.ofi-ls-num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofi-ls-muted { color: var(--ofi-cal-muted); }
+.ofi-ls-strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-ls-code { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ofi-ls-col-pos { width: 48px; }
+.ofi-ls-col-code { width: 130px; }
+.ofi-ls-desc { min-width: 240px; }
+.ofi-ls-desc__text { display: block; padding: 0 2px; }
+
+/* Die Produktzelle ist dieselbe wie auf der Rechnung (`.document-cell`); hier
+   bekommt sie das Kleid des Fensters. */
+.ofi-ls .document-cell {
+    width: 100%;
+    height: 32px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: var(--ofi-cal-hover);
+    padding: 0 8px;
+    font: inherit;
+    color: inherit;
+    outline: none;
+}
+.ofi-ls .document-cell:focus { background: var(--ofi-cal-surface); border-color: var(--ofi-cal-accent); }
+
+.ofi-ls-qty,
+.ofi-ls-unit {
+    height: 32px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: var(--ofi-cal-hover);
+    padding: 0 8px;
+    font: inherit;
+    color: var(--ofi-cal-text);
+    outline: none;
+}
+.ofi-ls-qty { width: 88px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-ls-unit { width: 64px; }
+.ofi-ls-qty:focus,
+.ofi-ls-unit:focus { background: var(--ofi-cal-surface); border-color: var(--ofi-cal-accent); }
+/* Mehr als offen ist erlaubt (Nachlieferung, Ersatz) — aber sichtbar. */
+.ofi-ls-qty.is-over { color: #b45309; }
+
+.ofi-ls-actions { width: 1%; white-space: nowrap; text-align: right; }
+.ofi-ls-iconbtn {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: var(--ofi-cal-muted);
+    transition: background-color 140ms ease, color 140ms ease;
+}
+.ofi-ls-iconbtn:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+.ofi-ls-iconbtn.is-danger:hover { color: var(--ofi-cal-danger); }
+.ofi-ls-confirm { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ofi-cal-text); }
+
+.ofi-ls-addline {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 6px;
+    border-top: 1px solid var(--ofi-cal-line);
+    padding: 9px 12px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ofi-cal-accent);
+    transition: background-color 140ms ease;
+}
+.ofi-ls-addline:hover { background: var(--ofi-cal-accent-tint); }
+
+@media (max-width: 720px) {
+    .ofi-ls-grid,
+    .ofi-ls-addr { grid-template-columns: minmax(0, 1fr); }
+}

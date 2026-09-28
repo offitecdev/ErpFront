@@ -5809,11 +5809,13 @@ body > :not(#root) .ofi-tp-addline:disabled { opacity: 0.4; cursor: not-allowed;
     border: 1px solid var(--ofi-cal-border-soft);
 }
 .dark .ofi-tp-menu { background: var(--ofi-d-surface-3); }
-/* Product combobox on a quote line (Odoo's product field): plain rows — the
-   name, the article number muted at the right — one hairline, then the two
-   action rows ("… hinzufügen", "Alle Produkte"). Rows carry `.ofi-option-row`
-   for the app-wide highlight; the menu's 5px padding and 8px row radius come
-   from the radius band further down. */
+/* Product combobox on a quote line (Odoo's product field, Samet's reference
+   picture `olmasıgereken.png`): plain rows with the NAME only (the article
+   number is the row's tooltip), then the action rows ("… hinzufügen",
+   «Mehr suchen …» in the accent colour) and — while the cell is empty — the
+   italic hint «Schreiben Sie etwas …». Rows carry `.ofi-option-row` for the
+   app-wide highlight; the menu's 5px padding and 8px row radius come from the
+   radius band further down. */
 .ofi-tp-combo__list { max-height: 360px; overflow-y: auto; }
 .ofi-tp-combo__row {
     display: flex;
@@ -5826,6 +5828,8 @@ body > :not(#root) .ofi-tp-addline:disabled { opacity: 0.4; cursor: not-allowed;
     color: var(--ofi-cal-text);
 }
 .ofi-tp-combo__row.is-action { font-weight: 500; }
+.ofi-tp-combo__row.is-more { font-weight: 400; color: var(--ofi-cal-accent); }
+.ofi-tp-combo__hint { padding: 7px 10px; font-size: 13px; line-height: 18px; font-style: italic; color: var(--ofi-cal-text); cursor: default; }
 .ofi-tp-combo__name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ofi-tp-combo__code { flex: 0 0 auto; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ofi-cal-muted); }
 .ofi-tp-combo__sep { margin: 4px 6px; border-top: 1px solid var(--ofi-cal-border-soft); }

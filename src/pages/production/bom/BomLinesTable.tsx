@@ -51,6 +51,8 @@ export interface BomTableRow {
     missingProduct: boolean;
     coverage?: BomLineCoverage;
     orders?: BomLineOrder[];
+    /** Was bei Wareneingängen an diese Zeile ging (Gelen mallar) — nur die Zahl. */
+    received?: number;
     /** Nur in einer Revision im Entwurf: der Unterschied zur geltenden Fassung. */
     change?: BomRowChange | null;
 }
@@ -187,6 +189,8 @@ export const BomLinesTable = ({
     emptyText,
     plain,
     footer,
+    hideSupplier,
+    numericOnly,
 }: {
     rows: BomTableRow[];
     mode: BomTableMode;
@@ -201,11 +205,19 @@ export const BomLinesTable = ({
     plain?: boolean;
     /** Die letzte, leere Zeile: hier wird hinzugefügt («tablonun en altında boş satır olsun»). */
     footer?: ReactNode;
+    /** Ohne Lieferantenspalte — die BOM sieht keinen Lieferanten (27.09.2026 abends). */
+    hideSupplier?: boolean;
+    /**
+     * «Sadece sayısal olarak» (27.09.2026 abends): bestellte Ware nur als Zahl
+     * (ohne Belegnummern), dazu die Spalte «Gelen» — was schon ankam.
+     */
+    numericOnly?: boolean;
 }) => {
+    const showReceived = Boolean(numericOnly) && mode === 'active';
     const editQty = editable && (mode === 'template' || mode === 'draft');
     // So viele Spalten wie der Kopf — die leere Zeile spannt über alle.
-    const columnCount = 5 + (mode !== 'consumed' ? 1 : 0) + (mode === 'draft' || mode === 'template' ? 1 : 0)
-        + 1 + (mode === 'active' ? 3 : 0) + (mode === 'consumed' ? 1 : 0) + 1;
+    const columnCount = (hideSupplier ? 4 : 5) + (mode !== 'consumed' ? 1 : 0) + (mode === 'draft' || mode === 'template' ? 1 : 0)
+        + 1 + (mode === 'active' ? 3 : 0) + (showReceived ? 1 : 0) + (mode === 'consumed' ? 1 : 0) + 1;
     return (
         <div className={`ofi-bom-tablewrap${plain ? ' is-plain' : ''}`}>
             <table className="ofi-bom-table" data-unstyled-table>
@@ -215,14 +227,15 @@ export const BomLinesTable = ({
                         <th className="is-name">{t('productionBom.columns.name')}</th>
                         <th>{t('productionBom.columns.brand')}</th>
                         <th>{t('productionBom.columns.modelNumber')}</th>
-                        <th>{t('productionBom.columns.supplier')}</th>
+                        {!hideSupplier && <th>{t('productionBom.columns.supplier')}</th>}
                         {mode !== 'consumed' && <th className="is-num">{t('productionBom.columns.stock')}</th>}
                         {(mode === 'draft' || mode === 'template') && <th className="is-num">{t('productionBom.columns.free')}</th>}
                         <th className="is-num is-accent">{mode === 'template' ? t('productionBom.columns.quantity') : t('productionBom.columns.need')}</th>
                         {mode === 'active' && (
                             <>
                                 <th className="is-num">{t('productionBom.columns.reserved')}</th>
-                                <th>{t('productionBom.columns.incoming')}</th>
+                                <th className={numericOnly ? 'is-num' : undefined}>{t('productionBom.columns.incoming')}</th>
+                                {showReceived && <th className="is-num">{t('productionBom.columns.received')}</th>}
                                 <th className="is-num">{t('productionBom.columns.missing')}</th>
                             </>
                         )}
@@ -256,7 +269,7 @@ export const BomLinesTable = ({
                                 </td>
                                 <td>{row.brand ?? <Dash />}</td>
                                 <td className="is-mono">{row.modelNumber ?? <Dash />}</td>
-                                <td>{row.supplierName ?? <Dash />}</td>
+                                {!hideSupplier && <td>{row.supplierName ?? <Dash />}</td>}
                                 {mode !== 'consumed' && <td className="is-num">{row.stock === null ? <Dash /> : fmtQty(row.stock)}</td>}
                                 {(mode === 'draft' || mode === 'template') && (
                                     <td className={`is-num${row.free !== null && row.free + 1e-9 < row.quantity ? ' is-short' : ''}`}>
@@ -295,23 +308,52 @@ export const BomLinesTable = ({
                                         <td className={`is-num${fullyReserved ? ' is-ok' : ''}`}>
                                             <SerialsPopover serials={coverage.serials} label={fmtQty(coverage.reserved)} />
                                         </td>
+                                        {numericOnly ? (
+                                            <td className="is-num">
+                                                {coverage.incoming > 1e-9 ? (
+                                                    <span className="ofi-bom-numcell">
+                                                        {fmtQty(coverage.incoming)}
+                                                        {coverage.incomingConfirmed > 1e-9 && (
+                                                            <small className={coverage.incomingConfirmed + 1e-9 >= coverage.incoming ? 'is-ok' : undefined}>
+                                                                {t('productionBom.detail.confirmedQty', { count: fmtQty(coverage.incomingConfirmed) })}
+                                                            </small>
+                                                        )}
+                                                    </span>
+                                                ) : <Dash />}
+                                            </td>
+                                        ) : (
                                         <td>
                                             <span className="ofi-bom-incoming">
                                                 {coverage.incoming > 0 && <span className="ofi-bom-num">{fmtQty(coverage.incoming)}</span>}
-                                                {(row.orders ?? []).filter((order) => order.kind === 'ORDER').map((order) => (
+                                                {(row.orders ?? []).filter((order) => order.kind === 'ORDER').map((order) => (onOpenOrder ? (
                                                     <button
                                                         key={order.purchaseOrderId}
                                                         type="button"
                                                         className="ofi-bom-chip ofi-nosize"
-                                                        onClick={() => onOpenOrder?.(order.purchaseOrderId)}
+                                                        onClick={() => onOpenOrder(order.purchaseOrderId)}
                                                         title={`${shownPurchaseCode(order.referenceNumber)} · ${fmtQty(order.received)}/${fmtQty(order.quantity)}`}
                                                     >
                                                         <PurchaseCode value={order.referenceNumber} />
                                                     </button>
-                                                ))}
+                                                ) : (
+                                                    // In der BOM nur der Weg: Nummer und Lieferstand, kein Sprung in den Beleg.
+                                                    <span
+                                                        key={order.purchaseOrderId}
+                                                        className="ofi-bom-chip is-static"
+                                                        title={`${shownPurchaseCode(order.referenceNumber)} · ${fmtQty(order.received)}/${fmtQty(order.quantity)}`}
+                                                    >
+                                                        <PurchaseCode value={order.referenceNumber} />
+                                                    </span>
+                                                )))}
                                                 {coverage.incoming <= 0 && !(row.orders ?? []).some((order) => order.kind === 'ORDER') && <Dash />}
                                             </span>
                                         </td>
+                                        )}
+                                        {showReceived && (
+                                            <td className={`is-num${(row.received ?? 0) > 1e-9 ? ' is-ok' : ''}`}>
+                                                {(row.received ?? 0) > 1e-9 ? fmtQty(row.received ?? 0) : <Dash />}
+                                            </td>
+                                        )}
                                         <td className={`is-num${missing > 1e-9 ? ' is-missing' : ''}`}>{missing > 1e-9 ? fmtQty(missing) : <Dash />}</td>
                                     </>
                                 )}

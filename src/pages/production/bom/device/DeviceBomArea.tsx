@@ -54,6 +54,16 @@ export interface BomViewContext {
     open: (view: BomView) => void;
     openOrder: (purchaseOrderId: string, tab?: string) => void;
     tasks: BomTasksBundle | null;
+    /**
+     * «Satın alma» (27.09.2026 abends): der Talep der BOM, aus dem der Einkauf
+     * gerade Belege macht — die Assistenten wählen nur seine Zeilen vor und
+     * hängen die neuen Belege an ihn.
+     */
+    procurement?: { requestId: string; lines: Map<string, number> } | null;
+    /** Wohin ein Assistent nach dem Anlegen zurückführt (Vorgabe: die BOM). */
+    homeKey?: (bomId: string) => string;
+    /** Die Ansicht läuft im Einkauf («Satın alma») — dort, und nur dort, stehen Lieferanten. */
+    purchasing?: boolean;
 }
 
 /**

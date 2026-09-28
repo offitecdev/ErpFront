@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import dayjs from 'dayjs';
 
+import { DeliveryNoteButton } from '@/components/orders/DeliveryNoteButton';
 import { OrderConfirmationButton } from '@/components/orders/OrderConfirmationButton';
 import { t } from '@/i18n/translate';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
@@ -68,6 +69,13 @@ export const OrderHeaderTable = memo(({ project, order, notifications }: {
             action={(
                 <span className="ofi-prj-card__actions">
                     <OrderConfirmationButton order={order} fallbackTenderId={project.tenderId} />
+                    {/* Der Lieferschein ist der zweite Beleg des Auftrags
+                        (28.09.2026) — er steht darum direkt daneben. */}
+                    <DeliveryNoteButton
+                        order={order}
+                        fallbackTenderId={project.tenderId}
+                        projectNumber={project.projectNumber || project.projectName || null}
+                    />
                     <OrderNotifications items={notifications} />
                 </span>
             )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Boxes, ChevronRight, Minus, Plus, Save, Trash2, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,7 +54,8 @@ const sameDraft = (draft: Draft, settings: BomSettings): boolean =>
  * der Abschnitte (heute: BOM), rechts der Abschnitt — im Rahmen der
  * Geräteseite, ohne Kopfleiste. Ändern darf die Administratorrolle.
  */
-export const ProductionSettingsPage = () => {
+/** `tabs`: die grauen Reiter von Üretim › Ayarlar (28.09.2026) — sie stehen statt des Titels. */
+export const ProductionSettingsPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
     useLanguageTick();
     const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
@@ -112,7 +113,7 @@ export const ProductionSettingsPage = () => {
     return (
         <div className="ofi-bom is-page">
             <header className="ofi-bom-head">
-                <h1 className="ofi-bom-head__title">{t('productionBom.settings.title')}</h1>
+                {tabs ?? <h1 className="ofi-bom-head__title">{t('productionBom.settings.title')}</h1>}
                 {canEdit && draft && (
                     <span className="ofi-bom-head__actions">
                         {dirty && (
@@ -201,7 +202,7 @@ export const ProductionSettingsPage = () => {
                                             </span>
                                         </div>
                                     </div>
-                                    <button type="button" className="ofi-bom-row is-link ofi-nosize" onClick={() => navigate('/production/bom-templates')}>
+                                    <button type="button" className="ofi-bom-row is-link ofi-nosize" onClick={() => navigate('/production/templates/bom')}>
                                         <span className="ofi-bom-row__label">{t('productionBom.settings.templatesLink')}</span>
                                         <ChevronRight className="ofi-bom-row__chev" aria-hidden />
                                     </button>

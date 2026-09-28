@@ -22,6 +22,11 @@ const PDF_LANGS: OrderPdfLang[] = ['de', 'tr', 'en'];
 export const PdfPanel = ({ order, priceRequest }: { order: PurchaseOrderRow; priceRequest: boolean }) => {
     const settings = usePdfSettings();
     const [lang, setLang] = useState<OrderPdfLang>('de');
+    /* Eine revidierte BOM-Bestellung hat zwei Blätter (27.09.2026 abends): die
+       Bestellung selbst und — eigenes PDF — die Änderungen ihrer Revision. */
+    const revisionNumber = !priceRequest && order.bomOrigin?.revision && order.bomOrigin.revision.number > 0 ? order.bomOrigin.revision.number : 0;
+    const [sheet, setSheet] = useState<'order' | 'revision'>('order');
+    const showRevision = revisionNumber > 0 && sheet === 'revision';
     const [url, setUrl] = useState<string | null>(null);
     const [busy, setBusy] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -35,11 +40,13 @@ export const PdfPanel = ({ order, priceRequest }: { order: PurchaseOrderRow; pri
 
     // Der Dateiname trägt den Code in der Sprache des DOKUMENTS.
     const code = localizePurchaseCode(order.referenceNumber, lang);
-    const fileName = supplierPdfFileName(code, suppliers[activeIndex], multi);
+    const fileName = showRevision ? `${code}_Rev${revisionNumber}.pdf` : supplierPdfFileName(code, suppliers[activeIndex], multi);
 
     const buildBytes = async (target: PurchaseOrderRow) => (priceRequest
         ? (await import('@/utils/pdf/priceRequestPdf')).buildPriceRequestPdfBytes(target, settings, lang)
-        : (await import('@/utils/pdf/orderPdf')).buildOrderPdfBytes(target, settings, lang));
+        : showRevision
+            ? (await import('@/utils/pdf/orderPdf')).buildOrderRevisionPdfBytes(target, settings, lang)
+            : (await import('@/utils/pdf/orderPdf')).buildOrderPdfBytes(target, settings, lang));
 
     const downloadBlob = (href: string, name: string) => {
         const anchor = document.createElement('a');
@@ -87,7 +94,7 @@ export const PdfPanel = ({ order, priceRequest }: { order: PurchaseOrderRow; pri
             setUrl(null);
         };
         // `updatedAt` erneuert die Vorschau nach einer Änderung.
-    }, [order.id, order.updatedAt, lang, priceRequest, activeIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [order.id, order.updatedAt, lang, priceRequest, activeIndex, showRevision]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <SectionCard
@@ -119,6 +126,26 @@ export const PdfPanel = ({ order, priceRequest }: { order: PurchaseOrderRow; pri
                             <FileDownload02 size={13} />
                             {t('inv.orders.requestSuppliers.downloadAll', { count: suppliers.length })}
                         </button>
+                    )}
+                    {revisionNumber > 0 && (
+                        <div className="ofi-lager-tabs flex items-center gap-1 rounded-md border border-slate-200 p-0.5 dark:border-white/15" role="tablist" aria-label={t('productionBom.orderDoc.label')}>
+                            {(['order', 'revision'] as const).map((entry) => (
+                                <button
+                                    key={entry}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={sheet === entry}
+                                    onClick={() => setSheet(entry)}
+                                    className={`rounded px-2.5 py-1 text-[11.5px] font-semibold transition-colors ${
+                                        sheet === entry
+                                            ? 'bg-[#0a7aff]/10 text-[#0a7aff] dark:bg-[#3b8dff]/25 dark:text-[#5c9fff]'
+                                            : 'text-slate-500 hover:bg-[#0a7aff]/[0.06] hover:text-[#0066e0] dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white'
+                                    }`}
+                                >
+                                    {entry === 'order' ? t('productionBom.orderDoc.order') : t('productionBom.orderDoc.revision', { n: revisionNumber })}
+                                </button>
+                            ))}
+                        </div>
                     )}
                     <div className="ofi-lager-tabs flex items-center gap-1 rounded-md border border-slate-200 p-0.5 dark:border-white/15">
                         {PDF_LANGS.map((entry) => (

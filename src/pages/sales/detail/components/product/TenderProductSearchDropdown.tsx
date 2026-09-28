@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, Plus } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
@@ -8,10 +7,12 @@ import type { ArticleQuickPick } from '@/types/inventory';
 
 import { resolveTypedArticleIndex } from '../../utils/tenderProduct.utils';
 
-// Odoo-style combobox list: short and fast, "Alle Produkte" for the rest.
-const DROPDOWN_PAGE_SIZE = 10;
-// A full first page plus the two action rows, without scrolling.
-const PANEL_HEIGHT_ESTIMATE = 430;
+// Odoo-style combobox list: short and fast, «Mehr suchen …» for the rest.
+// Eight rows like Odoo's own field (Samet's reference picture
+// `olmasıgereken.png`, 28.09.2026).
+const DROPDOWN_PAGE_SIZE = 8;
+// A full first page plus the action rows and the hint, without scrolling.
+const PANEL_HEIGHT_ESTIMATE = 380;
 // Pause after the last keystroke before the catalogue is asked. Was 300 ms;
 // with 150–200 ms network on top, the list trailed the typing by half a
 // second on production (measured 14.09.2026). Rows for the new text are shown
@@ -388,7 +389,7 @@ export const TenderProductSearchDropdown = ({
                 ? t('tenders.combo_use_typed_name', { name: option.name })
                 : t('tenders.combo_add_free_line', { name: option.name });
         }
-        return `${t('tenders.all_products')} …`;
+        return t('tenders.combo_search_more');
     };
 
     // Rows are taken on `pointerdown`, not `click`: it fires before the anchor
@@ -430,30 +431,34 @@ export const TenderProductSearchDropdown = ({
                         {t('tenders.productler_loading')}
                     </li>
                 )}
+                {/* Wie Odoo (Samets Vorlage `olmasıgereken.png`): nur die Namen,
+                    die Artikelnummer steht im Hinweis beim Überfahren. */}
                 {articleOptions.map((option, index) => option.kind === 'article' && (
                     <li
                         key={option.article.id}
-                        title={option.article.name}
+                        title={option.article.articleCode ? `${option.article.name} · ${option.article.articleCode}` : option.article.name}
                         className={`ofi-option-row ofi-tp-combo__row ${index === activeIdx ? 'is-active' : ''}`}
                         {...rowProps(index, option)}
                     >
                         <span className="ofi-tp-combo__name">{option.article.name}</span>
-                        {option.article.articleCode && (
-                            <span className="ofi-tp-combo__code">{option.article.articleCode}</span>
-                        )}
                     </li>
                 ))}
-                {articleOptions.length > 0 && <li role="separator" className="ofi-tp-combo__sep" />}
                 {actionOptions.map(({ option, index }) => (
                     <li
                         key={option.kind}
-                        className={`ofi-option-row ofi-tp-combo__row is-action ${index === activeIdx ? 'is-active' : ''}`}
+                        className={`ofi-option-row ofi-tp-combo__row is-action ${option.kind === 'more' ? 'is-more' : ''} ${index === activeIdx ? 'is-active' : ''}`}
                         {...rowProps(index, option)}
                     >
-                        {option.kind === 'add' ? <Plus size={13} className="shrink-0" /> : <Package size={13} className="shrink-0" />}
                         <span className="ofi-tp-combo__name">{optionLabel(option)}</span>
                     </li>
                 ))}
+                {/* Leere Zelle: der Hinweis «Schreiben Sie etwas …» — keine
+                    Option, die Pfeiltasten überspringen ihn (Odoo). */}
+                {!typedName && (
+                    <li role="presentation" className="ofi-tp-combo__hint">
+                        {t('tenders.combo_start_typing')}
+                    </li>
+                )}
             </ul>
         </div>,
         document.body,

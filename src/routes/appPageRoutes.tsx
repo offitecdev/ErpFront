@@ -96,20 +96,16 @@ const ProductionDevicePage = lazyNamed(
     'ProductionDevicePage',
     MacSpinnerScreen,
 );
-const ProductionLinesPage = lazyNamed(() => import('../pages/production/ProductionLinesPage'), 'ProductionLinesPage');
-// Schaltschränke (20.09.2026): die Seriennummern und der Typenkatalog.
-const PanelUnitsPage = lazyNamed(() => import('../pages/production/PanelUnitsPage'), 'PanelUnitsPage');
-const PanelUnitEditorPage = lazyNamed(() => import('../pages/production/PanelUnitEditorPage'), 'PanelUnitEditorPage');
-const PanelModelEditorPage = lazyNamed(() => import('../pages/production/PanelModelEditorPage'), 'PanelModelEditorPage');
-// Görevlendirme şablonları (26.09.2026, Vorgabe Samet): Vorlagen der Aufgaben
-// (Beispiel «Chiller»), die die Administratorrolle auf ein Gerät lädt. Im
-// Rahmen des Depos (MainLayout `isDeviceFocusPath`).
-const TaskTemplatesPage = lazyNamed(() => import('../pages/production/tasks/TaskTemplatesPage'), 'TaskTemplatesPage');
-// BOM (27.09.2026, Vorgabe Samet): die BOM-Vorlagen und die Produktions-
-// einstellungen (Höchstzahl BOM je Gerät und Bereich) — beide im Rahmen der
-// Geräteseite («solda küçük menüler, üstte menü yok»).
-const BomTemplatesPage = lazyNamed(() => import('../pages/production/bom/templates/BomTemplatesPage'), 'BomTemplatesPage');
-const ProductionSettingsPage = lazyNamed(() => import('../pages/production/bom/ProductionSettingsPage'), 'ProductionSettingsPage');
+// Şablonlar und Ayarlar (28.09.2026, Vorgabe Samet): je EINE Seite mit grauen
+// Reitern — Görevlendirme- und BOM-Vorlagen bzw. Üretim ayarları und
+// Yetkilendirme. Im Rahmen der Geräteseite (MainLayout `isDeviceFocusPath`).
+const ProductionTemplatesIndex = lazyNamed(() => import('../pages/production/hub/ProductionHubs'), 'ProductionTemplatesIndex');
+const ProductionTemplatesTasksPage = lazyNamed(() => import('../pages/production/hub/ProductionHubs'), 'ProductionTemplatesTasksPage');
+const ProductionTemplatesBomPage = lazyNamed(() => import('../pages/production/hub/ProductionHubs'), 'ProductionTemplatesBomPage');
+const ProductionSettingsGeneralPage = lazyNamed(() => import('../pages/production/hub/ProductionHubs'), 'ProductionSettingsGeneralPage');
+const ProductionSettingsAccessPage = lazyNamed(() => import('../pages/production/hub/ProductionHubs'), 'ProductionSettingsAccessPage');
+const ProductionPurchasingPage = lazyNamed(() => import('../pages/production/purchasing/ProductionPurchasingPage'), 'ProductionPurchasingPage');
+const ProductionCostingPage = lazyNamed(() => import('../pages/production/costing/ProductionCostingPage'), 'ProductionCostingPage');
 // Depo (26.09.2026, Vorgabe Samet): das eigene Lager der Produktionsfirma —
 // Produktkarten. Im Rahmen der Geräteseite (MainLayout `isDeviceFocusPath`).
 const WarehouseProductsPage = lazyNamed(() => import('../pages/warehouse/WarehouseProductsPage'), 'WarehouseProductsPage');
@@ -178,6 +174,12 @@ const LegacyOrderRedirect = () => {
    geworden und am selben Tag stillgelegt («mal kabul bölümünü şimdilik
    kaldır», siehe `_disabled/inventory-receive/`). Der alte Link führt darum
    auf die Auftragsseite — nicht ins Leere. */
+/* Alte Adressen der Vorlagen (bis 28.09.2026) — die Auswahl `?t=` reist mit. */
+const KeepQueryRedirect = ({ to }: { to: string }) => {
+    const { search } = useLocation();
+    return <Navigate to={`${to}${search}`} replace />;
+};
+
 const ReceiveRedirect = () => {
     const { id } = useParams();
     return <Navigate to={`/inventory/orders/${id}`} replace />;
@@ -391,17 +393,21 @@ export const renderAppPageRoutes = () => (
         <Route path="/production/orders" element={productionPage(ProductionOrdersPage)} />
         <Route path="/production/orders/:projectId" element={productionPage(ProductionProjectPage)} />
         <Route path="/production/orders/:projectId/devices/:deviceId" element={productionPage(ProductionDevicePage)} />
-        <Route path="/production/lines" element={productionPage(ProductionLinesPage)} />
-        {/* Schaltschränke: die Serienliste, dahinter der Typenkatalog. */}
-        <Route path="/production/panels" element={productionPage(PanelUnitsPage)} />
-        <Route path="/production/panels/new" element={productionPage(PanelUnitEditorPage)} />
-        <Route path="/production/panels/models/new" element={productionPage(PanelModelEditorPage)} />
-        <Route path="/production/panels/models/:modelId" element={productionPage(PanelModelEditorPage)} />
-        <Route path="/production/panels/:unitId" element={productionPage(PanelUnitEditorPage)} />
-        <Route path="/production/panel-models" element={<Navigate to="/production/panels?view=models" replace />} />
-        <Route path="/production/task-templates" element={productionPage(TaskTemplatesPage)} />
-        <Route path="/production/bom-templates" element={productionPage(BomTemplatesPage)} />
-        <Route path="/production/settings" element={productionPage(ProductionSettingsPage)} />
+        {/* «Sipariş edilen ürünler» und «Panolar» gibt es seit 28.09.2026 nicht mehr. */}
+        <Route path="/production/lines" element={<Navigate to="/production/orders" replace />} />
+        <Route path="/production/panels/*" element={<Navigate to="/production/orders" replace />} />
+        <Route path="/production/panel-models" element={<Navigate to="/production/orders" replace />} />
+        <Route path="/production/templates" element={productionPage(ProductionTemplatesIndex)} />
+        <Route path="/production/templates/tasks" element={productionPage(ProductionTemplatesTasksPage)} />
+        <Route path="/production/templates/bom" element={productionPage(ProductionTemplatesBomPage)} />
+        <Route path="/production/task-templates" element={<KeepQueryRedirect to="/production/templates/tasks" />} />
+        <Route path="/production/bom-templates" element={<KeepQueryRedirect to="/production/templates/bom" />} />
+        <Route path="/production/settings" element={productionPage(ProductionSettingsGeneralPage)} />
+        <Route path="/production/settings/access" element={productionPage(ProductionSettingsAccessPage)} />
+        {/* Satın alma (27.09.2026 abends): die Talepler der BOMs — Buchhaltung und Administratorrolle. */}
+        <Route path="/production/purchasing" element={productionPage(ProductionPurchasingPage)} />
+        {/* Kalkülasyon (27.09.2026 abends): geplante gegen tatsächliche Materialkosten aus der BOM. */}
+        <Route path="/production/costing" element={productionPage(ProductionCostingPage)} />
         {/* Depo: die Produktkarten ('/new' vor ':id'). */}
         <Route path="/warehouse" element={<Navigate to="/warehouse/products" replace />} />
         <Route path="/warehouse/products" element={productionPage(WarehouseProductsPage)} />

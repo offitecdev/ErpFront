@@ -22,6 +22,7 @@ import type { OfferScheduleSlotDto, TenderMaterialUsageDto } from '@/types/tende
 import type { ProjectMaterial } from '@/types/project';
 import { t } from '@/i18n/translate';
 import { toCurrencyCode } from '@/utils/currency';
+import { selectedSiteAddress } from '../../utils/tenderAddress.utils';
 import { parseClosingImages } from '../../utils/tenderProduct.utils';
 import { attachPdfPositionImages } from '../../utils/tenderPdfImages.utils';
 import {
@@ -255,6 +256,8 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                 validUntil: detail.tender.validUntil,
                 customerName: detail.tender.customerName || '',
                 customerAddress: detail.tender.customerAddress,
+                // Dieselbe Projekt- ODER Lieferadresse wie im Export.
+                siteAddress: selectedSiteAddress(detail.tender),
                 customerEmail: detail.tender.customerEmail,
                 customerPhone: detail.tender.customerPhone,
                 createdByName: detail.tender.createdByName,

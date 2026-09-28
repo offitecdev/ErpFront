@@ -4,7 +4,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LuMoon, LuSun } from '@/components/icons/lucideLocal';
 import { useAuthStore } from '../../store/authStore';
-import { isPathAllowed } from '@/lib/pageAccess';
+import { isPathAllowed, pageLevelForKey } from '@/lib/pageAccess';
 import { isPathAllowedForTechnician } from '@/lib/access';
 import { useMontageIsWorkspace } from '@/lib/useMontageWorkspace';
 import { useThemeStore } from '../../store/themeStore';
@@ -169,6 +169,10 @@ type MenuLeaf = {
         erst beim nächsten Öffnen der Berechtigungen in ihre Rolle geschrieben
         bekommt (Zwei-Faktor, 15.09.2026). */
     permissionOrAdmin?: string;
+    /** Administratorrolle ODER eine dieser Katalogseiten mit Stufe > 0 — für
+        Sammelseiten, deren Adresse selbst nicht im Katalog steht (Üretim ›
+        Şablonlar, 28.09.2026). */
+    anyPageKeys?: string[];
     /** Eigenes Zeichen vor dem Namen (siehe AppSidebar). */
     icon?: (props: { size?: number; className?: string }) => React.JSX.Element;
 };
@@ -336,15 +340,17 @@ const MENU_SECTIONS: MenuSection[] = [
         label: 'nav.production',
         icon: ProductionIcon,
         items: [
+            /* 28.09.2026 (Vorgabe Samet): «Projeler, Satın alma, Şablonlar, Ayarlar» —
+               «Sipariş edilen ürünler» und «Panolar» sind weg, Kalkülasyon ist ein
+               Knopf im Einkauf, die Vorlagen und Einstellungen je EINE Seite mit
+               grauen Reitern (pages/production/hub). */
             { key: '/production/orders', label: 'nav.productionOrders', permission: 'production.view' },
-            { key: '/production/lines', label: 'nav.productionLines', permission: 'production.view' },
-            { key: '/production/panels', label: 'nav.panels', permission: 'panels.view' },
-            // Görevlendirme şablonları (26.09.2026): lesen alle mit Produktion,
-            // bearbeiten nur die Administratorrolle (die Seite sagt es).
-            { key: '/production/task-templates', label: 'nav.productionTaskTemplates', permission: 'production.view' },
-            // BOM (27.09.2026): Vorlagen und die Einstellungen des Moduls.
-            { key: '/production/bom-templates', label: 'nav.productionBomTemplates', permission: 'production.view' },
-            { key: '/production/settings', label: 'nav.productionSettings', permission: 'production.view' },
+            // Satın alma (27.09.2026 abends): «sadece muhasebe ve rolü administrator olanlarda».
+            { key: '/production/purchasing', label: 'nav.productionPurchasing', permissionOrAdmin: 'production.purchasing.view' },
+            // Şablonlar: Administratorrolle + Makine / Elektrik Mühendisi (Rollen mit der Seite).
+            { key: '/production/templates', label: 'nav.productionTemplates', anyPageKeys: ['production.taskTemplates', 'production.bomTemplates'] },
+            // Ayarlar: Üretim ayarları + Yetkilendirme — nur die Administratorrolle.
+            { key: '/production/settings', label: 'nav.productionSettingsMenu', adminOnly: true },
         ],
     },
     {
@@ -697,10 +703,10 @@ const DEVICE_FOCUS_PATH = /^\/production\/orders\/[^/]+\/devices\/[^/]+\/?$/;
 const WAREHOUSE_PATH = /^\/warehouse(?:\/|$)/;
 /* Die Görevlendirme-Vorlagen (26.09.2026) ebenso: «aynı üretim depo modülü
    nasılsa o şekilde olması lazım» — zwei Spalten brauchen die ganze Breite. */
-const TASK_TEMPLATES_PATH = /^\/production\/task-templates\/?$/;
+const TASK_TEMPLATES_PATH = /^\/production\/templates(?:\/(?:tasks|bom))?\/?$/;
 /* Die BOM-Vorlagen und die Produktionseinstellungen (27.09.2026) ebenso:
    «üretimdeki gibi küçülecek, solda küçük menüler, üstte menü yok». */
-const BOM_PAGES_PATH = /^\/production\/(?:bom-templates|settings)\/?$/;
+const BOM_PAGES_PATH = /^\/production\/settings(?:\/access)?\/?$/;
 const isDeviceFocusPath = (pathname: string): boolean =>
     DEVICE_FOCUS_PATH.test(pathname) || WAREHOUSE_PATH.test(pathname) || TASK_TEMPLATES_PATH.test(pathname) || BOM_PAGES_PATH.test(pathname);
 
@@ -806,6 +812,8 @@ const MainLayoutInner: React.FC = () => {
                 if (!visible) return [];
                 if (item.adminOnly && !isSystemAdmin) return [];
                 if (item.permissionOrAdmin && !isSystemAdmin && !permissions.includes(item.permissionOrAdmin)) return [];
+                if (item.anyPageKeys && !isSystemAdmin
+                    && !item.anyPageKeys.some((pageKey) => pageLevelForKey(pageAccess, pageKey) > 0)) return [];
                 // Seitenrechte der Rolle (17.08.2026): steht die Seite im
                 // Katalog und gibt die Rolle sie nicht frei, verschwindet der
                 // Eintrag. Seiten ausserhalb des Katalogs bleiben unberührt.
@@ -1219,7 +1227,10 @@ const MainLayoutInner: React.FC = () => {
     /* Die Geräteseite der Produktion trägt ihren eigenen Rahmen (siehe
        `isDeviceFocusPath`): schmale Leiste, keine Kopfleiste. Sie sticht
        jede Navigationsart aus — Seitenleiste, Kopfmenü und Dock. */
-    const focusChrome = !hideMenuRail && isDeviceFocusPath(location.pathname);
+    /* 27.09.2026 (Samet): «üretim şirketlerinde sidebar küçük olsun ve header
+       yok olsun, tüm modüllerde» — in einer Produktionsfirma trägt JEDE Seite
+       diesen Rahmen, nicht nur die Fokusadressen. */
+    const focusChrome = !hideMenuRail && (isProductionCompany || isDeviceFocusPath(location.pathname));
     // The alternate navigation is desktop-only. Phones and touch-first native
     // tablets keep their existing drawer, where a permanent sidebar does not
     // exist in the first place.
@@ -1491,6 +1502,9 @@ const MainLayoutInner: React.FC = () => {
        und Profil — «bildirim küçült, dil küçük, profili küçült ve sidebar'a
        ekle». Ihr Mass und ihre Menüs nach rechts: styles/focusRail.css. */
     const focusTools = (<>
+        {/* Ohne Kopfleiste steht der Firmenwechsel hier — sonst käme man aus
+            einer Produktionsfirma (ganz in diesem Rahmen) nicht mehr heraus. */}
+        {tenants.length > 0 && <TenantSwitcher />}
         {bellTool}
         <LanguageSwitcher />
         {profileTool}

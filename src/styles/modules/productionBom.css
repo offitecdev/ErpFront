@@ -2655,3 +2655,881 @@ body > :not(#root) .ofi-bom-pop .ofi-bom-revdialog__field textarea:focus { borde
     .ofi-bom-revbanner { flex-wrap: wrap; }
     .ofi-bom-revaction { margin-left: 0; }
 }
+
+/* =========================================================
+   ── 30. SATIN ALMA · SÜREÇ · GELEN MALLAR (27.09.2026 abends, Vorgabe Samet)
+
+   «Bom'da sadece sipariş ve fiyat talep istekleri oluşsun … bom listede
+    genel bir süreç akışı görmek istiyorum hep … seri numarası varsa gelen
+    mallar yanında bir i olacak ve pop up açılacak — macOS Apple SwiftUI.»
+
+   Die Stationenleiste wie der Installationsassistent von macOS, die Talepler
+   und Wareneingänge als gruppierte Tafeln, die Seite «Satın alma» wie die
+   übrigen Produktionsseiten (Seitenleiste des Finders + Inhalt).
+   ========================================================= */
+
+/* ── 30.1 Der Weg der BOM — gläserner Knopf + Glasfenster ────
+   «İlerleme çubukları çok kötü, çok yer kaplıyor … progress butonu olsun
+    yukarıda, glass seviye, daire daire açılsın, daha temiz görünsün.» */
+.ofi-bom-ring { position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; }
+.ofi-bom-ring > svg { display: block; overflow: visible; }
+.ofi-bom-ring__track { stroke: var(--bom-fill-strong); }
+.ofi-bom-ring__arc { stroke: var(--bom-accent); transition: stroke-dashoffset 480ms var(--bom-ease); }
+.ofi-bom-ring.is-success .ofi-bom-ring__arc { stroke: var(--bom-success); }
+.ofi-bom-ring.is-muted .ofi-bom-ring__arc { stroke: var(--bom-muted); }
+.ofi-bom-ring__check { position: absolute; width: 56%; height: 56%; stroke-width: 3.4; color: var(--bom-success); }
+
+#root .ofi-bom button.ofi-bom-procbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 26px;
+    min-height: 0;
+    margin-left: 2px;
+    padding: 0 8px 0 4px;
+    border: 0.5px solid rgba(0, 0, 0, 0.1);
+    border-radius: 13px !important;
+    background: color-mix(in srgb, var(--bom-surface) 58%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    backdrop-filter: blur(18px) saturate(180%);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 0.5px 0 rgba(255, 255, 255, 0.75);
+    color: var(--bom-text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+#root .ofi-bom button.ofi-bom-procbtn:hover { background: color-mix(in srgb, var(--bom-accent) 7%, var(--bom-surface)); }
+#root .ofi-bom button.ofi-bom-procbtn.is-open,
+#root .ofi-bom button.ofi-bom-procbtn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--bom-ring), inset 0 0.5px 0 rgba(255, 255, 255, 0.75); }
+.dark .ofi-bom button.ofi-bom-procbtn { border-color: rgba(255, 255, 255, 0.12); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.08); }
+.ofi-bom-procbtn__label { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.ofi-bom-procbtn.is-done .ofi-bom-procbtn__label { color: var(--bom-success); }
+.ofi-bom-procbtn__count { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--bom-secondary); }
+.ofi-bom-procbtn__chev { width: 12px; height: 12px; color: var(--bom-secondary); transition: transform 180ms var(--bom-ease); }
+.ofi-bom-procbtn.is-open .ofi-bom-procbtn__chev { transform: rotate(180deg); }
+
+/* Das Glasfenster (Portal): wie die Kontrollzentrale von macOS. */
+body > .ofi-bom-pop.ofi-bom-procpop {
+    position: fixed;
+    z-index: 1300;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: calc(100vh - 16px);
+    padding: 14px 12px 10px;
+    overflow: auto;
+    border: 0.5px solid rgba(255, 255, 255, 0.6);
+    border-radius: 18px;
+    background: rgba(250, 250, 252, 0.74);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    backdrop-filter: blur(28px) saturate(190%);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.08), inset 0 0.5px 0 rgba(255, 255, 255, 0.85);
+    color: var(--bom-text);
+    font-family: var(--bom-font);
+    transform-origin: top left;
+    animation: ofi-bom-procpop-in 220ms var(--bom-ease) both;
+}
+.dark body > .ofi-bom-pop.ofi-bom-procpop,
+html.dark body > .ofi-bom-pop.ofi-bom-procpop {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(40, 40, 44, 0.72);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(0, 0, 0, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+}
+.ofi-bom-procpop__head { display: flex; align-items: center; gap: 10px; padding: 0 4px 2px; }
+.ofi-bom-procpop__title { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-bom-procpop__title > b { font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; }
+.ofi-bom-procpop__title > small { font-size: 11.5px; line-height: 1.35; color: var(--bom-secondary); }
+.ofi-bom-procpop__percent { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--bom-secondary); }
+.ofi-bom-procpop__steps { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.ofi-bom-procpop__step {
+    position: relative;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+    padding: 5px 6px;
+    border-radius: 10px;
+    animation: ofi-bom-procstep-in 260ms var(--bom-ease) both;
+    animation-delay: calc(var(--i, 0) * 34ms + 60ms);
+}
+/* Die Verbindung zum nächsten Kreis. */
+.ofi-bom-procpop__step::before {
+    content: '';
+    position: absolute;
+    top: 29px;
+    bottom: -5px;
+    left: 17px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--bom-fill-strong);
+}
+.ofi-bom-procpop__step:last-child::before { display: none; }
+.ofi-bom-procpop__step.is-done::before { background: var(--bom-accent); }
+.ofi-bom-procpop__step.is-current { background: color-mix(in srgb, var(--bom-accent) 9%, transparent); }
+.ofi-bom-procpop__dot {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 1.5px solid var(--bom-field-border);
+    border-radius: 50%;
+    background: var(--bom-surface);
+    color: var(--bom-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    animation: ofi-bom-procdot-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: calc(var(--i, 0) * 34ms + 60ms);
+}
+.ofi-bom-procpop__dot > svg { width: 13px; height: 13px; stroke-width: 3; }
+.ofi-bom-procpop__step.is-done .ofi-bom-procpop__dot { border-color: var(--bom-accent); background: var(--bom-accent); color: #fff; }
+.ofi-bom-procpop__step.is-current .ofi-bom-procpop__dot { border: 2px solid var(--bom-accent); color: var(--bom-accent-text); box-shadow: 0 0 0 3px var(--bom-ring); }
+.ofi-bom-procpop__step.is-skipped .ofi-bom-procpop__dot { border-style: dashed; color: var(--bom-muted); }
+.ofi-bom-procpop__step.is-optional:not(.is-done) .ofi-bom-procpop__dot { border-style: dotted; }
+.ofi-bom-procpop__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: 3px; }
+.ofi-bom-procpop__text > b { font-size: 12.5px; font-weight: 500; color: var(--bom-secondary); }
+.ofi-bom-procpop__step.is-done .ofi-bom-procpop__text > b { color: var(--bom-text); }
+.ofi-bom-procpop__step.is-current .ofi-bom-procpop__text > b { color: var(--bom-accent-text); font-weight: 600; }
+.ofi-bom-procpop__step.is-skipped .ofi-bom-procpop__text > b { color: var(--bom-muted); text-decoration: line-through; }
+.ofi-bom-procpop__text > small { font-size: 11px; line-height: 1.35; color: var(--bom-secondary); }
+.ofi-bom-procpop__detail { padding-top: 4px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--bom-muted); white-space: nowrap; }
+@keyframes ofi-bom-procpop-in {
+    from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes ofi-bom-procstep-in {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes ofi-bom-procdot-in {
+    from { transform: scale(0.3); }
+    to { transform: scale(1); }
+}
+
+/* ── 30.2 Talepler an der BOM ─────────────────────────────── */
+.ofi-bom-reqpill,
+.ofi-bom-reqkind {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.ofi-bom-reqpill.is-open { background: var(--bom-warning-soft); color: var(--bom-warning); }
+.ofi-bom-reqpill.is-progress { background: var(--bom-accent-soft); color: var(--bom-accent-text); }
+.ofi-bom-reqpill.is-done { background: var(--bom-success-soft); color: var(--bom-success); }
+.ofi-bom-reqpill.is-cancelled { background: var(--bom-fill-strong); color: var(--bom-secondary); }
+.ofi-bom-reqkind { padding: 0 7px 0 6px; background: var(--bom-fill); color: var(--bom-text); font-weight: 500; }
+.ofi-bom-reqkind > svg { width: 12px; height: 12px; color: var(--bom-secondary); }
+
+.ofi-bom-reqrow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 200px) 104px;
+    align-items: center;
+    gap: 14px;
+    min-height: 54px;
+    padding: 8px 14px;
+}
+.ofi-bom-reqrow + .ofi-bom-reqrow { border-top: 1px solid var(--bom-hairline); }
+.ofi-bom-reqrow.is-cancelled { opacity: 0.6; }
+.ofi-bom-reqrow__main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ofi-bom-reqrow__main > small { overflow: hidden; font-size: 11.5px; color: var(--bom-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.ofi-bom-reqrow__top { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+/* Wie weit der Einkauf ist: ein kleiner Ring und die Zahl — kein Balken. */
+.ofi-bom-reqrow__progress { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.ofi-bom-reqrow__progress > small { overflow: hidden; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--bom-secondary); text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 30.3 Gelen mallar ────────────────────────────────────── */
+.ofi-bom-goodsrow {
+    display: grid;
+    grid-template-columns: 92px 128px minmax(0, 1fr) 96px minmax(120px, 170px) 34px;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 4px 10px 4px 14px;
+    font-size: 12.5px;
+}
+.ofi-bom-goodsrow + .ofi-bom-goodsrow { border-top: 1px solid var(--bom-hairline); }
+.ofi-bom-goodsrow.is-head {
+    min-height: 30px;
+    background: var(--bom-head);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--bom-secondary);
+}
+.ofi-bom-goodsrow .is-num { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 4px; font-variant-numeric: tabular-nums; }
+.ofi-bom-goodsrow .is-num > small { font-size: 11px; color: var(--bom-secondary); }
+.ofi-bom-goodsrow__date { color: var(--bom-secondary); font-variant-numeric: tabular-nums; }
+.ofi-bom-goodsrow__name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.ofi-bom-goodsrow__name > b { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-bom-goodsrow__source { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--bom-secondary); }
+.ofi-bom-goodsrow__source > svg { width: 13px; height: 13px; flex: none; }
+.ofi-bom-goodsrow__info { display: inline-flex; justify-content: center; }
+/* ⓘ — wie der Info-Knopf im Finder: blau, rund, ruhig. */
+#root .ofi-bom .ofi-bom-infobtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50% !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--bom-accent);
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-bom .ofi-bom-infobtn:hover { background: var(--bom-accent-soft); }
+#root .ofi-bom .ofi-bom-infobtn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--bom-ring); }
+#root .ofi-bom .ofi-bom-infobtn > svg { width: 17px; height: 17px; stroke-width: 2; }
+
+/* Das Fenster der Seriennummern. */
+.ofi-bom-snpop { display: flex; flex-direction: column; gap: 12px; }
+.ofi-bom-snpop__facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--bom-border);
+    border-radius: 10px;
+    background: var(--bom-hairline);
+}
+.ofi-bom-snpop__facts > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; background: var(--bom-surface); }
+.ofi-bom-snpop__facts dt { font-size: 11px; color: var(--bom-secondary); }
+.ofi-bom-snpop__facts dd { margin: 0; font-size: 13px; font-weight: 500; color: var(--bom-text); }
+.ofi-bom-snpop__caption { padding: 0 2px; font-size: 11.5px; font-weight: 600; color: var(--bom-secondary); }
+.ofi-bom-snpop__list {
+    display: flex;
+    flex-direction: column;
+    max-height: 320px;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    border: 1px solid var(--bom-border);
+    border-radius: 10px;
+    list-style: none;
+}
+.ofi-bom-snpop__list > li { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 12px; }
+.ofi-bom-snpop__list > li:nth-child(even) { background: var(--bom-zebra); }
+.ofi-bom-snpop__index { min-width: 20px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--bom-muted); }
+.ofi-bom-snpop__list code { font: 500 12.5px/1.2 ui-monospace, 'SF Mono', Menlo, monospace; color: var(--bom-text); }
+.ofi-bom-snpop__state { margin-left: auto; font-size: 11px; color: var(--bom-secondary); white-space: nowrap; }
+.ofi-bom-snpop__state.is-reserved { color: var(--bom-success); font-weight: 600; }
+
+/* Nach dem Wareneingang: wohin die Ware ging. */
+.ofi-bom-alloc { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--bom-border); border-radius: 10px; }
+.ofi-bom-alloc__row { display: grid; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1.2fr); align-items: start; gap: 12px; padding: 10px 12px; }
+.ofi-bom-alloc__row + .ofi-bom-alloc__row { border-top: 1px solid var(--bom-hairline); }
+.ofi-bom-alloc__what,
+.ofi-bom-alloc__where { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-bom-alloc__what > b,
+.ofi-bom-alloc__where > b { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-bom-alloc__what > small,
+.ofi-bom-alloc__where > small { font-size: 11.5px; color: var(--bom-secondary); }
+.ofi-bom-alloc__qty { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.ofi-bom-alloc__row.is-free .ofi-bom-alloc__where > b { color: var(--bom-secondary); }
+.ofi-bom-alloc__serials { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ofi-bom-alloc__serials > code { padding: 1px 6px; border-radius: 5px; background: var(--bom-fill); font: 500 11px/1.5 ui-monospace, 'SF Mono', Menlo, monospace; }
+
+/* Bestellchips in der BOM: nur Anzeige, kein Sprung. */
+#root .ofi-bom .ofi-bom-chip.is-static { cursor: default; }
+#root .ofi-bom .ofi-bom-chip.is-static:hover { background: var(--bom-accent-soft); color: var(--bom-accent-text); -webkit-text-fill-color: currentColor; }
+
+/* ── 30.4 Das Fenster «Talep» ─────────────────────────────── */
+.ofi-bom-reqdlg { display: flex; flex-direction: column; gap: 12px; }
+.ofi-bom-reqdlg__hint { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--bom-secondary); }
+.ofi-bom-reqdlg__table {
+    display: flex;
+    flex-direction: column;
+    max-height: min(46vh, 420px);
+    overflow: auto;
+    border: 1px solid var(--bom-border);
+    border-radius: 10px;
+}
+.ofi-bom-reqdlg__row {
+    display: grid;
+    grid-template-columns: 34px 126px minmax(0, 1fr) 96px 138px;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 4px 12px 4px 10px;
+    font-size: 12.5px;
+}
+.ofi-bom-reqdlg__row + .ofi-bom-reqdlg__row { border-top: 1px solid var(--bom-hairline); }
+.ofi-bom-reqdlg__row.is-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    min-height: 30px;
+    background: var(--bom-head);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--bom-secondary);
+}
+.ofi-bom-reqdlg__row.is-on { background: color-mix(in srgb, var(--bom-accent) 5%, transparent); }
+.ofi-bom-reqdlg__row.is-pending { opacity: 0.62; }
+.ofi-bom-reqdlg__row .is-num { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; text-align: right; }
+.ofi-bom-reqdlg__row .is-num > small { font-size: 11px; color: var(--bom-secondary); }
+.ofi-bom-reqdlg__name { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-bom-reqdlg__name > b { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-bom-reqdlg__name > small { overflow: hidden; font-size: 11px; color: var(--bom-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.ofi-bom-reqdlg__name > small.is-pending { color: var(--bom-warning); font-weight: 500; }
+.ofi-bom-reqdlg__qty { display: inline-flex; align-items: center; gap: 6px; }
+.ofi-bom-reqdlg__qty > small { min-width: 30px; font-size: 11px; color: var(--bom-secondary); text-align: left; }
+body > :not(#root) .ofi-bom-pop .ofi-bom-reqdlg__qty > input {
+    width: 76px;
+    height: 28px;
+    min-height: 0;
+    padding: 0 8px;
+    border: 1px solid var(--bom-field-border);
+    border-radius: 7px !important;
+    background: var(--bom-field);
+    box-shadow: none;
+    color: var(--bom-text);
+    font: inherit;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+body > :not(#root) .ofi-bom-pop .ofi-bom-reqdlg__qty > input:focus { border-color: var(--bom-accent); box-shadow: 0 0 0 3px var(--bom-ring) !important; outline: none; }
+body > :not(#root) .ofi-bom-pop .ofi-bom-reqdlg__qty > input.is-invalid { border-color: var(--bom-danger); }
+body > :not(#root) .ofi-bom-pop .ofi-bom-reqdlg__qty > input:disabled { opacity: 0.5; }
+.ofi-bom-reqdlg__err { font-size: 10.5px; font-weight: 500; color: var(--bom-danger); }
+.ofi-bom-reqdlg__empty { margin: 0; padding: 18px; border: 1px dashed var(--bom-border); border-radius: 10px; font-size: 13px; color: var(--bom-secondary); text-align: center; }
+.ofi-bom-reqdlg__note { display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--bom-secondary); }
+body > :not(#root) .ofi-bom-pop .ofi-bom-reqdlg__note textarea {
+    width: 100%;
+    min-height: 54px;
+    padding: 7px 10px;
+    border: 1px solid var(--bom-field-border);
+    border-radius: 8px !important;
+    background: var(--bom-field);
+    box-shadow: none;
+    color: var(--bom-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.45;
+    resize: vertical;
+}
+body > :not(#root) .ofi-bom-pop .ofi-bom-reqdlg__note textarea:focus { border-color: var(--bom-accent); box-shadow: 0 0 0 3px var(--bom-ring) !important; outline: none; }
+.ofi-bom-reqdlg__count { font-size: 12px; color: var(--bom-secondary); }
+/* Das Kästchen der macOS-Listen. */
+body > :not(#root) .ofi-bom-pop button.ofi-bom-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    min-height: 0;
+    padding: 0;
+    border: 1.5px solid var(--bom-field-border);
+    border-radius: 5px !important;
+    background: var(--bom-field);
+    box-shadow: none;
+    color: #fff;
+    cursor: pointer;
+}
+body > :not(#root) .ofi-bom-pop button.ofi-bom-check.is-on { border-color: var(--bom-accent); background: var(--bom-accent); }
+body > :not(#root) .ofi-bom-pop button.ofi-bom-check:disabled { cursor: default; opacity: 0.45; }
+body > :not(#root) .ofi-bom-pop button.ofi-bom-check:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--bom-ring); }
+.ofi-bom-check > svg { width: 12px; height: 12px; stroke-width: 3.2; }
+
+/* ── 30.5 Die Seite «Satın alma» ──────────────────────────── */
+.ofi-pur .ofi-bom-head { gap: 12px; }
+.ofi-pur-search {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    width: 280px;
+    max-width: 100%;
+    height: 32px;
+    margin-left: auto;
+    padding: 0 10px;
+    border: 1px solid var(--bom-ctl-border);
+    border-radius: 8px;
+    background: var(--bom-field);
+}
+.ofi-pur-search:focus-within { border-color: var(--bom-accent); box-shadow: 0 0 0 3px var(--bom-ring); }
+.ofi-pur-search > svg { width: 14px; height: 14px; flex: none; color: var(--bom-muted); }
+#root .ofi-bom .ofi-pur-search > input {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none !important;
+    color: var(--bom-text);
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+}
+.ofi-pur-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: var(--bom-fill-strong);
+    color: var(--bom-secondary);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+#root .ofi-bom .ofi-bom-source__row.is-selected .ofi-pur-count { background: rgba(255, 255, 255, 0.24); color: #fff; }
+.ofi-pur-content { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ofi-pur-area { min-width: 0; }
+
+.ofi-pur-list { overflow: hidden; }
+#root .ofi-bom button.ofi-pur-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 124px minmax(140px, 190px) 96px;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    min-height: 72px;
+    margin: 0;
+    padding: 10px 14px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--bom-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+#root .ofi-bom button.ofi-pur-row + button.ofi-pur-row { border-top: 1px solid var(--bom-hairline); }
+#root .ofi-bom button.ofi-pur-row:hover { background: var(--bom-row-hover); }
+#root .ofi-bom button.ofi-pur-row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--bom-ring); }
+.ofi-pur-row__main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ofi-pur-row__top { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.ofi-pur-row__where { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; font-size: 12.5px; color: var(--bom-secondary); white-space: nowrap; }
+.ofi-pur-row__where > b { overflow: hidden; font-weight: 600; color: var(--bom-text); text-overflow: ellipsis; }
+.ofi-pur-row__lines { overflow: hidden; font-size: 11.5px; color: var(--bom-muted); text-overflow: ellipsis; white-space: nowrap; }
+.ofi-pur-row__delivery { display: inline-flex; align-items: center; gap: 8px; }
+.ofi-pur-row__delivery > svg { width: 15px; height: 15px; flex: none; color: var(--bom-secondary); }
+.ofi-pur-row__delivery > span { display: flex; flex-direction: column; gap: 1px; }
+.ofi-pur-row__delivery b { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-pur-row__delivery small { font-size: 10.5px; color: var(--bom-secondary); }
+.ofi-pur-row__progress { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.ofi-pur-row__progress > small { overflow: hidden; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--bom-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.ofi-pur-row__meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 11px; color: var(--bom-secondary); text-align: right; }
+
+.ofi-pur-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ofi-pur-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    border: 1px solid var(--bom-border);
+    border-radius: 12px;
+    background: var(--bom-surface);
+    box-shadow: var(--bom-card-shadow);
+}
+.ofi-pur-tile > span:first-child { font-size: 11.5px; font-weight: 600; color: var(--bom-secondary); }
+.ofi-pur-tile .ofi-pur-money { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+.ofi-pur-money { display: inline-flex; flex-direction: column; align-items: inherit; gap: 1px; font-variant-numeric: tabular-nums; }
+td.is-num .ofi-pur-money { align-items: flex-end; }
+
+.ofi-pur-segment {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--bom-fill-strong);
+}
+#root .ofi-bom .ofi-pur-segment > button {
+    height: 26px;
+    min-height: 0;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--bom-text);
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+#root .ofi-bom .ofi-pur-segment > button.is-on { background: var(--bom-surface); box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.16); font-weight: 600; }
+.dark .ofi-bom .ofi-pur-segment > button.is-on { background: #636366; color: #fff; }
+#root .ofi-bom table.ofi-bom-table.is-clickable > tbody > tr { cursor: pointer; }
+
+.ofi-pur-facts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid var(--bom-border);
+    border-radius: 12px;
+    background: var(--bom-hairline);
+    box-shadow: var(--bom-card-shadow);
+}
+.ofi-pur-facts > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 10px 14px; background: var(--bom-surface); }
+.ofi-pur-facts > div > span { font-size: 11px; font-weight: 600; color: var(--bom-secondary); }
+.ofi-pur-facts > div > b { font-size: 14px; font-weight: 600; }
+.ofi-pur-facts > div > small { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; overflow: hidden; font-size: 11.5px; color: var(--bom-secondary); text-overflow: ellipsis; }
+.ofi-pur-facts__date { display: inline-flex; align-items: center; gap: 6px; }
+.ofi-pur-facts__date > svg { width: 14px; height: 14px; color: var(--bom-secondary); }
+.ofi-pur-linestate { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--bom-warning); }
+.ofi-pur-linestate::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.ofi-pur-linestate.is-done { color: var(--bom-success); }
+
+#root .ofi-bom button.ofi-pur-docrow {
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr) auto 120px 64px;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 46px;
+    margin: 0;
+    padding: 6px 14px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--bom-text);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+#root .ofi-bom button.ofi-pur-docrow + button.ofi-pur-docrow { border-top: 1px solid var(--bom-hairline); }
+#root .ofi-bom button.ofi-pur-docrow:hover { background: var(--bom-row-hover); }
+.ofi-pur-docrow__supplier { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-pur-docrow__sum { font-variant-numeric: tabular-nums; text-align: right; }
+.ofi-pur-docrow__recv { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--bom-secondary); }
+
+@media (max-width: 1100px) {
+    .ofi-bom-reqrow { grid-template-columns: minmax(0, 1fr) auto; }
+    .ofi-bom-reqrow__progress { grid-column: 1 / -1; grid-row: 2; }
+    #root .ofi-bom button.ofi-pur-row { grid-template-columns: minmax(0, 1fr) 120px 150px; }
+    .ofi-pur-row__meta { display: none; }
+    .ofi-pur-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+    .ofi-bom-goodsrow { grid-template-columns: minmax(0, 1fr) 70px 34px; }
+    .ofi-bom-goodsrow > :nth-child(1),
+    .ofi-bom-goodsrow > :nth-child(2),
+    .ofi-bom-goodsrow > :nth-child(5) { display: none; }
+    .ofi-bom-reqdlg__row { grid-template-columns: 30px minmax(0, 1fr) 120px; }
+    .ofi-bom-reqdlg__row > :nth-child(2),
+    .ofi-bom-reqdlg__row > :nth-child(4) { display: none; }
+    .ofi-bom-alloc__row { grid-template-columns: minmax(0, 1fr) 48px; }
+    .ofi-bom-alloc__where { grid-column: 1 / -1; }
+    .ofi-pur-search { width: 100%; margin-left: 0; }
+    #root .ofi-bom button.ofi-pur-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .ofi-pur-row__delivery,
+    .ofi-pur-row__progress { justify-self: stretch; }
+    .ofi-pur-tiles,
+    .ofi-pur-facts { grid-template-columns: minmax(0, 1fr); }
+    #root .ofi-bom button.ofi-pur-docrow { grid-template-columns: 110px minmax(0, 1fr) auto; }
+    .ofi-pur-docrow__sum,
+    .ofi-pur-docrow__recv { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ofi-bom-procpop,
+    .ofi-bom-procpop__step,
+    .ofi-bom-procpop__dot { animation: none !important; }
+    .ofi-bom-ring__arc { transition: none; }
+}
+
+/* =========================================================
+   ── 31. KALKÜLASYON · SATIN ALMA NACH ART (27.09.2026 abends, Vorgabe Samet)
+
+   «BOM'dan otomatik bir kalkülasyon listesi … başka bir sayfada, temiz
+    olsun, çok detay olmasın.» — «fiyat talepleri ve satın alma talepleri
+    şeklinde» — «bomda yazsa ama sadece sayısal olarak gelenler».
+   ========================================================= */
+
+/* Bestellt / eingegangen in der BOM: nur Zahlen. */
+.ofi-bom-numcell { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px; font-variant-numeric: tabular-nums; }
+.ofi-bom-numcell > small { font-size: 10.5px; font-weight: 500; color: var(--bom-secondary); white-space: nowrap; }
+.ofi-bom-numcell > small.is-ok { color: var(--bom-success); }
+
+/* Stand-Filter der Talepler: Zähler in der Segmentsteuerung. */
+.ofi-pur-segment__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 16px;
+    margin-left: 6px;
+    padding: 0 5px;
+    border-radius: 8px;
+    background: var(--bom-fill-strong);
+    color: var(--bom-secondary);
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+#root .ofi-bom .ofi-pur-segment > button { display: inline-flex; align-items: center; }
+
+/* Der Weg zur Kalkulation unter der Seitenleiste. */
+#root .ofi-bom button.ofi-pur-costlink {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 50px;
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--bom-border);
+    border-radius: 12px !important;
+    background: var(--bom-surface);
+    box-shadow: var(--bom-card-shadow);
+    color: var(--bom-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+#root .ofi-bom button.ofi-pur-costlink:hover { background: var(--bom-row-hover); }
+#root .ofi-bom button.ofi-pur-costlink > svg:first-child { width: 18px; height: 18px; flex: none; color: var(--bom-accent); }
+#root .ofi-bom button.ofi-pur-costlink > svg:last-child { width: 15px; height: 15px; flex: none; margin-left: auto; color: var(--bom-muted); }
+.ofi-pur-costlink > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-pur-costlink > span > b { font-size: 13px; font-weight: 600; }
+.ofi-pur-costlink > span > small { font-size: 11px; color: var(--bom-secondary); }
+
+.ofi-pur-tile > small { font-size: 11.5px; color: var(--bom-secondary); }
+.ofi-pur-tile > small.is-warn { color: var(--bom-warning); }
+
+/* ── Die Seite «Kalkülasyon» ─────────────────────────────── */
+.ofi-cost { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ofi-cost-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 0 2px; }
+.ofi-cost-head__title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-cost-head__title > b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.ofi-cost-head__title > small { font-size: 12.5px; color: var(--bom-secondary); }
+.ofi-cost-head__delivery { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--bom-secondary); }
+.ofi-cost-head__delivery > svg { width: 14px; height: 14px; }
+.ofi-cost-amounts { display: inline-flex; flex-direction: column; align-items: inherit; gap: 1px; font-variant-numeric: tabular-nums; }
+.ofi-pur-tile .ofi-cost-amounts { align-items: flex-start; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+td.is-num .ofi-cost-amounts,
+.ofi-cost-device__sum .ofi-cost-amounts,
+.ofi-cost-total__cells .ofi-cost-amounts { align-items: flex-end; }
+.ofi-cost-amounts > .is-over { color: var(--bom-danger); }
+.ofi-cost-amounts > .is-under { color: var(--bom-success); }
+.ofi-cost-side__sum { margin-left: auto; font-size: 11px; font-style: normal; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--bom-secondary); white-space: nowrap; }
+#root .ofi-bom .ofi-bom-source__row.is-selected .ofi-cost-side__sum { color: rgba(255, 255, 255, 0.85); }
+
+.ofi-cost-device {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--bom-border);
+    border-radius: 12px;
+    background: var(--bom-surface);
+    box-shadow: var(--bom-card-shadow);
+}
+#root .ofi-bom button.ofi-cost-device__head {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 54px;
+    margin: 0;
+    padding: 8px 14px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--bom-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+#root .ofi-bom button.ofi-cost-device__head:hover { background: var(--bom-row-hover); }
+.ofi-cost-device.is-open > .ofi-cost-device__head { border-bottom: 1px solid var(--bom-hairline); }
+.ofi-cost-device__chev { width: 16px; height: 16px; color: var(--bom-muted); transform: rotate(-90deg); transition: transform 180ms var(--bom-ease); }
+.ofi-cost-device.is-open .ofi-cost-device__chev { transform: none; }
+.ofi-cost-device__title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-cost-device__title > b { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-cost-device__title > small { overflow: hidden; font-size: 11.5px; color: var(--bom-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.ofi-cost-device__sum { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; min-width: 110px; font-size: 13.5px; font-weight: 600; }
+.ofi-cost-device__sum > small { font-size: 10.5px; font-weight: 500; color: var(--bom-secondary); }
+.ofi-cost-device .ofi-bom-tablewrap { border: 0; }
+.ofi-cost-name { display: block; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-cost-price { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px; font-variant-numeric: tabular-nums; }
+.ofi-cost-price > small { font-size: 10.5px; color: var(--bom-secondary); }
+.ofi-cost-missing { font-size: 11.5px; font-weight: 500; color: var(--bom-warning); }
+#root .ofi-bom table.ofi-cost-table td.is-over { color: var(--bom-danger); font-weight: 500; }
+#root .ofi-bom table.ofi-cost-table td.is-under { color: var(--bom-success); font-weight: 500; }
+#root .ofi-bom table.ofi-cost-table tfoot tr.ofi-cost-foot > td {
+    padding-top: 9px;
+    padding-bottom: 9px;
+    border-top: 1px solid var(--bom-border);
+    background: var(--bom-head);
+    font-weight: 600;
+}
+
+.ofi-cost-total {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 20px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--bom-accent) 8%, var(--bom-surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bom-accent) 22%, transparent);
+}
+.ofi-cost-total > span:first-child { font-size: 14px; font-weight: 600; }
+.ofi-cost-total__cells { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.ofi-cost-total__cells > span { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 16px; font-weight: 600; }
+.ofi-cost-total__cells > span > small { font-size: 10.5px; font-weight: 500; color: var(--bom-secondary); }
+
+@media (max-width: 720px) {
+    #root .ofi-bom button.ofi-cost-device__head { grid-template-columns: 18px minmax(0, 1fr) auto; }
+    .ofi-cost-device__sum:last-child { display: none; }
+    .ofi-cost-total__cells { width: 100%; justify-content: space-between; }
+}
+
+/* ── 31.2 Satın alma › Revizyonlar (27.09.2026 abends) ─────
+   «Revizyonlarda … satın alma kısmında üretimde orada görebilelim» — die
+   BOM zeigt keine Lieferanten, hier steht jede Revision mit ihren Bestellungen. */
+#root .ofi-bom button.ofi-pur-revrow {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+    width: 100%;
+    margin: 0;
+    padding: 11px 14px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--bom-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+#root .ofi-bom button.ofi-pur-revrow + button.ofi-pur-revrow { border-top: 1px solid var(--bom-hairline); }
+#root .ofi-bom button.ofi-pur-revrow:hover { background: var(--bom-row-hover); }
+.ofi-pur-revrow__when { margin-left: auto; font-size: 11px; color: var(--bom-secondary); white-space: nowrap; }
+.ofi-pur-revrow__reason { overflow: hidden; font-size: 12px; color: var(--bom-text); text-overflow: ellipsis; white-space: nowrap; }
+.ofi-pur-revrow__none { font-size: 11.5px; color: var(--bom-muted); }
+.ofi-pur-revrow__orders { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+.ofi-pur-revrow__order {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--bom-secondary);
+}
+.ofi-pur-revrow__order > svg { width: 12px; height: 12px; flex: none; color: var(--bom-muted); }
+.ofi-pur-revrow__order > b { flex: none; }
+.ofi-pur-revrow__supplier { overflow: hidden; font-weight: 500; color: var(--bom-text); text-overflow: ellipsis; white-space: nowrap; }
+.ofi-pur-revrow__order.is-revise > span:last-child { color: var(--bom-accent-text); font-weight: 500; }
+.ofi-pur-revrow__order.is-cancel > span:last-child,
+.ofi-pur-revrow__order.is-delete > span:last-child { color: var(--bom-danger); font-weight: 500; }
+/* Knöpfe unter einer betroffenen Bestellung (nur im Einkauf). */
+.ofi-bom-revorder__foot { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px solid var(--bom-hairline); }
+
+/* ── 31.3 Satın alma = EINE Liste (28.09.2026) ─────────────
+   «her şey tek yerde olsun, alt menülere ayrılmasın … işlem yapılan ve yeni
+   gelen talepler listede en başa düşsün»; danach: Ausgaben-Kacheln weg, die
+   Bestellungen eines Talep NUR auf seiner Seite, 15 Einträge je Seite. */
+.ofi-pur-single { flex: 1 1 auto; }
+
+#root .ofi-bom button.ofi-pur-costlink.is-head {
+    flex: none;
+    width: auto;
+    min-height: 32px;
+    height: 32px;
+    padding: 0 10px;
+    gap: 7px;
+    border-radius: 8px !important;
+    box-shadow: none;
+}
+#root .ofi-bom button.ofi-pur-costlink.is-head > svg:first-child { width: 15px; height: 15px; }
+#root .ofi-bom button.ofi-pur-costlink.is-head > svg:last-child { width: 13px; height: 13px; margin-left: 0; }
+
+/* Ein Eintrag = eine Zeile; die Haarlinie trennt Einträge. */
+.ofi-pur-item + .ofi-pur-item { border-top: 1px solid var(--bom-hairline); }
+.ofi-pur-revrow__icon { width: 14px; height: 14px; flex: none; color: var(--bom-secondary); }
+.ofi-pur-row__meta > b { font-size: 12px; font-weight: 600; color: var(--bom-text); font-variant-numeric: tabular-nums; }
+
+/* Fusszeile der Tafel: «1–15 / 37» links, ‹ 1 2 3 › in der Mitte. */
+.ofi-pur-pager {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 6px 12px;
+    border-top: 1px solid var(--bom-hairline);
+    font-size: 12px;
+    color: var(--bom-secondary);
+}
+.ofi-pur-pager__range { min-width: 0; overflow: hidden; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-pur-pager__steps { display: inline-flex; align-items: center; justify-self: center; gap: 2px; }
+#root .ofi-bom button.ofi-pur-pager__arrow,
+#root .ofi-bom button.ofi-pur-pager__page {
+    display: grid;
+    place-items: center;
+    min-width: 28px;
+    height: 28px;
+    min-height: 0;
+    margin: 0;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 7px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--bom-text);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-bom button.ofi-pur-pager__arrow > svg { width: 14px; height: 14px; }
+#root .ofi-bom button.ofi-pur-pager__arrow:hover:not(:disabled),
+#root .ofi-bom button.ofi-pur-pager__page:hover:not(.is-on) { background: var(--bom-row-hover); }
+#root .ofi-bom button.ofi-pur-pager__arrow:disabled { color: var(--bom-muted); cursor: default; opacity: 0.5; }
+#root .ofi-bom button.ofi-pur-pager__page.is-on { background: var(--bom-accent); color: #fff; }
+#root .ofi-bom button.ofi-pur-pager__arrow:focus-visible,
+#root .ofi-bom button.ofi-pur-pager__page:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bom-ring); }
+.ofi-pur-pager__gap { padding: 0 2px; color: var(--bom-muted); }
+
+@media (max-width: 760px) {
+    .ofi-pur .ofi-bom-head { flex-wrap: wrap; }
+    .ofi-pur .ofi-pur-search { flex: 1 1 120px; width: auto; min-width: 0; }
+    #root .ofi-bom button.ofi-pur-costlink.is-head > span { display: none; }
+    .ofi-pur-segment { align-self: stretch; }
+    #root .ofi-bom .ofi-pur-segment > button { flex: 1 1 auto; justify-content: center; padding: 0 8px; }
+    /* Projekt · Gerät · BOM brechen um statt das Projekt wegzuschneiden. */
+    .ofi-pur-row__where { flex-wrap: wrap; white-space: normal; }
+    .ofi-pur-pager { grid-template-columns: minmax(0, 1fr) auto; }
+    .ofi-pur-pager__steps { justify-self: end; }
+}

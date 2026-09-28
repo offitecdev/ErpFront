@@ -139,15 +139,19 @@ export const PAGE_MODULES: CatalogModule[] = [
         labelKey: 'nav.production',
         pages: [
             { key: 'production.orders', path: '/production/orders', labelKey: 'nav.productionOrders', maxLevel: 2 },
-            { key: 'production.lines', path: '/production/lines', labelKey: 'nav.productionLines', maxLevel: 1 },
-            { key: 'production.panels', path: '/production/panels', labelKey: 'nav.panels', maxLevel: 2 },
+            // «Sipariş edilen ürünler» und «Panolar» sind seit dem 28.09.2026 keine Seiten mehr.
             // Görevlendirme şablonları (26.09.2026): nur ansehen — bearbeiten und
             // auf ein Gerät laden darf allein die Administratorrolle.
-            { key: 'production.taskTemplates', path: '/production/task-templates', labelKey: 'nav.productionTaskTemplates', maxLevel: 1 },
+            { key: 'production.taskTemplates', path: '/production/templates/tasks', labelKey: 'nav.productionTaskTemplates', maxLevel: 1 },
             // BOM (27.09.2026): Vorlagen ansehen; pflegen darf «Produktion
             // verwalten» bzw. die Administratorrolle (das prüft der Server).
-            { key: 'production.bomTemplates', path: '/production/bom-templates', labelKey: 'nav.productionBomTemplates', maxLevel: 1 },
+            { key: 'production.bomTemplates', path: '/production/templates/bom', labelKey: 'nav.productionBomTemplates', maxLevel: 1 },
             { key: 'production.settings', path: '/production/settings', labelKey: 'nav.productionSettings', maxLevel: 1 },
+            // Satın alma (27.09.2026 abends): Talepler der BOMs → Preisanfragen und Bestellungen,
+            // Lieferanten und Ausgaben. 1 ansehen · 2 Belege machen. Erbt von «Giden faturalar».
+            { key: 'production.purchasing', path: '/production/purchasing', labelKey: 'nav.productionPurchasing', maxLevel: 2 },
+            // Kalkülasyon (27.09.2026 abends): Menge × Alışpreis je Kalem, geplant gegen tatsächlich. 1 ansehen.
+            { key: 'production.costing', path: '/production/costing', labelKey: 'nav.productionCosting', maxLevel: 1 },
         ],
     },
     {

@@ -104,19 +104,10 @@ export const stackFromParams = (params: URLSearchParams): Array<NavEntry<BomView
     if (!bomId) return [root];
     // Die Haupt-BOM IST die Wurzel — ihre Unteransichten hängen direkt daran.
     const base = bomId === MAIN_ALIAS ? [root] : [root, entryOf({ kind: 'bom', bomId })];
+    // Bestellen, Preisanfragen, Belege und Wareneingang macht seit dem 27.09.2026
+    // abends der Einkauf auf «Satın alma» — alte Adressen landen auf der BOM.
+    void purchaseOrderId;
     switch (kind) {
-        case 'wizard': return [...base, entryOf({ kind: 'wizard', bomId, step: 1 })];
-        case 'request': return [...base, entryOf({ kind: 'request', bomId, step: 1 })];
-        case 'purchases': return [...base, entryOf({ kind: 'purchases', bomId })];
-        case 'purchase':
-            return purchaseOrderId
-                ? [...base, entryOf({ kind: 'purchases', bomId }), entryOf({ kind: 'purchase', bomId, purchaseOrderId })]
-                : base;
-        case 'receipt':
-            return purchaseOrderId
-                ? [...base, entryOf({ kind: 'purchases', bomId }), entryOf({ kind: 'purchase', bomId, purchaseOrderId }), entryOf({ kind: 'receipt', bomId, purchaseOrderId })]
-                : base;
-        case 'documents': return [...base, entryOf({ kind: 'documents', bomId })];
         case 'revisions': return [...base, entryOf({ kind: 'revisions', bomId })];
         case 'revision': {
             const revision = Number(params.get('rev'));
@@ -174,6 +165,30 @@ export const wizardFromProposal = (proposal: BomProposal): WizardState => ({
         extraSuppliers: [],
     }])),
 });
+
+/**
+ * Aus einem Talep der BOM (Satın alma): nur seine Zeilen sind vorgewählt.
+ * Die Menge bleibt die Untergrenze des Servers (was fehlt, Mindestmenge) —
+ * es sei denn, der Talep wollte mehr; dann seine, mit Hinweis.
+ */
+export const restrictWizard = (state: WizardState, lines: Map<string, number> | null | undefined): WizardState => {
+    if (!lines) return state;
+    const next: WizardState['lines'] = {};
+    for (const line of state.proposal.lines) {
+        const entry = state.lines[line.lineId];
+        if (!entry) continue;
+        const wanted = lines.get(line.lineId);
+        const include = !line.block && wanted !== undefined;
+        const quantity = wanted !== undefined && wanted > line.floor + 1e-9 ? wanted : line.floor;
+        next[line.lineId] = {
+            ...entry,
+            include,
+            quantityText: String(quantity),
+            note: quantity > line.floor + 1e-9 ? t('productionBom.procurement.fromRequestNote') : entry.note,
+        };
+    }
+    return { ...state, lines: next };
+};
 
 export const parseQty = (text: string): number => {
     const parsed = Number(String(text).trim().replace(/['\s]/g, '').replace(',', '.'));
@@ -290,6 +305,23 @@ export const requestWizardFromProposal = (proposal: BomRequestProposal): Request
         }];
     })),
 });
+
+/** Aus einem Talep PRICE: nur seine Zeilen, mit seiner Menge. */
+export const restrictRequestWizard = (state: RequestWizardState, lines: Map<string, number> | null | undefined): RequestWizardState => {
+    if (!lines) return state;
+    const next: RequestWizardState['lines'] = {};
+    for (const line of state.proposal.lines) {
+        const entry = state.lines[line.lineId];
+        if (!entry) continue;
+        const wanted = lines.get(line.lineId);
+        next[line.lineId] = {
+            ...entry,
+            include: wanted !== undefined,
+            quantityText: wanted !== undefined ? quantityToText(wanted) : entry.quantityText,
+        };
+    }
+    return { ...state, lines: next };
+};
 
 export const requestLineProblem = (state: RequestLineState): 'QTY' | null => {
     const qty = parseQty(state.quantityText);

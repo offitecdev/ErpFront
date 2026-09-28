@@ -18,6 +18,7 @@ import {
     predictedNumber,
     requestInput,
     requestLineProblem,
+    restrictRequestWizard,
     requestWizardFromProposal,
     supplierGroupKey,
     viewKey,
@@ -79,6 +80,9 @@ export const RequestWizardView = ({
     onWizard: (next: RequestWizardState | null) => void;
 }) => {
     const { nav } = context;
+    // Aus einem Talep PRICE der BOM (Satın alma): nur seine Zeilen, die Anfragen hängen an ihm.
+    const requestLines = context.procurement?.lines ?? null;
+    const requestId = context.procurement?.requestId ?? null;
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
     const [supplierFor, setSupplierFor] = useState<string | null>(null);
@@ -89,11 +93,11 @@ export const RequestWizardView = ({
     useEffect(() => {
         if (!needsProposal) return undefined;
         let alive = true;
-        productionBomApi.requestProposal(bom.id)
-            .then((proposal) => { if (alive) { onWizard(requestWizardFromProposal(proposal)); setError(null); } })
+        productionBomApi.requestProposal(bom.id, requestId)
+            .then((proposal) => { if (alive) { onWizard(restrictRequestWizard(requestWizardFromProposal(proposal), requestLines)); setError(null); } })
             .catch((failure) => { if (alive) setError(productionBomErrorText(failure)); });
         return () => { alive = false; };
-    }, [bom.id, needsProposal, onWizard]);
+    }, [bom.id, needsProposal, onWizard, requestId, requestLines]);
 
     const lines = wizard?.proposal.lines ?? [];
     const included = lines.filter((line) => wizard?.lines[line.lineId]?.include);
@@ -133,12 +137,12 @@ export const RequestWizardView = ({
         if (!wizard || creating) return;
         setCreating(true);
         try {
-            const result = await productionBomApi.createRequests(bom.id, requestInput(wizard));
+            const result = await productionBomApi.createRequests(bom.id, requestInput(wizard), requestId);
             context.applyBom(result.bom);
             onWizard({ ...wizard, result: { created: result.created, failed: result.failed } });
             result.failed.forEach((entry) => toast.error(t('productionBom.request.failed', { supplier: entry.supplierName })));
             // Das Ergebnis steht direkt über der BOM: zurück führt zu ihr, nicht in einen alten Entwurf.
-            nav.popTo(viewKey({ kind: 'bom', bomId: bom.id }));
+            nav.popTo(context.homeKey?.(bom.id) ?? viewKey({ kind: 'bom', bomId: bom.id }));
             nav.push(entryOf({ kind: 'request', bomId: bom.id, step: 4 }));
         } catch (failure) {
             toast.error(productionBomErrorText(failure));

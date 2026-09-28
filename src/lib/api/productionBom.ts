@@ -20,6 +20,15 @@ import type {
     BomTemplateInput,
     BomTemplateSummary,
     BomTableAiResult,
+    BomProcurementInput,
+    BomProcurementSummary,
+    BomReceiptAllocation,
+    ProcurementList,
+    ProcurementRequest,
+    ProcurementSpending,
+    CostingProject,
+    CostingProjectSummary,
+    ProcurementRevision,
 } from '../../types/productionBom';
 import type { TaskArea } from '../../types/productionTasks';
 
@@ -90,14 +99,43 @@ export const productionBomApi = {
         (await apiClient.get(`/production/bom/purchases/${enc(purchaseOrderId)}/revisions/${number}/quote-file`, { responseType: 'blob' })).data,
     proposal: async (bomId: string): Promise<BomProposal> =>
         (await apiClient.get(`/production/bom/boms/${enc(bomId)}/order-proposal`)).data,
-    createOrders: async (bomId: string, lines: BomOrderLineInput[]): Promise<BomOrdersResult> =>
-        (await apiClient.post(`/production/bom/boms/${enc(bomId)}/orders`, { lines })).data,
-    /** «Fiyat talebi» — nur solange die BOM nicht freigegeben ist. */
-    requestProposal: async (bomId: string): Promise<BomRequestProposal> =>
-        (await apiClient.get(`/production/bom/boms/${enc(bomId)}/request-proposal`)).data,
+    /** Seit 27.09.2026 abends nur der Einkauf — `procurementRequestId` = der Talep der BOM, aus dem die Belege entstehen. */
+    createOrders: async (bomId: string, lines: BomOrderLineInput[], procurementRequestId?: string | null): Promise<BomOrdersResult> =>
+        (await apiClient.post(`/production/bom/boms/${enc(bomId)}/orders`, { lines, ...(procurementRequestId ? { procurementRequestId } : {}) })).data,
+    /** «Fiyat talebi» — im Entwurf; aus einem Talep PRICE des Einkaufs auch danach. */
+    requestProposal: async (bomId: string, procurementRequestId?: string | null): Promise<BomRequestProposal> =>
+        (await apiClient.get(`/production/bom/boms/${enc(bomId)}/request-proposal`, { params: procurementRequestId ? { procurementRequestId } : {} })).data,
     /** Je Lieferant eine Preisanfrage (Name, Modell, Menge). Gleiche Antwortform wie «Sipariş oluştur». */
-    createRequests: async (bomId: string, lines: BomRequestLineInput[]): Promise<BomOrdersResult> =>
-        (await apiClient.post(`/production/bom/boms/${enc(bomId)}/price-requests`, { lines })).data,
+    createRequests: async (bomId: string, lines: BomRequestLineInput[], procurementRequestId?: string | null): Promise<BomOrdersResult> =>
+        (await apiClient.post(`/production/bom/boms/${enc(bomId)}/price-requests`, { lines, ...(procurementRequestId ? { procurementRequestId } : {}) })).data,
+
+    /* ── Talep an den Einkauf (27.09.2026 abends) ── */
+    /** Die BOM stellt einen Talep — ohne Lieferant, ohne Preis. */
+    createProcurementRequest: async (bomId: string, input: BomProcurementInput): Promise<{ request: BomProcurementSummary; bom: Bom }> =>
+        (await apiClient.post(`/production/bom/boms/${enc(bomId)}/procurement-requests`, input)).data,
+    /** … und zieht einen unberührten zurück. */
+    withdrawProcurementRequest: async (requestId: string): Promise<{ bom: Bom }> =>
+        (await apiClient.post(`/production/bom/procurement/requests/${enc(requestId)}/withdraw`, {})).data,
+    /** «Satın alma» (Buchhaltung, Administratorrolle). */
+    procurementList: async (): Promise<ProcurementList> =>
+        (await apiClient.get('/production/bom/procurement/requests')).data,
+    procurementRequest: async (requestId: string): Promise<{ request: ProcurementRequest; bom: Bom; canProcure: boolean }> =>
+        (await apiClient.get(`/production/bom/procurement/requests/${enc(requestId)}`)).data,
+    procurementAction: async (requestId: string, action: 'close' | 'reopen' | 'cancel'): Promise<{ request: ProcurementRequest }> =>
+        (await apiClient.post(`/production/bom/procurement/requests/${enc(requestId)}/${action}`, {})).data,
+    /** Eine BOM voll (mit Lieferanten und Preisen) — nur der Einkauf. */
+    procurementBom: async (bomId: string): Promise<{ bom: Bom; project: ProcurementRequest['project']; device: ProcurementRequest['device']; canProcure: boolean }> =>
+        (await apiClient.get(`/production/bom/procurement/boms/${enc(bomId)}`)).data,
+    /** «Satın alma › Revizyonlar»: freigegebene BOM-Revisionen mit ihren Bestellungen (Lieferant). */
+    procurementRevisions: async (): Promise<{ revisions: ProcurementRevision[] }> =>
+        (await apiClient.get('/production/bom/procurement/revisions')).data,
+    /** «Kalkülasyon»: Projekte mit geplanten und tatsächlichen Materialkosten. */
+    costingProjects: async (): Promise<{ projects: CostingProjectSummary[] }> =>
+        (await apiClient.get('/production/bom/costing')).data,
+    costingProject: async (projectId: string): Promise<CostingProject> =>
+        (await apiClient.get(`/production/bom/costing/${enc(projectId)}`)).data,
+    procurementSpending: async (): Promise<ProcurementSpending> =>
+        (await apiClient.get('/production/bom/procurement/spending')).data,
 
     setQuoteNumber: async (purchaseOrderId: string, quoteNumber: string): Promise<{ bom: Bom | null }> =>
         (await apiClient.put(`/production/bom/purchases/${enc(purchaseOrderId)}/quote-number`, { quoteNumber })).data,
@@ -113,7 +151,7 @@ export const productionBomApi = {
     receive: async (
         purchaseOrderId: string,
         lines: Array<{ index: number; quantity: number; serials: string[] }>,
-    ): Promise<{ bom: Bom | null; status: string }> =>
+    ): Promise<{ bom: Bom | null; status: string; allocations?: BomReceiptAllocation[] }> =>
         (await apiClient.post(`/production/bom/purchases/${enc(purchaseOrderId)}/receive`, { lines })).data,
     /** Die leeren Zellen der Vorlagenspalten per KI füllen — Zeilen und Spalten bleiben, wie sie sind. */
     fillTable: async (

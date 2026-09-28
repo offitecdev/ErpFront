@@ -1,21 +1,15 @@
 import { useState } from 'react';
-import { ArrowRight, Eye, FileText } from 'lucide-react';
+import { ArrowRight, Eye, FileDiff, FileText } from 'lucide-react';
 
-import i18n from '@/i18n';
 import { t } from '@/i18n/translate';
 import { productionBomApi } from '@/lib/api/productionBom';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
 import type { PurchaseOrderRow } from '@/types/inventory';
 import type { BomPurchase } from '@/types/productionBom';
-import type { OrderPdfLang } from '@/utils/pdf/orderPdf';
 
 import { fmtQty, orderUnitLabel, shortDate } from '../bomFormat';
 import { openArchivedQuote, openBlob } from './bomFiles';
-
-const pdfLang = (): OrderPdfLang => {
-    const lang = String(i18n.resolvedLanguage || i18n.language || 'de').slice(0, 2);
-    return lang === 'tr' || lang === 'en' ? lang : 'de';
-};
+import { openOrderRevisionPdf, pdfLang } from './revisionPdf';
 
 /**
  * ── DIE ALTEN FASSUNGEN EINER BOM-BESTELLUNG (27.09.2026) ───────────────────
@@ -26,11 +20,20 @@ const pdfLang = (): OrderPdfLang => {
  */
 export const BomPurchaseRevisions = ({ purchase }: { purchase: BomPurchase }) => {
     const settings = usePdfSettings();
-    const [busy, setBusy] = useState<number | null>(null);
+    const [busy, setBusy] = useState<string | null>(null);
     const list = [...purchase.revisions].sort((a, b) => b.number - a.number);
 
+    const openChangePdf = async (number: number) => {
+        setBusy(`change:${number}`);
+        try {
+            await openOrderRevisionPdf(purchase.purchaseOrderId, number, settings);
+        } finally {
+            setBusy(null);
+        }
+    };
+
     const openPdf = async (number: number) => {
-        setBusy(number);
+        setBusy(`old:${number}`);
         try {
             await openBlob(async () => {
                 const detail = await productionBomApi.purchaseRevision(purchase.purchaseOrderId, number);
@@ -59,8 +62,19 @@ export const BomPurchaseRevisions = ({ purchase }: { purchase: BomPurchase }) =>
                             {t('productionBom.revision.byBomRevision', { revision: entry.bomRevision })}
                         </span>
                         <span className="ofi-bom-orderrevs__actions">
+                            {/* Das eigene Blatt der Änderung («o pdf ayrı olsun … bunlar değişti»). */}
+                            <button
+                                type="button"
+                                className="ofi-bom-btn is-small ofi-nosize"
+                                disabled={busy !== null}
+                                title={t('productionBom.revision.changePdfTitle', { revision: entry.number })}
+                                onClick={() => void openChangePdf(entry.number)}
+                            >
+                                {busy === `change:${entry.number}` ? <span className="ofi-bom-spinner is-small" /> : <FileDiff />}
+                                {t('productionBom.revision.changePdf', { revision: entry.number })}
+                            </button>
                             <button type="button" className="ofi-bom-btn is-small is-quiet ofi-nosize" disabled={busy !== null} onClick={() => void openPdf(entry.number)}>
-                                {busy === entry.number ? <span className="ofi-bom-spinner is-small" /> : <FileText />}
+                                {busy === `old:${entry.number}` ? <span className="ofi-bom-spinner is-small" /> : <FileText />}
                                 {t('productionBom.revision.oldPdf', { revision: entry.number - 1 })}
                             </button>
                             {entry.quoteFile && (

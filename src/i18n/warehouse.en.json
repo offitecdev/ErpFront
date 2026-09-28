@@ -185,7 +185,7 @@
       "title": "Add product",
       "subtitle": "Scan the barcode — the product is recognised and added to stock right away.",
       "waiting": "Waiting for a barcode",
-      "waitingHint": "Scan a product barcode, manufacturer barcode, ERP code or serial number. Every scan adds +1.",
+      "waitingHint": "Scan a product barcode, manufacturer barcode, ERP code or serial number. Each scan adds +1; if a confirmed order is waiting for the product, it is booked as its goods receipt.",
       "looking": "Searching…",
       "notFound": "There is no product card for this barcode.",
       "createCard": "Create card",
@@ -215,7 +215,18 @@
       "addedCount_one": "{{count}} added",
       "addedCount_other": "{{count}} added",
       "total_one": "{{count}} unit added in this window",
-      "total_other": "{{count}} units added in this window"
+      "total_other": "{{count}} units added in this window",
+      "qtyLabel": "Quantity added — change it and press Enter",
+      "receipt": {
+        "line": "{{quantity}} received",
+        "progress": "{{received}}/{{ordered}} delivered",
+        "completed": "Order complete",
+        "free": "{{quantity}} went to free stock",
+        "undo": "Undo",
+        "undoTitle": "Undo this goods receipt and the stock entry"
+      },
+      "orderChip": "{{quantity}}",
+      "orderChipTitle": "Quantity received into this order from this window"
     },
     "serials": {
       "title": "Serial numbers",
@@ -297,7 +308,8 @@
       "SUPPLIER_NAME_REQUIRED": "No supplier chosen for barcode «{{code}}».",
       "SUPPLIER_DUPLICATE": "«{{name}}» is already on this card.",
       "TOO_MANY_SUPPLIERS": "A card can have at most {{max}} suppliers.",
-      "MANUFACTURER_BARCODE_TAKEN": "Manufacturer barcode «{{code}}» already belongs to «{{name}}» — a manufacturer barcode can belong to one product only."
+      "MANUFACTURER_BARCODE_TAKEN": "Manufacturer barcode «{{code}}» already belongs to «{{name}}» — a manufacturer barcode can belong to one product only.",
+      "RECEIPT_UNDO_INVALID": "This goods receipt can no longer be undone — the order or its record has changed."
     },
     "settings": {
       "title": "Warehouse settings",

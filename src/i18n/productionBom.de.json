@@ -1,7 +1,11 @@
 {
   "nav": {
     "productionBomTemplates": "BOM-Vorlagen",
-    "productionSettings": "Produktionseinstellungen"
+    "productionSettings": "Produktionseinstellungen",
+    "productionPurchasing": "Einkauf",
+    "productionCosting": "Kalkulation",
+    "productionTemplates": "Vorlagen",
+    "productionSettingsMenu": "Einstellungen"
   },
   "productionBom": {
     "common": {
@@ -61,7 +65,8 @@
       "minimum": "Mindestmenge",
       "order": "Bestellung",
       "quantity": "Menge",
-      "note": "Notiz"
+      "note": "Notiz",
+      "received": "Eingegangen"
     },
     "templates": {
       "title": "BOM-Vorlagen",
@@ -235,7 +240,8 @@
       "saved": "Gespeichert",
       "saveFirst": "Zuerst speichern",
       "invalidQuantity": "Jede Zeile braucht eine Menge über 0.",
-      "unsavedText": "Die Änderungen an {{number}} sind nicht gespeichert. Ohne Speichern gehen sie verloren."
+      "unsavedText": "Die Änderungen an {{number}} sind nicht gespeichert. Ohne Speichern gehen sie verloren.",
+      "confirmedQty": "{{count}} bestätigt"
     },
     "wizard": {
       "title": "Bestellungen anlegen",
@@ -493,7 +499,12 @@
       "REVISION_NOT_FOUND": "Diese Revision gibt es nicht.",
       "REASON_REQUIRED": "Der Grund der Revision ist Pflicht.",
       "REVISION_NO_CHANGES": "Die Revision ändert nichts — zuerst Zeilen ändern oder die Revision verwerfen.",
-      "REVISION_CONFLICT": "Die BOM hat sich inzwischen geändert — bitte neu laden."
+      "REVISION_CONFLICT": "Die BOM hat sich inzwischen geändert — bitte neu laden.",
+      "KIND_INVALID": "Ungültige Anforderungsart",
+      "NOT_FOUND": "Nicht gefunden",
+      "REQUEST_NOT_FOUND": "Anforderung nicht gefunden",
+      "REQUEST_IN_PROGRESS": "Der Einkauf arbeitet bereits daran — Zurückziehen nicht möglich",
+      "REQUEST_MISMATCH": "Die Anforderung gehört nicht zu diesem Vorgang"
     },
     "tasks": {
       "title": "Aufgaben",
@@ -657,7 +668,252 @@
         "CANCEL": "Stornierung zu klären",
         "KEEP": "So belassen"
       },
-      "orderPill": "Bestellung Rev.{{revision}}"
+      "orderPill": "Bestellung Rev.{{revision}}",
+      "openOrder": "Bestellung öffnen",
+      "changePdf": "Bestelländerung (PDF, Rev. {{revision}})",
+      "changePdfTitle": "Blatt für den Lieferanten: nur die mit Rev. {{revision}} geänderten Positionen"
+    },
+    "process": {
+      "title": "Ablauf",
+      "titleMain": "Ablauf · alle Unter-BOMs",
+      "now": "Jetzt: {{step}}",
+      "allDone": "Ablauf abgeschlossen",
+      "remaining_one": "Danach noch {{count}} Schritt",
+      "remaining_other": "Danach noch {{count}} Schritte",
+      "lastStep": "Letzter Schritt",
+      "optional": "Optional",
+      "skipped": "Übersprungen",
+      "step": {
+        "list": "Liste",
+        "price": "Preisanfrage",
+        "approve": "BOM-Freigabe",
+        "orderRequest": "Bestellanforderung",
+        "purchasing": "Einkauf",
+        "confirmed": "Lieferantenbestätigung",
+        "received": "Wareneingang · reserviert",
+        "completed": "BOM abgeschlossen",
+        "consumed": "Vom Lager abgebucht"
+      },
+      "hint": {
+        "list": "Zeilen erfassen, Mengen festlegen",
+        "price": "Optional: vor der Freigabe Preise beim Einkauf anfragen",
+        "approve": "Die BOM wird freigegeben — endgültig, Änderungen über eine Revision",
+        "orderRequest": "Fehlende Zeilen gehen als Anforderung an den Einkauf",
+        "purchasing": "Die Buchhaltung bestellt — erledigt, wenn nichts mehr fehlt",
+        "confirmed": "Die Lieferanten bestätigen die Bestellungen",
+        "received": "Ware kommt an und wird dem Projekt mit dem frühesten Liefertermin reserviert",
+        "completed": "Alles reserviert — BOM abgeschlossen",
+        "consumed": "Am Projektende werden die Reservierungen abgebucht"
+      },
+      "open": "Ablauf anzeigen"
+    },
+    "procurement": {
+      "priceButton": "Preise anfragen",
+      "priceButtonTitle": "Preise beim Einkauf anfragen — Lieferanten und Preise bestimmt der Einkauf",
+      "orderButton": "Bestellanforderung",
+      "orderButtonTitle": "Fehlende Zeilen als Bestellanforderung an den Einkauf senden",
+      "allRequested": "Alles Fehlende liegt beim Einkauf",
+      "dialogTitle": {
+        "PRICE": "Preise anfragen",
+        "ORDER": "Bestellanforderung senden"
+      },
+      "dialogSubtitle": {
+        "PRICE": "{{number}} · geht als Anforderung an den Einkauf",
+        "ORDER": "{{number}} · Fehlendes geht an den Einkauf"
+      },
+      "dialogHint": {
+        "PRICE": "Nur Produkte und Mengen wählen. Lieferanten und Preise bestimmt der Einkauf (Buchhaltung); die Anforderung erscheint unter Produktion › Einkauf.",
+        "ORDER": "Angefordert wird, was weder am Lager noch bestellt ist — nie weniger. Lieferanten und Preise bestimmt der Einkauf."
+      },
+      "send": {
+        "PRICE": "Preisanfrage senden",
+        "ORDER": "Bestellanforderung senden"
+      },
+      "selected": "{{count}} Zeilen gewählt",
+      "all": "Alle wählen",
+      "quantity": "Angeforderte Menge",
+      "pending": "{{number}} wartet im Einkauf",
+      "minQty": "Mindestens {{min}}",
+      "nothing": {
+        "PRICE": "Diese BOM hat keine Zeilen",
+        "ORDER": "Nichts fehlt — alles am Lager oder bestellt"
+      },
+      "note": "Notiz an den Einkauf",
+      "notePlaceholder": "Optional — z. B. Dringlichkeit, bevorzugte Marke",
+      "created": {
+        "PRICE": "Preisanfrage {{number}} an den Einkauf gesendet",
+        "ORDER": "Bestellanforderung {{number}} an den Einkauf gesendet"
+      },
+      "title": "Anforderungen an den Einkauf",
+      "titleMeta": "Lieferanten und Preise führt der Einkauf",
+      "status": {
+        "OPEN": "Wartet",
+        "IN_PROGRESS": "Im Einkauf",
+        "DONE": "Erledigt",
+        "CANCELLED": "Storniert"
+      },
+      "kind": {
+        "PRICE": "Preisanfrage",
+        "ORDER": "Bestellanforderung"
+      },
+      "linesCount_one": "{{count}} Zeile",
+      "linesCount_other": "{{count}} Zeilen",
+      "progressTitle": {
+        "PRICE": "Zeilen mit Preisanfrage",
+        "ORDER": "Bestellte Zeilen"
+      },
+      "progress": {
+        "PRICE": "{{done}}/{{total}} angefragt",
+        "ORDER": "{{done}}/{{total}} bestellt"
+      },
+      "withdraw": "Zurückziehen",
+      "withdrawn": "{{number}} zurückgezogen",
+      "fromRequestNote": "Menge aus der Anforderung"
+    },
+    "goodsIn": {
+      "title": "Wareneingänge",
+      "meta": "Gesamt {{total}} — dem frühesten Liefertermin zugeteilt",
+      "date": "Datum",
+      "quantity": "Menge",
+      "source": "Herkunft",
+      "fromStock": "Lagerzugang",
+      "serialsOf": "{{name}} — Seriennummern",
+      "serialsTitle": "Eingegangene Seriennummern",
+      "bom": "BOM",
+      "by": "Angenommen von",
+      "serialCount_one": "{{count}} Seriennummer",
+      "serialCount_other": "{{count}} Seriennummern",
+      "reserved": "In dieser BOM reserviert",
+      "moved": "Nicht mehr in dieser Zeile",
+      "allocTitle": "Ware angenommen",
+      "allocSubtitle": "Automatisch den Projekten mit dem frühesten Liefertermin zugeteilt",
+      "freeStock": "Freier Bestand",
+      "freeStockHint": "Kein wartender Bedarf — frei im Lager"
+    },
+    "purchasing": {
+      "title": "Einkauf",
+      "back": "Anforderungen",
+      "search": "Anforderung, Projekt, Produkt, Lieferant suchen",
+      "sideNote": "Hier landen die Anforderungen aus den BOMs. Lieferanten und Preise sehen nur Buchhaltung und Administratoren.",
+      "empty": {
+        "feed": {
+          "all": "Noch keine Anfragen",
+          "open": "Keine offenen Anfragen",
+          "done": "Keine erledigten Anfragen",
+          "cancelled": "Keine stornierten Anfragen"
+        }
+      },
+      "emptyHint": {
+        "feed": "Anfragen aus einer BOM erscheinen hier in einer Liste; Preisanfragen und Bestellungen stehen als Vorgänge in ihrer Anfrage."
+      },
+      "bomDocuments": "Vorgänge der BOM",
+      "createRequests": "Preisanfragen erstellen",
+      "createOrders": "Bestellungen erstellen",
+      "readOnly": "Nur ansehen — Vorgänge anlegen braucht Buchhaltungs-/Administratorrechte.",
+      "fact": {
+        "project": "Projekt",
+        "delivery": "Liefertermin",
+        "deliveryHint": "Vorrang: frühester Termin",
+        "bom": "BOM",
+        "requested": "Angefordert"
+      },
+      "lines": "Angeforderte Zeilen",
+      "missingNow": "Fehlt jetzt",
+      "state": "Stand",
+      "lineAsked": "Angefragt",
+      "lineOrdered": "Bestellt",
+      "lineOpen": "Wartet",
+      "received": "Erhalten",
+      "noRequestsYet": "Noch keine Preisanfrage erstellt",
+      "noOrdersYet": "Noch keine Bestellung erstellt",
+      "action": {
+        "close": "Als erledigt markieren",
+        "reopen": "Wieder öffnen",
+        "cancel": "Stornieren",
+        "closeDone": "{{number}} erledigt",
+        "reopenDone": "{{number}} wieder geöffnet",
+        "cancelDone": "{{number}} storniert",
+        "closeTitle": "{{number}} als erledigt markieren?",
+        "cancelTitle": "{{number}} stornieren?",
+        "closeText": "Die Anforderung verlässt die offene Liste; ihre Vorgänge bleiben.",
+        "cancelText": "Die Anforderung wird storniert und erscheint so in der BOM. Vorgänge werden nicht gelöscht."
+      },
+      "statusFilter": "Stand",
+      "status": {
+        "open": "Offen",
+        "done": "Erledigt",
+        "cancelled": "Storniert",
+        "all": "Alle"
+      },
+      "costingHint": "Geplante und tatsächliche Materialkosten",
+      "revisionNoOrders": "Keine Bestellung betroffen",
+      "lastActivity": "Letzte Aktion",
+      "pageRange": "{{from}}–{{to}} von {{total}}",
+      "prevPage": "Vorherige Seite",
+      "nextPage": "Nächste Seite",
+      "revisionOrders_one": "{{count}} Bestellung betroffen",
+      "revisionOrders_other": "{{count}} Bestellungen betroffen",
+      "documentsOf": {
+        "PRICE": "Preisanfragen dieser Anforderung",
+        "ORDER": "Bestellungen dieser Anforderung"
+      },
+      "confirmedOf": "{{done}}/{{total}} bestätigt",
+      "receiveNow": "Wareneingang",
+      "requestsSent": "{{count}} Preisanfragen"
+    },
+    "costing": {
+      "title": "Kalkulation",
+      "search": "Projekt suchen",
+      "projects": "Projekte",
+      "empty": "Noch kein Projekt mit BOM",
+      "emptyHint": "Sobald ein Gerät eine BOM hat, werden die Materialkosten hier berechnet.",
+      "plan": "Geplante Materialkosten",
+      "forecast": "Tatsächliche Kosten (Prognose)",
+      "diff": "Abweichung zum Plan",
+      "missingPrice_one": "{{count}}/{{total}} Position ohne Einkaufspreis",
+      "missingPrice_other": "{{count}}/{{total}} Positionen ohne Einkaufspreis",
+      "allPriced": "Alle {{total}} Positionen haben einen Einkaufspreis",
+      "actualLines_one": "{{count}}/{{total}} Position mit echtem Bestellpreis",
+      "actualLines_other": "{{count}}/{{total}} Positionen mit echtem Bestellpreis",
+      "diffHint": "{{percent}} — bei Positionen mit echtem Preis",
+      "noCompare": "Für den Vergleich fehlen bestätigte Bestellpreise",
+      "projectTotal": "Projektsumme",
+      "deviceTotal": "Maschinensumme",
+      "planShort": "Plan",
+      "forecastShort": "Ist (Prognose)",
+      "diffShort": "Abweichung",
+      "item": "Material",
+      "quantity": "Menge",
+      "unitPrice": "Einkaufspreis",
+      "planTotal": "Plan gesamt",
+      "actualTotal": "Ist gesamt",
+      "fromQuote": "Angebot",
+      "fromQuoteTitle": "Kein Einkaufspreis auf der Karte — aus dem günstigsten Angebot",
+      "noPrice": "kein Preis",
+      "actualUnitTitle": "Bestellpreis je Einheit: {{price}}",
+      "position": "Pos. {{number}}",
+      "note": "Plan: Einkaufspreis der Lagerkarte (sonst das günstigste Angebot). Ist: Preis der bestätigten Bestellungen. Prognose: Ist-Preis, sonst Plan. Währungen werden nie umgerechnet.",
+      "sideNote": "Preise sehen nur Buchhaltung und Administratoren."
+    },
+    "orderDoc": {
+      "label": "Dokument",
+      "order": "Bestellung",
+      "revision": "Änderung Rev. {{n}}"
+    },
+    "hub": {
+      "settingsTab": "Produktionseinstellungen",
+      "accessTab": "Berechtigungen",
+      "access": {
+        "templatesTitle": "Wer die Vorlagen sieht",
+        "templatesIntro": "Die Reiter Aufgabenvorlagen und BOM-Vorlagen erscheinen nur bei den hier eingeschalteten Rollen. Die Administratorrolle sieht immer alles.",
+        "role": "Rolle",
+        "always": "Immer",
+        "people_one": "{{count}} Person",
+        "people_other": "{{count}} Personen",
+        "note": "Die Änderung gilt für die Personen mit dieser Rolle ab der nächsten Anmeldung bzw. nach dem Neuladen. Neue Rollen und weitere Seitenrechte: «Rollen verwalten».",
+        "manageRoles": "Rollen verwalten",
+        "saveFailed": "«{{role}}» konnte nicht gespeichert werden"
+      }
     }
   }
 }

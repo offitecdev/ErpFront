@@ -179,7 +179,7 @@
       "title": "Ürün ekle",
       "subtitle": "Barkodu okutun — ürün tanınır ve depoya hemen eklenir.",
       "waiting": "Barkod bekleniyor",
-      "waitingHint": "Ürün barkodu, üretici barkodu, ERP kodu veya seri numarası okutun. Her okutma +1 olarak eklenir.",
+      "waitingHint": "Ürün barkodu, üretici barkodu, ERP kodu veya seri numarası okutun. Her okutma +1 olarak eklenir; ürünü bekleyen onaylı bir sipariş varsa otomatik mal kabul edilir.",
       "looking": "Aranıyor…",
       "notFound": "Bu barkoda ait ürün kartı yok.",
       "createCard": "Yeni kart oluştur",
@@ -207,7 +207,18 @@
       "undo": "Bir adet geri al",
       "undoSerial": "Bu seri numarasını geri al",
       "addedCount": "{{count}} adet eklendi",
-      "total": "Bu pencerede {{count}} adet eklendi"
+      "total": "Bu pencerede {{count}} adet eklendi",
+      "qtyLabel": "Eklenen adet — değiştirip Enter'a basın",
+      "receipt": {
+        "line": "{{quantity}} adet mal kabul edildi",
+        "progress": "{{received}}/{{ordered}} geldi",
+        "completed": "Sipariş tamamlandı",
+        "free": "{{quantity}} adet serbest stoğa girdi",
+        "undo": "Geri al",
+        "undoTitle": "Bu mal kabulünü ve stok girişini geri al"
+      },
+      "orderChip": "{{quantity}} adet",
+      "orderChipTitle": "Bu pencereden bu siparişe mal kabul edilen adet"
     },
     "serials": {
       "title": "Seri numaraları",
@@ -287,7 +298,8 @@
       "SUPPLIER_NAME_REQUIRED": "«{{code}}» barkodu için tedarikçi seçilmedi.",
       "SUPPLIER_DUPLICATE": "«{{name}}» bu kartta zaten var.",
       "TOO_MANY_SUPPLIERS": "Bir kartta en fazla {{max}} tedarikçi olabilir.",
-      "MANUFACTURER_BARCODE_TAKEN": "Üretici barkodu «{{code}}» zaten «{{name}}» kartında — bir üretici barkodu yalnızca bir ürüne ait olabilir."
+      "MANUFACTURER_BARCODE_TAKEN": "Üretici barkodu «{{code}}» zaten «{{name}}» kartında — bir üretici barkodu yalnızca bir ürüne ait olabilir.",
+      "RECEIPT_UNDO_INVALID": "Bu mal kabulü geri alınamaz — sipariş veya kayıt değişmiş."
     },
     "settings": {
       "title": "Depo ayarları",

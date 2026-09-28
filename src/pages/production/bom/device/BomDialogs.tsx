@@ -203,7 +203,7 @@ export const InsertTemplateDialog = ({
                 ) : (
                     <div className="ofi-bom-pickpanel__empty">
                         <b>{t('productionBom.pick.empty')}</b>
-                        <button type="button" className="ofi-bom-btn is-small ofi-nosize" onClick={() => navigate('/production/bom-templates')}>
+                        <button type="button" className="ofi-bom-btn is-small ofi-nosize" onClick={() => navigate('/production/templates/bom')}>
                             <Settings2 />
                             {t('productionBom.pick.manage')}
                         </button>

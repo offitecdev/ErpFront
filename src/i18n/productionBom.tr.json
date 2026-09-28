@@ -1,7 +1,11 @@
 {
   "nav": {
     "productionBomTemplates": "BOM şablonları",
-    "productionSettings": "Üretim ayarları"
+    "productionSettings": "Üretim ayarları",
+    "productionPurchasing": "Satın alma",
+    "productionCosting": "Kalkülasyon",
+    "productionTemplates": "Şablonlar",
+    "productionSettingsMenu": "Ayarlar"
   },
   "productionBom": {
     "common": {
@@ -61,7 +65,8 @@
       "minimum": "Min. alış",
       "order": "Sipariş",
       "quantity": "Miktar",
-      "note": "Not"
+      "note": "Not",
+      "received": "Gelen"
     },
     "templates": {
       "title": "BOM şablonları",
@@ -235,7 +240,8 @@
       "saved": "Kaydedildi",
       "saveFirst": "Önce kaydedin",
       "invalidQuantity": "Her satırın miktarı 0'dan büyük olmalı.",
-      "unsavedText": "{{number}} içindeki değişiklikler kaydedilmedi. Kaydetmeden çıkarsanız kaybolur."
+      "unsavedText": "{{number}} içindeki değişiklikler kaydedilmedi. Kaydetmeden çıkarsanız kaybolur.",
+      "confirmedQty": "{{count}} onaylı"
     },
     "wizard": {
       "title": "Sipariş oluştur",
@@ -493,7 +499,12 @@
       "REVISION_NOT_FOUND": "Bu revizyon bulunamadı.",
       "REASON_REQUIRED": "Revizyon sebebi zorunludur.",
       "REVISION_NO_CHANGES": "Revizyonda değişiklik yok — önce satırları değiştirin ya da revizyonu iptal edin.",
-      "REVISION_CONFLICT": "BOM bu arada değişti — sayfayı yenileyin."
+      "REVISION_CONFLICT": "BOM bu arada değişti — sayfayı yenileyin.",
+      "KIND_INVALID": "Talep türü geçersiz",
+      "NOT_FOUND": "Bulunamadı",
+      "REQUEST_NOT_FOUND": "Talep bulunamadı",
+      "REQUEST_IN_PROGRESS": "Satın alma bu talep üzerinde çalışıyor — geri çekilemez",
+      "REQUEST_MISMATCH": "Talep bu işleme ait değil"
     },
     "tasks": {
       "title": "Görevler",
@@ -655,7 +666,252 @@
         "CANCEL": "İptal görüşülecekti",
         "KEEP": "Olduğu gibi bırakıldı"
       },
-      "orderPill": "Sipariş Rev.{{revision}}"
+      "orderPill": "Sipariş Rev.{{revision}}",
+      "openOrder": "Siparişi aç",
+      "changePdf": "Revizyon PDF'i (Rev.{{revision}})",
+      "changePdfTitle": "Tedarikçiye giden değişiklik belgesi: yalnızca Rev.{{revision}} ile değişen pozisyonlar"
+    },
+    "process": {
+      "title": "Süreç",
+      "titleMain": "Süreç · tüm alt BOM'lar",
+      "now": "Şu an: {{step}}",
+      "allDone": "Süreç tamamlandı",
+      "remaining_one": "Sonra {{count}} adım kaldı",
+      "remaining_other": "Sonra {{count}} adım kaldı",
+      "lastStep": "Son adım",
+      "optional": "İsteğe bağlı",
+      "skipped": "Atlandı",
+      "step": {
+        "list": "Liste",
+        "price": "Fiyat talebi",
+        "approve": "BOM onayı",
+        "orderRequest": "Satın alma talebi",
+        "purchasing": "Satın alma",
+        "confirmed": "Tedarikçi onayı",
+        "received": "Mal kabul · rezerve",
+        "completed": "BOM tamamlandı",
+        "consumed": "Stoktan düşüldü"
+      },
+      "hint": {
+        "list": "Satırlar eklenir, miktarlar belirlenir",
+        "price": "İsteğe bağlı: onaydan önce satın almadan fiyat istenir",
+        "approve": "BOM onaylanır — geri dönüş yok, değişiklik revizyonla",
+        "orderRequest": "Eksik kalan satırlar satın almaya talep olarak gönderilir",
+        "purchasing": "Muhasebe siparişleri oluşturur — eksik kalmayınca tamam",
+        "confirmed": "Tedarikçi siparişleri onaylar",
+        "received": "Mallar gelir, en erken teslim tarihli projeye rezerve edilir",
+        "completed": "Her şey rezerve — BOM tamamlandı",
+        "consumed": "Proje bitince rezerveler stoktan düşülür"
+      },
+      "open": "Süreci göster"
+    },
+    "procurement": {
+      "priceButton": "Fiyat talebi iste",
+      "priceButtonTitle": "Satın almadan fiyat iste — tedarikçi ve fiyatları satın alma belirler",
+      "orderButton": "Satın alma talebi",
+      "orderButtonTitle": "Eksik kalanları satın almaya talep olarak gönder",
+      "allRequested": "Eksiklerin hepsi satın almada",
+      "dialogTitle": {
+        "PRICE": "Fiyat talebi iste",
+        "ORDER": "Satın alma talebi gönder"
+      },
+      "dialogSubtitle": {
+        "PRICE": "{{number}} · satın almaya talep olarak gider",
+        "ORDER": "{{number}} · eksik kalanlar satın almaya gider"
+      },
+      "dialogHint": {
+        "PRICE": "Sadece ürün ve miktar seçilir. Tedarikçiyi ve fiyatları Satın alma (muhasebe) belirler; talep Üretim › Satın alma sayfasına düşer.",
+        "ORDER": "Stokta ve siparişte olmayan kadarı talep edilir — daha azı olmaz. Tedarikçi ve fiyatları Satın alma belirler."
+      },
+      "send": {
+        "PRICE": "Fiyat talebini gönder",
+        "ORDER": "Satın alma talebini gönder"
+      },
+      "selected": "{{count}} satır seçili",
+      "all": "Tümünü seç",
+      "quantity": "Talep miktarı",
+      "pending": "{{number}} satın almada bekliyor",
+      "minQty": "En az {{min}}",
+      "nothing": {
+        "PRICE": "Bu BOM'da satır yok",
+        "ORDER": "Eksik satır yok — her şey stokta veya siparişte"
+      },
+      "note": "Satın almaya not",
+      "notePlaceholder": "İsteğe bağlı — örn. aciliyet, tercih edilen marka",
+      "created": {
+        "PRICE": "Fiyat talebi {{number}} satın almaya gönderildi",
+        "ORDER": "Satın alma talebi {{number}} gönderildi"
+      },
+      "title": "Satın alma talepleri",
+      "titleMeta": "Tedarikçi ve fiyatları Satın alma takip eder",
+      "status": {
+        "OPEN": "Bekliyor",
+        "IN_PROGRESS": "Satın almada",
+        "DONE": "Tamamlandı",
+        "CANCELLED": "İptal"
+      },
+      "kind": {
+        "PRICE": "Fiyat talebi",
+        "ORDER": "Satın alma talebi"
+      },
+      "linesCount_one": "{{count}} satır",
+      "linesCount_other": "{{count}} satır",
+      "progressTitle": {
+        "PRICE": "Fiyatı istenen satırlar",
+        "ORDER": "Siparişi verilen satırlar"
+      },
+      "progress": {
+        "PRICE": "{{done}}/{{total}} fiyat istendi",
+        "ORDER": "{{done}}/{{total}} sipariş verildi"
+      },
+      "withdraw": "Geri çek",
+      "withdrawn": "{{number}} geri çekildi",
+      "fromRequestNote": "Satın alma talebindeki miktar"
+    },
+    "goodsIn": {
+      "title": "Gelen mallar",
+      "meta": "Toplam {{total}} — en erken teslim tarihli projeye ayrılanlar",
+      "date": "Tarih",
+      "quantity": "Miktar",
+      "source": "Kaynak",
+      "fromStock": "Depo girişi",
+      "serialsOf": "{{name}} — seri numaraları",
+      "serialsTitle": "Gelen seri numaraları",
+      "bom": "BOM",
+      "by": "Kabul eden",
+      "serialCount_one": "{{count}} seri numarası",
+      "serialCount_other": "{{count}} seri numarası",
+      "reserved": "Bu BOM'da rezerve",
+      "moved": "Artık bu satırda değil",
+      "allocTitle": "Mal kabul edildi",
+      "allocSubtitle": "Mallar en erken teslim tarihli projelere otomatik ayrıldı",
+      "freeStock": "Serbest stok",
+      "freeStockHint": "Bekleyen ihtiyaç yok — depoda serbest"
+    },
+    "purchasing": {
+      "title": "Satın alma",
+      "back": "Talepler",
+      "search": "Talep, proje, ürün, tedarikçi ara",
+      "sideNote": "BOM'lardan gelen talepler burada. Tedarikçi ve fiyatları yalnızca muhasebe ve yöneticiler görür.",
+      "empty": {
+        "feed": {
+          "all": "Henüz talep yok",
+          "open": "Açık talep yok",
+          "done": "Tamamlanan talep yok",
+          "cancelled": "İptal edilen talep yok"
+        }
+      },
+      "emptyHint": {
+        "feed": "BOM'da «Fiyat talebi iste» veya «Satın alma talebi» ile gönderilen talepler burada tek listede görünür; fiyat talepleri ve siparişler talebin içinde işlem olarak durur."
+      },
+      "bomDocuments": "BOM işlemleri",
+      "createRequests": "Fiyat talebi oluştur",
+      "createOrders": "Sipariş oluştur",
+      "readOnly": "Görüntüleme yetkiniz var — işlem yapmak muhasebe/yönetici yetkisi ister.",
+      "fact": {
+        "project": "Proje",
+        "delivery": "Teslim tarihi",
+        "deliveryHint": "Öncelik: en erken teslim",
+        "bom": "BOM",
+        "requested": "Talep"
+      },
+      "lines": "Talep edilen satırlar",
+      "missingNow": "Şu an eksik",
+      "state": "Durum",
+      "lineAsked": "Fiyat istendi",
+      "lineOrdered": "Sipariş verildi",
+      "lineOpen": "Bekliyor",
+      "received": "Teslim alınan",
+      "noRequestsYet": "Henüz fiyat talebi oluşturulmadı",
+      "noOrdersYet": "Henüz sipariş oluşturulmadı",
+      "action": {
+        "close": "Tamamlandı say",
+        "reopen": "Yeniden aç",
+        "cancel": "İptal et",
+        "closeDone": "{{number}} tamamlandı",
+        "reopenDone": "{{number}} yeniden açıldı",
+        "cancelDone": "{{number}} iptal edildi",
+        "closeTitle": "{{number}} tamamlandı sayılsın mı?",
+        "cancelTitle": "{{number}} iptal edilsin mi?",
+        "closeText": "Talep açık listeden çıkar; yapılan işlemler aynen kalır.",
+        "cancelText": "Talep iptal edilir; BOM'da iptal olarak görünür. Yapılan işlemler silinmez."
+      },
+      "statusFilter": "Durum",
+      "status": {
+        "open": "Açık",
+        "done": "Tamamlanan",
+        "cancelled": "İptal",
+        "all": "Tümü"
+      },
+      "costingHint": "Planlanan ve gerçek malzeme maliyeti",
+      "revisionNoOrders": "Hiçbir siparişi etkilemedi",
+      "lastActivity": "Son işlem",
+      "pageRange": "{{from}}–{{to}} / {{total}}",
+      "prevPage": "Önceki sayfa",
+      "nextPage": "Sonraki sayfa",
+      "revisionOrders_one": "{{count}} siparişi etkiledi",
+      "revisionOrders_other": "{{count}} siparişi etkiledi",
+      "documentsOf": {
+        "PRICE": "Bu talepteki fiyat talepleri",
+        "ORDER": "Bu talepteki siparişler"
+      },
+      "confirmedOf": "{{done}}/{{total}} onaylandı",
+      "receiveNow": "Mal kabul",
+      "requestsSent": "{{count}} fiyat talebi"
+    },
+    "costing": {
+      "title": "Kalkülasyon",
+      "search": "Proje ara",
+      "projects": "Projeler",
+      "empty": "Henüz BOM'u olan proje yok",
+      "emptyHint": "Bir cihazda BOM oluşturulunca malzeme maliyeti burada otomatik hesaplanır.",
+      "plan": "Planlanan malzeme maliyeti",
+      "forecast": "Gerçek maliyet (tahmini)",
+      "diff": "Plan ile fark",
+      "missingPrice_one": "{{count}}/{{total}} kalemde alış fiyatı yok",
+      "missingPrice_other": "{{count}}/{{total}} kalemde alış fiyatı yok",
+      "allPriced": "{{total}} kalemin hepsinde alış fiyatı var",
+      "actualLines_one": "{{count}}/{{total}} kalem gerçek sipariş fiyatlı",
+      "actualLines_other": "{{count}}/{{total}} kalem gerçek sipariş fiyatlı",
+      "diffHint": "{{percent}} — gerçek fiyatı olan kalemlerde",
+      "noCompare": "Karşılaştırma için onaylı sipariş fiyatı bekleniyor",
+      "projectTotal": "Proje toplamı",
+      "deviceTotal": "Makine toplamı",
+      "planShort": "Plan",
+      "forecastShort": "Gerçek (tahmini)",
+      "diffShort": "Fark",
+      "item": "Malzeme",
+      "quantity": "Miktar",
+      "unitPrice": "Alış fiyatı",
+      "planTotal": "Plan toplam",
+      "actualTotal": "Gerçek toplam",
+      "fromQuote": "teklif",
+      "fromQuoteTitle": "Kartta alış fiyatı yok — en uygun fiyat teklifinden",
+      "noPrice": "fiyat yok",
+      "actualUnitTitle": "Sipariş birim fiyatı: {{price}}",
+      "position": "Poz. {{number}}",
+      "note": "Plan: Depo kartındaki alış fiyatı (yoksa en uygun fiyat teklifi). Gerçek: onaylı siparişlerdeki fiyat. Tahmini gerçek: gerçek fiyat, yoksa plan. Döviz çevrilmez.",
+      "sideNote": "Fiyatları yalnızca muhasebe ve yöneticiler görür."
+    },
+    "orderDoc": {
+      "label": "Belge",
+      "order": "Sipariş",
+      "revision": "Revizyon {{n}}"
+    },
+    "hub": {
+      "settingsTab": "Üretim ayarları",
+      "accessTab": "Yetkilendirme",
+      "access": {
+        "templatesTitle": "Şablonları kimler görür",
+        "templatesIntro": "Görevlendirme şablonları ve BOM şablonları sekmeleri yalnızca burada açılan rollerde görünür. Administrator her zaman hepsini görür.",
+        "role": "Rol",
+        "always": "Her zaman",
+        "people_one": "{{count}} kişi",
+        "people_other": "{{count}} kişi",
+        "note": "Değişiklik, rolü taşıyan kişilerde bir sonraki girişte ya da sayfa yenilendiğinde geçerli olur. Yeni rol ve diğer sayfa yetkileri için «Rolleri yönet».",
+        "manageRoles": "Rolleri yönet",
+        "saveFailed": "«{{role}}» kaydedilemedi"
+      }
     }
   }
 }

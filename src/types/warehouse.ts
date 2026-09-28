@@ -188,6 +188,39 @@ export interface WarehouseSerialInput {
     serialNumber: string;
     productionProjectId?: string | null;
     productionItemId?: string | null;
+    /** «Ürün ekle»: das Stück ist Wareneingang (28.09.2026) — `code` = der Barcode, der die Karte nannte. */
+    goodsIn?: boolean;
+    code?: string | null;
+}
+
+/**
+ * «Ürün ekle» = Wareneingang (28.09.2026): eine bestätigte BOM-Bestellung
+ * (MAL KABULDE), der eine Buchung gutgeschrieben wurde — der früheste
+ * Liefertermin des Projekts zuerst. Spiegel von Erp_Backend
+ * `shared/warehouseGoodsIn.ts`.
+ */
+export interface WarehouseGoodsInCredit {
+    /** Kennung der Buchung an dieser Bestellung — «Geri al» nennt sie. */
+    receiptId: string;
+    purchaseOrderId: string;
+    referenceNumber: string;
+    quantity: number;
+    serials: string[];
+    /** Die Positionen dieser Karte in der Bestellung: bestellt / jetzt da. */
+    ordered: number;
+    received: number;
+    completed: boolean;
+    projectNumber: string | null;
+    projectName: string | null;
+    deviceName: string | null;
+}
+
+export interface WarehouseGoodsIn {
+    credits: WarehouseGoodsInCredit[];
+    /** Stück, auf die keine Bestellung wartete — freier Bestand. */
+    free: number;
+    /** Wohin die eben gelesenen Seriennummern reserviert wurden. */
+    reservations: Array<{ serialNumber: string; projectNumber: string | null; projectName: string | null; deviceName: string | null }>;
 }
 
 export interface WarehouseAvailability {

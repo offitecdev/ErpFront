@@ -185,7 +185,7 @@
       "title": "Produkt einbuchen",
       "subtitle": "Barcode scannen — das Produkt wird erkannt und sofort eingebucht.",
       "waiting": "Warte auf einen Barcode",
-      "waitingHint": "Produktbarcode, Herstellerbarcode, ERP-Code oder Seriennummer scannen. Jeder Scan bucht +1 ein.",
+      "waitingHint": "Produkt-Barcode, Herstellerbarcode, ERP-Code oder Seriennummer scannen. Jeder Scan zählt +1; wartet eine bestätigte Bestellung auf das Produkt, wird er als ihr Wareneingang gebucht.",
       "looking": "Suche…",
       "notFound": "Zu diesem Barcode gibt es keine Produktkarte.",
       "createCard": "Karte anlegen",
@@ -215,7 +215,18 @@
       "addedCount_one": "{{count}} eingebucht",
       "addedCount_other": "{{count}} eingebucht",
       "total_one": "{{count}} Stück in diesem Fenster eingebucht",
-      "total_other": "{{count}} Stück in diesem Fenster eingebucht"
+      "total_other": "{{count}} Stück in diesem Fenster eingebucht",
+      "qtyLabel": "Eingebuchte Menge — ändern und Enter drücken",
+      "receipt": {
+        "line": "{{quantity}} Stk. als Wareneingang gebucht",
+        "progress": "{{received}}/{{ordered}} geliefert",
+        "completed": "Bestellung vollständig",
+        "free": "{{quantity}} Stk. in den freien Bestand",
+        "undo": "Rückgängig",
+        "undoTitle": "Diesen Wareneingang samt Lagerbuchung zurücknehmen"
+      },
+      "orderChip": "{{quantity}} Stk.",
+      "orderChipTitle": "Aus diesem Fenster in diese Bestellung eingegangene Menge"
     },
     "serials": {
       "title": "Seriennummern",
@@ -297,7 +308,8 @@
       "SUPPLIER_NAME_REQUIRED": "Zum Barcode «{{code}}» ist kein Lieferant gewählt.",
       "SUPPLIER_DUPLICATE": "«{{name}}» steht schon auf dieser Karte.",
       "TOO_MANY_SUPPLIERS": "Eine Karte hat höchstens {{max}} Lieferanten.",
-      "MANUFACTURER_BARCODE_TAKEN": "Der Herstellerbarcode «{{code}}» gehört schon zu «{{name}}» — ein Herstellerbarcode gehört zu genau einem Produkt."
+      "MANUFACTURER_BARCODE_TAKEN": "Der Herstellerbarcode «{{code}}» gehört schon zu «{{name}}» — ein Herstellerbarcode gehört zu genau einem Produkt.",
+      "RECEIPT_UNDO_INVALID": "Dieser Wareneingang lässt sich nicht mehr zurücknehmen — Bestellung oder Protokoll haben sich geändert."
     },
     "settings": {
       "title": "Depo-Einstellungen",

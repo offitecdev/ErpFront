@@ -43,8 +43,6 @@ const RETIRED_PAGE_KEYS: Readonly<Record<string, string>> = {
     'personnel.approvals': 'personnel.requestsIncoming',
     'personnel.incoming': 'personnel.requestsIncoming',
     'sales.invoices': 'accounting.invoices',
-    // Pano modelleri artık Pano Merkezi içindeki ikinci sekmedir.
-    'production.panelModels': 'production.panels',
 };
 
 /**
@@ -83,16 +81,16 @@ const PAGE_LEVEL_FALLBACKS: Readonly<Record<string, string>> = {
     // Die Produktion liest die Lieferantenbestellungen — wer sie führt,
     // sieht die Produktionsaufträge (19.09.2026).
     'production.orders': 'inventory.orders',
-    'production.lines': 'inventory.orders',
     // Das Depo gehört zur Produktion — wer ihre Projekte sieht, sieht auch
     // die Produktkarten (26.09.2026).
     'warehouse.products': 'production.orders',
     'warehouse.settings': 'production.orders',
-    // Die Görevlendirme-Vorlagen gehören zur Produktion (26.09.2026).
-    'production.taskTemplates': 'production.orders',
-    // BOM-Vorlagen und Produktionseinstellungen (27.09.2026) ebenso.
-    'production.bomTemplates': 'production.orders',
+    // Die Vorlagen (Görevlendirme + BOM) erben seit 28.09.2026 nichts mehr —
+    // nur Rollen, die sie tragen (Makine / Elektrik Mühendisi), und die Administratorrolle.
     'production.settings': 'production.orders',
+    // «Satın alma» (27.09.2026 abends) gehört der Buchhaltung.
+    'production.purchasing': 'accounting.invoices',
+    'production.costing': 'accounting.invoices',
 };
 
 /**

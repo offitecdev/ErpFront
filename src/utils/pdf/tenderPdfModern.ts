@@ -35,6 +35,13 @@ export interface TenderPdfData {
     validUntil?: string | null;
     customerName: string;
     customerAddress?: string | null;
+    /**
+     * PROJEKT- ODER LIEFERADRESSE (Vorgabe Samet 28.09.2026: «sadece teslim
+     * veya projeden biri, hangisi seçildiyse o olmalı — teklifte de
+     * irsaliyede de»). Genau EINE, die auf der Offerte gewählte — sie steht
+     * unter der Anschrift des Kunden. Leer: nur die Kundenanschrift.
+     */
+    siteAddress?: { kind: 'INSTALLATION' | 'DELIVERY'; address: string } | null;
     customerEmail?: string | null;
     customerPhone?: string | null;
     customerTaxNumber?: string | null;
@@ -186,6 +193,9 @@ export interface PdfStrings {
     offerNumber: string;
     kommission: string;
     referenz: string;
+    /** Überschrift der gewählten Zusatzanschrift unter dem Kunden. */
+    siteAddressInstallation: string;
+    siteAddressDelivery: string;
     offerDate: string;
     validUntil: string;
     /**
@@ -282,6 +292,8 @@ const I18N: Record<PdfLang, PdfStrings> = {
         offerNumber: 'Teklif Numarası :',
         kommission: 'Komisyon:',
         referenz: 'Referans:',
+        siteAddressInstallation: 'Proje adresi',
+        siteAddressDelivery: 'Teslimat adresi',
         offerDate: 'Teklif Tarihi:',
         validUntil: 'Teklif Bitiş Tarihi:',
         seller: 'Salesperson:',
@@ -342,6 +354,8 @@ const I18N: Record<PdfLang, PdfStrings> = {
         offerNumber: 'Angebots-Nr. :',
         kommission: 'Kommission:',
         referenz: 'Referenz:',
+        siteAddressInstallation: 'Projektadresse',
+        siteAddressDelivery: 'Lieferadresse',
         offerDate: 'Angebotsdatum:',
         validUntil: 'Gültig bis:',
         seller: 'Salesperson:',
@@ -402,6 +416,8 @@ const I18N: Record<PdfLang, PdfStrings> = {
         offerNumber: 'Offer No. :',
         kommission: 'Commission:',
         referenz: 'Reference:',
+        siteAddressInstallation: 'Project address',
+        siteAddressDelivery: 'Delivery address',
         offerDate: 'Offer Date:',
         validUntil: 'Valid Until:',
         seller: 'Salesperson:',
@@ -1255,6 +1271,10 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
         addrY = drawAddressBlockLines(doc, data.customerAddress, addrX, addrY, addrW, 10, 4.9);
     }
     // Müşteri e-postası / telefonu bilinçli olarak PDF'e yazılmaz.
+
+    // Projekt- ODER Lieferadresse — nur die auf der Offerte gewählte, nie
+    // beide (28.09.2026). Kleine Überschrift, darunter die Anschrift.
+    addrY = drawSiteAddress(doc, data.siteAddress, L, addrX, addrY, addrW);
 
     // ── Başlık + kısa kırmızı vurgu + giriş metni ────────────────────────────
     let yTitle = Math.max(addrY, cardY + cardH) + 16;
@@ -2513,6 +2533,64 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
         writeLines(debtorLines, infoX, iy + 3.5);
     }
 }
+
+/**
+ * Die EINE Zusatzanschrift unter dem Kunden: Überschrift in Versalien (klein,
+ * grau), darunter die Anschrift. Gibt das y NACH dem Block zurück; ohne
+ * Anschrift bleibt y unverändert.
+ */
+function drawSiteAddress(
+    doc: jsPDF,
+    site: TenderPdfData['siteAddress'],
+    L: PdfStrings,
+    x: number,
+    y: number,
+    width: number,
+): number {
+    const address = String(site?.address || '').trim();
+    if (!site || !address) return y;
+    const label = site.kind === 'DELIVERY' ? L.siteAddressDelivery : L.siteAddressInstallation;
+    let cursor = y + 2.6;
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(7.3);
+    doc.setTextColor(...C.LABEL);
+    doc.text(label.toUpperCase(), x, cursor, { charSpace: 0.15 });
+    cursor += 4.6;
+    doc.setFontSize(9.5);
+    doc.setTextColor(...C.TEXT);
+    return drawAddressBlockLines(doc, address, x, cursor, width, 9.5, 4.6);
+}
+
+/**
+ * ── MARKENGERÜST FÜR WEITERE BELEGE (28.09.2026) ───────────────────────────
+ * Der Lieferschein (`deliveryNotePdf.ts`) trägt denselben Kopf und Fuss wie die
+ * Offerte — Logo, Dalga, Fusszeile, Schrift und Farben. Er holt die Bausteine
+ * von HIER, damit es eine Quelle bleibt; an der Offerte selbst ändert das
+ * nichts (Vorgabe Samet: die Offertvorlage bleibt, wie sie ist).
+ */
+export const brandKit = {
+    FONT,
+    C,
+    PAGE_W,
+    PAGE_H,
+    ML,
+    MR,
+    CONTENT_W,
+    CONTENT_BOTTOM,
+    LOGO_X,
+    LOGO_Y,
+    WAVE_W,
+    WAVE_H,
+    WAVE_CENTER_Y,
+    CONTACT_PHONE,
+    CONTACT_EMAIL,
+    CONTACT_WEB,
+    registerFonts,
+    loadLogo,
+    loadHeaderWave,
+    drawPageFooter,
+    drawSiteAddress,
+};
 
 function downloadPdf(bytes: Uint8Array, filename: string) {
     const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
