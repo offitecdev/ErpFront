@@ -97,6 +97,8 @@ export const TASK_LIMITS = {
     stageName: 60,
     subtasks: 30,
     subtaskName: 200,
+    checklistItems: 30,
+    checklistItemText: 200,
 } as const;
 
 const SUM_TOLERANCE = 0.01;
@@ -137,10 +139,11 @@ export const stageNameTaken = (section: TaskSection, name: string, exceptKey?: s
 
 const randomPart = (): string => Math.random().toString(36).slice(2, 10).padEnd(8, '0');
 
-/** Kennungen eigener Bereiche («s-…», passt in `area` VARCHAR(16)), Stufen («g-…») und Unteraufgaben («u-…»). */
+/** Kennungen eigener Bereiche («s-…», passt in `area` VARCHAR(16)), Stufen («g-…»), Unteraufgaben («u-…») und Punkte der Freigabe-Checkliste («c-…»). */
 export const newSectionKey = (): string => `s-${randomPart()}`;
 export const newStageKey = (): string => `g-${randomPart()}`;
 export const newSubtaskId = (): string => `u-${randomPart()}`;
+export const newChecklistItemId = (): string => `c-${randomPart()}`;
 
 /* ── Adresse ───────────────────────────────────────────────────────────── */
 
@@ -220,6 +223,26 @@ export const checkTemplate = (sections: readonly TaskSection[], tasks: readonly 
     return { valid: sharesOk && hasTasks && areas.every((entry) => entry.ok), sharesSum, sharesOk, areas };
 };
 
+/**
+ * Was an einer Vorlage (oder der Kopie am Gerät) nicht aufgeht — ein Satz je
+ * Problem, für den Hinweis «unvollständig». Leer, wenn alles stimmt.
+ */
+export const checkProblems = (sections: readonly TaskSection[], taskCount: number, check: TaskTemplateCheck): string[] => {
+    if (!sections.length) return [t('productionTasks.check.noSections')];
+    const problems: string[] = [];
+    if (!taskCount) problems.push(t('productionTasks.check.noTasks'));
+    if (!check.sharesOk) problems.push(t('productionTasks.check.shares', { sum: formatPercent(check.sharesSum) }));
+    for (const entry of check.areas) {
+        if (entry.ok) continue;
+        const target = sections.find((row) => row.key === entry.area);
+        const label = target ? sectionLabel(target) : entry.area;
+        problems.push(entry.taskCount
+            ? t('productionTasks.check.weights', { area: label, sum: formatPercent(entry.weightSum) })
+            : t('productionTasks.check.noAreaTasks', { area: label, share: formatPercent(entry.share) }));
+    }
+    return problems;
+};
+
 /** Die Aufgaben eines Bereichs, nach Stufen gruppiert (in der Reihenfolge des Weges). */
 export const tasksByStage = <T extends Pick<ProductionTask, 'area' | 'stage'>>(tasks: readonly T[], section: TaskSection): Map<TaskStage, T[]> => {
     const groups = new Map<TaskStage, T[]>();
@@ -280,6 +303,21 @@ export const pendingApprovals = (tasks: ReadonlyArray<{ subtasks: ReadonlyArray<
 
 /** Fertig melden (erledigt bzw. wartet auf Freigabe) geht mit «Document» erst mit einem PDF. */
 export const needsPdfFirst = (subtask: TaskSubtask): boolean => subtask.requiresDocument && !hasSubtaskDocument(subtask);
+
+/**
+ * Kommt eine Pflicht dazu («Document»/«Approval» neu, ein Punkt der Checkliste
+ * neu oder anders)? Dann beginnt die Unteraufgabe beim Speichern offen von
+ * vorn — wortgleich mit `requirementsAdded` des Servers (28.09.2026).
+ */
+export const requirementsAdded = (
+    before: Pick<TaskSubtask, 'requiresDocument' | 'requiresApproval' | 'approvalChecklist'>,
+    after: Pick<TaskSubtask, 'requiresDocument' | 'requiresApproval' | 'approvalChecklist'>,
+): boolean => {
+    if (after.requiresDocument && !before.requiresDocument) return true;
+    if (after.requiresApproval && !before.requiresApproval) return true;
+    const earlier = new Map(before.approvalChecklist.map((item) => [item.id, item.text]));
+    return after.approvalChecklist.some((item) => earlier.get(item.id) !== item.text.replace(/\s+/g, ' ').trim());
+};
 
 /** Was an eine Unteraufgabe darf — wie der Server: nur PDF, höchstens 25 MB. */
 export const SUBTASK_FILE_ACCEPT = 'application/pdf';

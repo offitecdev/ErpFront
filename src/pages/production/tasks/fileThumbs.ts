@@ -24,7 +24,8 @@ const remember = (key: string, value: Promise<string | null>) => {
 };
 
 let pdfjsReady: Promise<typeof import('pdfjs-dist')> | null = null;
-const loadPdfjs = () => {
+/** PDF.js — erst geladen, wenn wirklich ein PDF zu zeigen ist (auch die Prüfansicht der Dateien nutzt es). */
+export const loadPdfjs = () => {
     pdfjsReady ??= Promise.all([import('pdfjs-dist'), import('pdfjs-dist/build/pdf.worker.min.mjs?url')])
         .then(([pdfjs, worker]) => {
             pdfjs.GlobalWorkerOptions.workerSrc = worker.default;

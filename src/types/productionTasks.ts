@@ -51,7 +51,8 @@ export interface TaskSection {
 
 /** Der Stand einer Aufgabe am Gerät (28.09.2026); in der Vorlage immer TODO. */
 /** PENDING = fertig, wartet auf die Freigabe der Verwaltung (28.09.2026, nur mit «Approval»). */
-export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'PENDING' | 'DONE';
+/** REVISION (28.09.2026) = von der Verwaltung zur Überarbeitung zurückgegeben (nur an Unteraufgaben). */
+export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'REVISION' | 'PENDING' | 'DONE';
 
 /** Ein Kalendertag `YYYY-MM-DD`. */
 export type TaskDay = string;
@@ -63,6 +64,12 @@ export type TaskDay = string;
 /** Eine Datei an einer Unteraufgabe am Gerät (28.09.2026). */
 export interface TaskSubtaskFile {
     id: string;
+    /** Fassungen derselben Datei (28.09.2026): gleiche `groupId` (die Kennung der ersten Fassung). */
+    groupId: string;
+    /** 1, 2, 3 … — die höchste Fassung einer Gruppe ist die aktuelle. */
+    version: number;
+    /** Was sich in dieser Fassung geändert hat (ab Fassung 2 Pflicht); null bei der ersten. */
+    revisionNote: string | null;
     name: string;
     type: string;
     size: number;
@@ -70,6 +77,12 @@ export interface TaskSubtaskFile {
     uploadedByName: string | null;
     /** Zeitpunkt (ISO). */
     uploadedAt: string;
+}
+
+/** Ein Punkt der Freigabe-Checkliste einer Unteraufgabe (28.09.2026). */
+export interface TaskSubtaskChecklistItem {
+    id: string;
+    text: string;
 }
 
 export interface TaskSubtask {
@@ -85,6 +98,8 @@ export interface TaskSubtask {
     dueDate: TaskDay | null;
     requiresDocument: boolean;
     requiresApproval: boolean;
+    /** Die Freigabe-Checkliste (nur mit «Approval», sonst leer). */
+    approvalChecklist: TaskSubtaskChecklistItem[];
     /** Dateien am Gerät (in der Vorlage keine). */
     files: TaskSubtaskFile[];
     /** Abgeschlossen («Complete the task», die Verwaltung) — danach gesperrt. */
@@ -92,6 +107,21 @@ export interface TaskSubtask {
     completedByName: string | null;
     completedAt: string | null;
     completionNote: string | null;
+    /** Zurück zur Überarbeitung («Request revision», die Verwaltung) — der Abschluss leert es. */
+    revisionById: string | null;
+    revisionByName: string | null;
+    revisionAt: string | null;
+    revisionNote: string | null;
+    /** Jede Rückgabe zur Überarbeitung, älteste zuerst — bleibt auch nach der Freigabe (28.09.2026). */
+    revisionHistory: TaskSubtaskRevisionRequest[];
+}
+
+/** Eine Rückgabe zur Überarbeitung (28.09.2026): wer, wann (ISO), was zu ändern war. */
+export interface TaskSubtaskRevisionRequest {
+    byId: string | null;
+    byName: string | null;
+    at: string;
+    note: string | null;
 }
 
 export interface ProductionTask {

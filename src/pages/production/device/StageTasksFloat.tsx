@@ -10,7 +10,7 @@ import { StageCard } from '../tasks/StageCard';
 import type { SubtaskActions } from '../tasks/subtaskFileModel';
 import { StageFilesCard } from './StageFilesCard';
 import { stageFilesOf } from './stageFileModel';
-import { formatPercent, initialsOf, roundPercent, stageLabel } from '../tasks/taskModel';
+import { initialsOf, stageLabel } from '../tasks/taskModel';
 
 /** Bleibt die Karte offen, wenn man die Stufe wechselt? — solange das Fenster lebt. */
 const OPEN_KEY = 'ofi:ptk-stage-float-open';
@@ -154,7 +154,6 @@ export const StageTasksFloat = ({
     const files = showFiles ? stageFilesOf(tasks) : [];
 
     const stageName = stageLabel(stage);
-    const weight = roundPercent(tasks.reduce((sum, task) => sum + task.weight, 0));
     const people = [...new Set(tasks.flatMap((task) => task.assigneeIds))];
     const faces = meId && people.includes(meId) ? [meId, ...people.filter((id) => id !== meId)] : people;
     const mine = meId ? tasks.filter((task) => task.assigneeIds.includes(meId)).length : 0;
@@ -203,7 +202,8 @@ export const StageTasksFloat = ({
                         <span className="ofi-ptk-float__text">
                             <b>{t('productionTasks.stageFloat.title')}</b>
                             <small>
-                                {t('productionTasks.stageFloat.summary', { count: tasks.length, weight: formatPercent(weight) })}
+                                {/* Ohne das Gewicht der Stufe (28.09.2026: am Gerät immer 100 %). */}
+                                {t('productionTasks.stageFloat.summary', { count: tasks.length })}
                                 {mine > 0 && <em>{t('productionTasks.stageFloat.mine', { count: mine })}</em>}
                             </small>
                         </span>

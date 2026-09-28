@@ -3,7 +3,7 @@ import { Check, ListChecks } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
 
-import { AdminGlyph, FlagGlyph, StepChevron } from './deviceGlyphs';
+import { FlagGlyph, StepChevron } from './deviceGlyphs';
 import { deviceStageLabel, stageNumber, type DeviceStage, type DeviceStageId } from './deviceStages';
 
 type Props = {
@@ -16,6 +16,10 @@ type Props = {
     done?: ReadonlySet<DeviceStageId>;
     /** Wie viele Unteraufgaben je Stufe auf die Freigabe warten (28.09.2026) — neben dem Namen. */
     pending?: ReadonlyMap<DeviceStageId, number>;
+    /** Gesperrte Stufen (28.09.2026): die Kopie am Gerät geht nicht auf — erst die Zuweisungen richten. */
+    locked?: ReadonlySet<DeviceStageId>;
+    /** Warum gesperrt — steht im Tipp der Stufe. */
+    lockedHint?: string;
 };
 
 /**
@@ -38,7 +42,7 @@ type Props = {
  * zeigt bei den nicht gewählten Stufen nur noch die Nummer (der Name steht im
  * Tipp). Erst wenn auch das nicht reicht (Telefon), läuft die Leiste seitlich.
  */
-export const DeviceProcessBar = ({ stages, current, onSelect, mine, done, pending }: Props) => {
+export const DeviceProcessBar = ({ stages, current, onSelect, mine, done, pending, locked, lockedHint }: Props) => {
     const listRef = useRef<HTMLDivElement>(null);
     const trackRef = useRef<HTMLDivElement>(null);
     const steps = stages.filter((stage) => !stage.finish);
@@ -96,16 +100,18 @@ export const DeviceProcessBar = ({ stages, current, onSelect, mine, done, pendin
     }, [current]);
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-        const index = stages.findIndex((stage) => stage.id === current);
-        const last = stages.length - 1;
+        // Gesperrte Stufen (28.09.2026) überspringen die Pfeiltasten.
+        const open = stages.filter((stage) => !locked?.has(stage.id));
+        const index = open.findIndex((stage) => stage.id === current);
+        const last = open.length - 1;
         const target = event.key === 'ArrowRight' ? Math.min(last, index + 1)
             : event.key === 'ArrowLeft' ? Math.max(0, index - 1)
                 : event.key === 'Home' ? 0
                     : event.key === 'End' ? last
                         : -1;
-        if (target < 0 || target === index) return;
+        if (target < 0 || target === index || !open[target]) return;
         event.preventDefault();
-        onSelect(stages[target].id);
+        onSelect(open[target].id);
         window.requestAnimationFrame(() => {
             listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
         });
@@ -113,14 +119,19 @@ export const DeviceProcessBar = ({ stages, current, onSelect, mine, done, pendin
 
     const tabProps = (stage: DeviceStage) => {
         const selected = stage.id === current;
+        const isLocked = Boolean(locked?.has(stage.id));
         return {
             id: `ofi-pdev-tab-${stage.id}`,
             role: 'tab' as const,
             type: 'button' as const,
             'aria-selected': selected,
             'aria-controls': 'ofi-pdev-panel',
+            // Gesperrt (28.09.2026): die Kopie am Gerät geht nicht auf — der Tipp sagt, warum.
+            'aria-disabled': isLocked || undefined,
+            disabled: isLocked,
+            title: isLocked && lockedHint ? `${deviceStageLabel(stage)} — ${lockedHint}` : deviceStageLabel(stage),
             tabIndex: selected ? 0 : -1,
-            onClick: () => onSelect(stage.id),
+            onClick: () => { if (!isLocked) onSelect(stage.id); },
         };
     };
 
@@ -142,7 +153,7 @@ export const DeviceProcessBar = ({ stages, current, onSelect, mine, done, pendin
                                     <StepChevron size={11} />
                                 </span>
                             )}
-                            <button {...tabProps(stage)} title={deviceStageLabel(stage)} className="ofi-pdev-steps__seg ofi-nosize">
+                            <button {...tabProps(stage)} className="ofi-pdev-steps__seg ofi-nosize">
                                 {/* Die Zuweisungen sind keine Stufe des Bereichs — ein Zeichen statt einer Nummer. */}
                                 <span
                                     className={`ofi-pdev-steps__num ${stage.adminOnly ? 'is-icon' : ''} ${done?.has(stage.id) ? 'is-done' : ''}`}
@@ -159,11 +170,6 @@ export const DeviceProcessBar = ({ stages, current, onSelect, mine, done, pendin
                                         title={t('productionTasks.stage.pendingHint', { count: pending?.get(stage.id) ?? 0 })}
                                     >
                                         {pending?.get(stage.id)}
-                                    </span>
-                                )}
-                                {stage.adminOnly && (
-                                    <span className="ofi-pdev-steps__admin" title={t('production.deviceStages.adminOnly')}>
-                                        <AdminGlyph size={12} />
                                     </span>
                                 )}
                                 {mine?.has(stage.id) && (

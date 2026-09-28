@@ -406,6 +406,7 @@ export const TaskTemplatesPage = () => {
             )}
 
             <PopupDialog
+                closeOnBackdrop={false}
                 open={confirmDelete}
                 onClose={() => { if (!deleting) setConfirmDelete(false); }}
                 title={t('productionTasks.template.deleteTitle')}
@@ -425,6 +426,7 @@ export const TaskTemplatesPage = () => {
 
             {/* Wechsel zu einer anderen Vorlage mit ungespeicherten Änderungen. */}
             <PopupDialog
+                closeOnBackdrop={false}
                 open={switchTo !== null}
                 onClose={() => setSwitchTo(null)}
                 title={t('productionTasks.template.unsavedTitle')}
@@ -453,6 +455,7 @@ export const TaskTemplatesPage = () => {
 
             {/* Verlassen der Seite mit ungespeicherten Änderungen. */}
             <PopupDialog
+                closeOnBackdrop={false}
                 open={guard.isOpen}
                 onClose={guard.cancel}
                 title={t('productionTasks.template.unsavedTitle')}

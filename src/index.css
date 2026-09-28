@@ -1769,6 +1769,15 @@ select option:checked {
   html {
     @apply font-sans;
   }
+  /* Die Hand über allem, was man klicken kann (28.09.2026: «all buttons should show the
+     hand icon on hover») — Tailwind 4 setzt Knöpfe auf den Pfeil zurück. In der Basis-
+     Schicht: eigene cursor-Regeln (Ziehgriffe, gesperrte Knöpfe) gewinnen weiterhin. */
+  :where(button, [role="button"], summary, select, a[href], input[type="checkbox"], input[type="radio"], label:has(> input[type="checkbox"], > input[type="radio"])):not(:disabled, [aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  :where(button, [role="button"], select, input):is(:disabled, [aria-disabled="true"]) {
+    cursor: not-allowed;
+  }
 }
 
 @layer utilities {

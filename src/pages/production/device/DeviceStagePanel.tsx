@@ -73,6 +73,10 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
         openFile: handle.openSubtaskFile,
         loadFile: handle.loadSubtaskFile,
         complete: handle.completeSubtask,
+        requestRevision: handle.requestSubtaskRevision,
+        unlock: handle.unlockSubtask,
+        setStatus: handle.setSubtaskStatus,
+        addChecklistItem: handle.addChecklistItem,
     };
     const bomArea = stage.id === 'bom' && isBuiltInArea(section.key) ? section.key : null;
     /* Stufe BOM (27.09.2026, Samet: «görevler artık bir buton halinde bulunsun,

@@ -18,7 +18,7 @@ import '@/styles/modules/production.css';
 import '@/styles/modules/productionDevice.css';
 import '@/styles/modules/productionTasks.css';
 
-import { areaFromParam, areaParam, pendingApprovals, staffName } from '../tasks/taskModel';
+import { areaFromParam, areaParam, checkTemplate, pendingApprovals, staffName } from '../tasks/taskModel';
 import { AreaSelect } from './AreaSelect';
 import { DeviceAssignmentBoard } from './DeviceAssignmentBoard';
 import { DeviceHeader } from './DeviceHeader';
@@ -91,7 +91,21 @@ export const ProductionDevicePage = () => {
     const area = areaFromParam(params.get('area'), sections);
     const section = sections.find((entry) => entry.key === area) ?? sections[0] ?? null;
     const stages = useMemo(() => (section ? visibleDeviceStages(isAdmin, section) : []), [isAdmin, section]);
-    const stage = section && stages.length ? deviceStageFrom(params.get('stage'), stages, section) : null;
+    const requested = section && stages.length ? deviceStageFrom(params.get('stage'), stages, section) : null;
+    /* Die 100-%-Regel am Gerät (28.09.2026): passt die Verwaltung Gewichte an und
+       geht die Kopie nicht mehr auf, bleibt sie in den Zuweisungen, bis sie wieder
+       aufgeht — «they shouldn't be allowed to move to the stage tabs». */
+    const planCheck = useMemo(
+        () => (plan ? checkTemplate(plan.sections, tasks.data?.tasks ?? []) : null),
+        [plan, tasks.data?.tasks],
+    );
+    const planBroken = isAdmin && Boolean(planCheck && !planCheck.valid);
+    const assignmentsStage = stages.find((entry) => entry.id === 'assignments') ?? null;
+    const stage = planBroken && assignmentsStage ? assignmentsStage : requested;
+    const lockedStages = useMemo(
+        () => new Set<DeviceStageId>(planBroken ? stages.filter((entry) => entry.id !== 'assignments').map((entry) => entry.id) : []),
+        [planBroken, stages],
+    );
     const writeParams = (nextArea: TaskArea, nextStage: DeviceStageId, nextStages = stages) =>
         setParams(() => {
             const query = new URLSearchParams();
@@ -107,7 +121,10 @@ export const ProductionDevicePage = () => {
         if (attempt) attempt(go);
         else go();
     };
-    const select = (id: DeviceStageId) => guarded(() => { if (section) writeParams(section.key, id); });
+    const select = (id: DeviceStageId) => {
+        if (lockedStages.has(id)) return;
+        guarded(() => { if (section) writeParams(section.key, id); });
+    };
     // Beim Wechsel des Bereichs bleibt die Stelle des Weges («Cihaz seçimi» ↔ «Devre tasarımı»).
     const selectArea = (next: TaskArea) => guarded(() => {
         const nextSection = sections.find((entry) => entry.key === next) ?? sections[0];
@@ -230,7 +247,16 @@ export const ProductionDevicePage = () => {
                 onOpenProject={openProject}
                 control={<AreaSelect sections={sections} value={section.key} onChange={selectArea} showShares />}
             />
-            <DeviceProcessBar stages={stages} current={stage.id} onSelect={select} mine={mine} done={doneStages} pending={pendingStages} />
+            <DeviceProcessBar
+                stages={stages}
+                current={stage.id}
+                onSelect={select}
+                mine={mine}
+                done={doneStages}
+                pending={pendingStages}
+                locked={lockedStages}
+                lockedHint={t('productionTasks.device.stagesLocked')}
+            />
             <DeviceStagePanel
                 key={`${section.key}:${stage.id}`}
                 deviceId={deviceId}

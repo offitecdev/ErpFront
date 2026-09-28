@@ -1,17 +1,20 @@
 import { useMemo, useState } from 'react';
-import { ListChecks, Plus, RefreshCw, Trash2, TriangleAlert } from 'lucide-react';
+import { ListChecks, Plus, RefreshCw, Save, Trash2, TriangleAlert } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
+import { productionTaskErrorText, productionTasksApi, refreshTaskTemplates } from '@/lib/api/productionTasks';
 import { fmtDateTime } from '@/pages/inventory/utils/format';
 import type { ProductionTask, TaskPerson, TaskSection } from '@/types/productionTasks';
 
 import type { PersonNames } from '../tasks/PeopleCell';
 import { StageCard } from '../tasks/StageCard';
 import { TaskEditDialog } from '../tasks/TaskEditDialog';
-import { newTask } from '../tasks/templateDraft';
-import { formatPercent, roundPercent, sectionLabel, tasksByStage } from '../tasks/taskModel';
+import { draftInput, newTask } from '../tasks/templateDraft';
+import { InlineCreate } from '../tasks/InlineName';
+import { checkProblems, checkTemplate, formatPercent, roundPercent, sectionLabel, stageNameTaken, TASK_LIMITS, tasksByStage } from '../tasks/taskModel';
 import { stageNumber, type DeviceStage } from './deviceStages';
 import { TemplateLoadDialog } from './TemplateLoadDialog';
 import type { DeviceTasksHandle } from './useDeviceTasks';
@@ -48,7 +51,7 @@ export const DeviceAssignmentBoard = ({
     staffLoading: boolean;
     meId: string | null;
 }) => {
-    const { data, error, loading, busyTaskId, reload, assign, saveTasks, load, unload } = handle;
+    const { data, error, loading, busyTaskId, reload, assign, saveTasks, load, unload, addStage } = handle;
     // Eine Aufgabe dieses Geräts im Fenster — bestehend oder neu in einer Stufe.
     const [taskEdit, setTaskEdit] = useState<{ task: ProductionTask; isNew: boolean } | null>(null);
     const [loadOpen, setLoadOpen] = useState(false);
@@ -59,6 +62,8 @@ export const DeviceAssignmentBoard = ({
     const groups = useMemo(() => (section ? tasksByStage(data?.tasks ?? [], section) : new Map()), [data?.tasks, section]);
     const areaTasks = (data?.tasks ?? []).filter((task) => task.area === section?.key);
     const assigned = areaTasks.filter((task) => task.assigneeIds.length > 0).length;
+    // Was die Aufgaben des Bereichs zusammen wiegen — unter 100 % lässt sich eine Stufe ergänzen.
+    const areaWeight = roundPercent(areaTasks.reduce((sum, task) => sum + task.weight, 0));
 
     /* Anpassen (28.09.2026): «admin should be able to customize the tasks and
        subtasks — it shouldn't change the template, only the version that the
@@ -73,6 +78,32 @@ export const DeviceAssignmentBoard = ({
     const deleteTask = () => {
         if (!taskEdit) return;
         void saveTasks(tasksNow.filter((entry) => entry.id !== taskEdit.task.id)).then((ok) => { if (ok) setTaskEdit(null); });
+    };
+
+    // Geht die Kopie am Gerät auf? Sonst sind die Stufen gesperrt (ProductionDevicePage).
+    const planCheck = checkTemplate(plan?.sections ?? [], tasksNow);
+    const planProblems = plan ? checkProblems(plan.sections, tasksNow.length, planCheck) : [];
+
+    /* «Save as template» (28.09.2026): diese Fassung als neue Vorlage — wie
+       «Çoğalt» auf der Seite der Vorlagen. Stand, Dateien, Freigaben und Tage
+       nimmt die Vorlage nicht mit (der Server lässt sie ohnehin weg). */
+    const [saveAsOpen, setSaveAsOpen] = useState(false);
+    const [saveAsName, setSaveAsName] = useState('');
+    const [savingAs, setSavingAs] = useState(false);
+    const saveAsTemplate = async () => {
+        const name = saveAsName.replace(/\s+/g, ' ').trim();
+        if (!plan || !name || savingAs) return;
+        setSavingAs(true);
+        try {
+            const created = await productionTasksApi.createTemplate(draftInput({ id: null, name, sections: plan.sections, tasks: tasksNow }));
+            void refreshTaskTemplates();
+            toast.success(t('productionTasks.device.savedAsTemplate', { name: created.name }));
+            setSaveAsOpen(false);
+        } catch (failure) {
+            toast.error(productionTaskErrorText(failure));
+        } finally {
+            setSavingAs(false);
+        }
     };
 
     /* Die Namen, die eine Auswahl eben gesetzt hat, reisen mit (sofort sichtbar). */
@@ -146,6 +177,18 @@ export const DeviceAssignmentBoard = ({
                                 <RefreshCw />
                                 {t('productionTasks.device.change')}
                             </button>
+                            {/* Diese Fassung als neue Vorlage (28.09.2026) — ohne Stand, Dateien und Tage. */}
+                            <button
+                                type="button"
+                                className="ofi-ptk-btn is-small ofi-nosize"
+                                onClick={() => {
+                                    setSaveAsName(`${plan.templateName} · ${data?.device.name ?? ''}`.replace(/\s·\s$/, '').slice(0, TASK_LIMITS.templateName));
+                                    setSaveAsOpen(true);
+                                }}
+                            >
+                                <Save />
+                                {t('productionTasks.device.saveAsTemplate')}
+                            </button>
                             <button
                                 type="button"
                                 className="ofi-ptk-btn is-small is-icon is-quiet is-danger-hover ofi-nosize"
@@ -158,6 +201,18 @@ export const DeviceAssignmentBoard = ({
                         </span>
                     </div>
 
+                    {/* Die 100-%-Regel am Gerät (28.09.2026): geht die Kopie nicht auf, sind die
+                        Stufen gesperrt, bis Gewichte, Aufgaben oder Unteraufgaben wieder stimmen. */}
+                    {!planCheck.valid && planProblems.length > 0 && (
+                        <div className="ofi-ptk-note is-warn ofi-ptk-planlock" role="status">
+                            <TriangleAlert aria-hidden />
+                            <span>
+                                <b>{t('productionTasks.device.planBrokenTitle')}</b>
+                                {planProblems.map((problem) => <span key={problem} className="ofi-ptk-note__line">{problem}</span>)}
+                            </span>
+                        </div>
+                    )}
+
                     <div className="ofi-ptk-grid">
                         {section.stages.map((stage) => (
                             <StageCard
@@ -167,6 +222,8 @@ export const DeviceAssignmentBoard = ({
                                 number={stageNumber(stages, stage.key)}
                                 tasks={groups.get(stage.key) ?? []}
                                 share={section.share}
+                                // In den Zuweisungen mit dem Gewicht der Stufe (28.09.2026).
+                                showStageWeight
                                 names={names}
                                 mode="device"
                                 editable
@@ -180,6 +237,19 @@ export const DeviceAssignmentBoard = ({
                                 onAddTask={(area, stageKey) => setTaskEdit({ task: newTask(area, stageKey), isNew: true })}
                             />
                         ))}
+                        {/* Neue Stufe am Gerät (28.09.2026) — wie in der Vorlage, nur solange der
+                            Bereich unter 100 % wiegt; die Vorlage bleibt unberührt. */}
+                        {section.stages.length < TASK_LIMITS.stages && (
+                            <InlineCreate
+                                className="ofi-ptk-addstage"
+                                label={t('productionTasks.template.addStage')}
+                                placeholder={t('productionTasks.template.stageNamePlaceholder')}
+                                maxLength={TASK_LIMITS.stageName}
+                                isTaken={(name) => stageNameTaken(section, name)}
+                                onCreate={(name) => void addStage(section.key, name)}
+                                disabledReason={areaWeight >= 100 - 0.01 ? t('productionTasks.template.sectionFull') : undefined}
+                            />
+                        )}
                     </div>
                 </>
             )}
@@ -205,6 +275,42 @@ export const DeviceAssignmentBoard = ({
             )}
 
             <PopupDialog
+                closeOnBackdrop={false}
+                open={saveAsOpen}
+                onClose={() => { if (!savingAs) setSaveAsOpen(false); }}
+                title={t('productionTasks.device.saveAsTitle')}
+                subtitle={t('productionTasks.device.saveAsText')}
+                icon={<Save size={18} />}
+                width={480}
+                footer={(
+                    <PopupActions>
+                        <PopupButton onClick={() => setSaveAsOpen(false)} disabled={savingAs}>{t('productionTasks.actions.cancel')}</PopupButton>
+                        <PopupButton variant="primary" loading={savingAs} disabled={!saveAsName.trim()} onClick={() => void saveAsTemplate()}>
+                            {t('productionTasks.actions.save')}
+                        </PopupButton>
+                    </PopupActions>
+                )}
+            >
+                <form
+                    className="ofi-ptk-pop ofi-ptk-form"
+                    onSubmit={(event) => { event.preventDefault(); void saveAsTemplate(); }}
+                    noValidate
+                >
+                    <label className="ofi-ptk-field">
+                        <span className="ofi-ptk-field__label">{t('productionTasks.template.name')}</span>
+                        <input
+                            className="ofi-ptk-input"
+                            value={saveAsName}
+                            maxLength={TASK_LIMITS.templateName}
+                            autoFocus
+                            onChange={(event) => setSaveAsName(event.target.value)}
+                        />
+                    </label>
+                </form>
+            </PopupDialog>
+
+            <PopupDialog
+                closeOnBackdrop={false}
                 open={confirmUnload}
                 onClose={() => { if (!unloading) setConfirmUnload(false); }}
                 title={t('productionTasks.device.unloadTitle')}

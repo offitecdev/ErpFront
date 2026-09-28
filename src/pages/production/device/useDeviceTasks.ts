@@ -160,9 +160,15 @@ export const useDeviceTasks = (deviceId: string) => {
     }, [commit]);
 
     /* Dateien und Abschluss einer Unteraufgabe (28.09.2026) — der Server entscheidet, dann sichtbar. */
-    const uploadSubtaskFile = useCallback(async (task: ProductionTask, subtask: TaskSubtask, file: File): Promise<boolean> => {
+    const uploadSubtaskFile = useCallback(async (
+        task: ProductionTask,
+        subtask: TaskSubtask,
+        file: File,
+        revisionOf?: string,
+        revisionNote?: string,
+    ): Promise<boolean> => {
         try {
-            takeTask((await productionTasksApi.uploadSubtaskFile(deviceId, task.id, subtask.id, file)).task);
+            takeTask((await productionTasksApi.uploadSubtaskFile(deviceId, task.id, subtask.id, file, revisionOf, revisionNote)).task);
             return true;
         } catch (error) {
             toast.error(productionTaskErrorText(error, 'productionTasks.err.uploadFailed'));
@@ -188,9 +194,9 @@ export const useDeviceTasks = (deviceId: string) => {
         [deviceId],
     );
 
-    const completeSubtask = useCallback(async (task: ProductionTask, subtask: TaskSubtask, note: string): Promise<boolean> => {
+    const completeSubtask = useCallback(async (task: ProductionTask, subtask: TaskSubtask, note: string, checked: string[]): Promise<boolean> => {
         try {
-            takeTask((await productionTasksApi.completeSubtask(deviceId, task.id, subtask.id, note)).task);
+            takeTask((await productionTasksApi.completeSubtask(deviceId, task.id, subtask.id, note, checked)).task);
             toast.success(t('productionTasks.complete.done'));
             return true;
         } catch (error) {
@@ -198,6 +204,49 @@ export const useDeviceTasks = (deviceId: string) => {
             return false;
         }
     }, [deviceId, takeTask]);
+
+    const addChecklistItem = useCallback(async (task: ProductionTask, subtask: TaskSubtask, text: string): Promise<boolean> => {
+        try {
+            takeTask((await productionTasksApi.addChecklistItem(deviceId, task.id, subtask.id, text)).task);
+            return true;
+        } catch (error) {
+            toast.error(productionTaskErrorText(error));
+            return false;
+        }
+    }, [deviceId, takeTask]);
+
+    const unlockSubtask = useCallback(async (task: ProductionTask, subtask: TaskSubtask): Promise<boolean> => {
+        try {
+            takeTask((await productionTasksApi.unlockSubtask(deviceId, task.id, subtask.id)).task);
+            toast.success(t('productionTasks.subtask.unlocked'));
+            return true;
+        } catch (error) {
+            toast.error(productionTaskErrorText(error));
+            return false;
+        }
+    }, [deviceId, takeTask]);
+
+    const requestSubtaskRevision = useCallback(async (task: ProductionTask, subtask: TaskSubtask, note: string): Promise<boolean> => {
+        try {
+            takeTask((await productionTasksApi.requestSubtaskRevision(deviceId, task.id, subtask.id, note)).task);
+            toast.success(t('productionTasks.review.revisionSent'));
+            return true;
+        } catch (error) {
+            toast.error(productionTaskErrorText(error));
+            return false;
+        }
+    }, [deviceId, takeTask]);
+
+    const addStage = useCallback(async (area: string, name: string): Promise<boolean> => {
+        try {
+            commit(await productionTasksApi.addStage(deviceId, area, name));
+            toast.success(t('productionTasks.device.stageAdded', { name }));
+            return true;
+        } catch (error) {
+            toast.error(productionTaskErrorText(error));
+            return false;
+        }
+    }, [deviceId, commit]);
 
     const saveTasks = useCallback(async (tasks: ProductionTask[]): Promise<boolean> => {
         try {
@@ -249,6 +298,10 @@ export const useDeviceTasks = (deviceId: string) => {
         openSubtaskFile,
         loadSubtaskFile,
         completeSubtask,
+        requestSubtaskRevision,
+        unlockSubtask,
+        addChecklistItem,
+        addStage,
         saveTasks,
         load,
         unload,

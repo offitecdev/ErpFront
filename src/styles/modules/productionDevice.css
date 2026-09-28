@@ -187,6 +187,9 @@
 }
 #root .ofi-list-apple .ofi-pdev-steps__seg:hover { background: rgba(255, 255, 255, 0.55); color: var(--la-text); }
 .dark #root .ofi-list-apple .ofi-pdev-steps__seg:hover { background: rgba(255, 255, 255, 0.06); }
+/* Gesperrt (28.09.2026): die Kopie am Gerät geht nicht auf 100 % — erst die Zuweisungen richten. */
+#root .ofi-list-apple :is(.ofi-pdev-steps__seg, .ofi-pdev-steps__finish):disabled { opacity: 0.4; cursor: not-allowed; }
+#root .ofi-list-apple :is(.ofi-pdev-steps__seg, .ofi-pdev-steps__finish):disabled:hover { background: transparent; color: inherit; }
 #root .ofi-list-apple .ofi-pdev-steps__seg[aria-selected="true"] {
     background: #ffffff;
     color: var(--la-text);

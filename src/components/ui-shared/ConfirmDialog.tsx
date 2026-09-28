@@ -32,6 +32,7 @@ export const ConfirmDialog = ({
     onConfirm,
     onCancel,
     zIndex = 900,
+    closeOnBackdrop = true,
 }: {
     open: boolean;
     title: ReactNode;
@@ -44,6 +45,8 @@ export const ConfirmDialog = ({
     onConfirm: () => void;
     onCancel: () => void;
     zIndex?: number;
+    /** false: ein Klick neben das Fenster schliesst es nicht (z. B. Görevlendirme, 28.09.2026). */
+    closeOnBackdrop?: boolean;
 }) => {
     const confirmRef = useRef<HTMLButtonElement | null>(null);
     // Çağıranlar `onCancel`i satır içi ok fonksiyonu olarak verir (her render'da
@@ -81,7 +84,7 @@ export const ConfirmDialog = ({
         <div className="fixed inset-0 flex items-center justify-center px-3" style={{ zIndex }}>
             <div
                 className="ofi-win-scrim absolute inset-0"
-                onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}
+                onMouseDown={(event) => { if (closeOnBackdrop && event.target === event.currentTarget && !busy) onCancel(); }}
                 aria-hidden
             />
             <section

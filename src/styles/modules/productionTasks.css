@@ -998,6 +998,8 @@ body > :not(#root) .ofi-ptk-task__open {
 .ofi-ptk-status-pill.is-progress { background: var(--ptk-accent-soft); color: var(--ptk-accent-text); }
 .ofi-ptk-status-pill.is-done { background: color-mix(in srgb, var(--ptk-success) 14%, transparent); color: var(--ptk-success); }
 .ofi-ptk-status-pill.is-pending { background: var(--ptk-warning-soft); color: var(--ptk-warning); }
+/* Zur Überarbeitung zurückgegeben (28.09.2026): rot — hier ist etwas zu ändern. */
+.ofi-ptk-status-pill.is-revision { background: color-mix(in srgb, var(--ptk-danger) 12%, transparent); color: var(--ptk-danger); }
 #root .ofi-ptk select.ofi-ptk-status-pill.is-select:not([multiple]):not([size]),
 body > :not(#root) select.ofi-ptk-status-pill.is-select {
     -webkit-appearance: none;
@@ -1049,6 +1051,47 @@ body > :not(#root) select.ofi-ptk-status-pill.is-select {
 /* Am Gerät: der Fortschrittskreis vor dem Kürzel (erledigte Unteraufgaben). */
 .ofi-ptk-row > .ofi-ptk-code:has(> .ofi-ptk-ring) { display: inline-flex; align-items: center; gap: 7px; }
 .ofi-ptk-ring { flex: none; transform: rotate(-90deg); }
+/* Schloss abgeschlossener Unteraufgaben (28.09.2026) — genau unter dem Kreis der Aufgabe:
+   16px breit wie der Kreis; unter einer Aufgabe mit Pfeil 17px eingerückt (Pfeil 18px,
+   Rand −4/−2, Abstand 5px), Abstand zum Kürzel wie dort. */
+.ofi-ptk-row > .ofi-ptk-code.has-lockslot { display: inline-flex; align-items: center; gap: 7px; }
+.ofi-ptk-row > .ofi-ptk-code.has-lockslot.is-under-fold { gap: 5px; }
+.ofi-ptk-lockslot { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 16px; height: 16px; color: var(--ptk-secondary); }
+.ofi-ptk-code.is-under-fold > .ofi-ptk-lockslot { margin-left: 17px; }
+.ofi-ptk-lockslot > svg { width: 13px; height: 13px; }
+/* Für die Verwaltung ein Knopf: ein Klick hebt die Sperre auf (mit Rückfrage). */
+#root .ofi-ptk .ofi-ptk-lockbtn,
+body > :not(#root) .ofi-ptk-lockbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    min-height: 0;
+    margin: -2px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-secondary);
+    cursor: pointer;
+}
+#root .ofi-ptk .ofi-ptk-lockbtn:hover { background: var(--ptk-fill-strong); color: var(--ptk-text); }
+#root .ofi-ptk .ofi-ptk-lockbtn:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: 0; }
+.ofi-ptk-lockbtn > svg { width: 13px; height: 13px; }
+/* Wartet auf die Freigabe (28.09.2026): gesperrt, gelb wie der Stand. */
+#root .ofi-ptk .ofi-ptk-lockbtn.is-awaiting,
+.ofi-ptk-lockslot > svg.is-awaiting { color: var(--ptk-warning); }
+/* ▶ Start (28.09.2026): offen → in Arbeit, für alle, die den Stand setzen dürfen. */
+#root .ofi-ptk .ofi-ptk-lockbtn.is-start { color: var(--ptk-success); }
+#root .ofi-ptk .ofi-ptk-lockbtn.is-start:hover { background: color-mix(in srgb, var(--ptk-success) 14%, transparent); color: var(--ptk-success); }
+#root .ofi-ptk .ofi-ptk-lockbtn:disabled { opacity: 0.45; cursor: default; }
+.ofi-ptk-lockbtn.is-start > svg { fill: currentColor; }
+/* ■ Stopp (28.09.2026): in Arbeit → wieder offen; rot, etwas kleiner als ▶. */
+#root .ofi-ptk .ofi-ptk-lockbtn.is-stop { color: var(--ptk-danger); }
+#root .ofi-ptk .ofi-ptk-lockbtn.is-stop:hover { background: color-mix(in srgb, var(--ptk-danger) 12%, transparent); color: var(--ptk-danger); }
+.ofi-ptk-lockbtn.is-stop > svg { width: 11px; height: 11px; fill: currentColor; }
 .ofi-ptk-ring circle { fill: none; stroke-width: 2.2; }
 .ofi-ptk-ring__track { stroke: var(--ptk-fill-strong); }
 .ofi-ptk-ring__value { stroke: var(--ptk-accent); stroke-linecap: round; transition: stroke-dashoffset 240ms ease; }
@@ -1494,8 +1537,13 @@ body > :not(#root) .ofi-ptk-card__close {
 .ofi-ptk-subedit__item + .ofi-ptk-subedit__row { border-top: 1px solid var(--ptk-hairline); }
 .ofi-ptk-subedit__item.is-invalid { background: color-mix(in srgb, var(--ptk-danger) 5%, transparent); }
 .ofi-ptk-subedit__item > .ofi-ptk-field__error { padding-left: 28px; }
-/* Gewicht mit Beitrag und die Pflichtfelder auf EINER Zeile. */
-.ofi-ptk-subedit__meta { display: flex; flex-wrap: nowrap; align-items: center; gap: 12px; min-width: 0; padding-left: 28px; }
+/* Die Kopie am Gerät geht nicht auf 100 % (28.09.2026): Hinweis über den Stufen der Zuweisungen. */
+.ofi-ptk-planlock { margin: 0 0 12px; }
+/* Neue Pflicht an einer begonnenen Unteraufgabe: Speichern öffnet sie wieder (28.09.2026). */
+.ofi-ptk-subedit__item > .ofi-ptk-reopennote { margin-left: 28px; }
+/* Unter dem Namen (28.09.2026), mit etwas Luft: links die Tage (am Gerät), rechts die Pflichtfelder. */
+.ofi-ptk-subedit__meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-width: 0; margin-top: 6px; padding-left: 28px; }
+.ofi-ptk-subedit__dates { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .ofi-ptk-subedit__overall {
     display: inline-flex;
     align-items: center;
@@ -1509,7 +1557,52 @@ body > :not(#root) .ofi-ptk-card__close {
     font-variant-numeric: tabular-nums;
 }
 .ofi-ptk-subedit__part { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ptk-secondary); white-space: nowrap; }
-.ofi-ptk-subedit__flags { display: inline-flex; align-items: center; gap: 12px; margin-left: auto; }
+/* Gewicht und Beitrag stehen neben dem Namen — sie schrumpfen nicht, der Name gibt nach. */
+.ofi-ptk-subedit__row > .ofi-ptk-subedit__part { flex: none; }
+/* Die Pflichtfelder gleich neben den Tagen (28.09.2026). */
+.ofi-ptk-subedit__flags { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+/* Freigabe-Checkliste (28.09.2026): Knopf neben «Approval», darunter die Punkte. */
+body > :not(#root) .ofi-ptk-btn.ofi-ptk-checklistbtn {
+    flex: none;
+    gap: 4px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0 7px;
+    border-radius: 6px !important;
+    box-shadow: none;
+    font-size: 11.5px;
+}
+body > :not(#root) .ofi-ptk-btn.ofi-ptk-checklistbtn svg { width: 13px; height: 13px; }
+.ofi-ptk-checklistbtn__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--ptk-accent);
+    color: #fff;
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+}
+body > :not(#root) .ofi-ptk-btn.ofi-ptk-checklistbtn.is-open { background: var(--ptk-accent-soft); border-color: var(--ptk-accent); color: var(--ptk-accent); }
+.ofi-ptk-apchecklist {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-left: 28px;
+    padding: 8px 10px;
+    border: 1px solid var(--ptk-hairline);
+    border-radius: 9px;
+    background: var(--ptk-zebra);
+}
+.ofi-ptk-apchecklist__title { display: inline-flex; align-items: center; gap: 6px; color: var(--ptk-secondary); font-size: 12px; font-weight: 600; }
+.ofi-ptk-apchecklist__title > svg { width: 14px; height: 14px; }
+.ofi-ptk-apchecklist .ofi-ptk-subedit__row.is-new { padding: 0; background: none; }
+.ofi-ptk-apticks > li { padding: 9px 14px; }
+.ofi-ptk-apticks > li + li { border-top: 1px solid var(--ptk-hairline); }
+.ofi-ptk-flag.ofi-ptk-aptick { display: flex; gap: 10px; font-size: 13px; white-space: normal; }
 /* Das Gewicht einer Unteraufgabe: kompakt. */
 .ofi-ptk-percent.is-subtask { width: 92px; }
 body > :not(#root) .ofi-ptk-percent.is-subtask > input.ofi-ptk-input { height: 30px; min-height: 30px; font-size: 12.5px; }
@@ -1623,11 +1716,13 @@ body > .ofi-mac-selection.ofi-ptk-picker .ofi-mac-selection__footer { justify-co
     .ofi-ptk-editor__head { flex-wrap: wrap; }
     #root .ofi-ptk .ofi-ptk-namefield { flex-basis: 100%; min-width: 0; }
     .ofi-ptk-editor__actions { margin-left: 0; }
-    .ofi-ptk-subedit__row.is-new { flex-wrap: wrap; }
+    .ofi-ptk-subedit__row.is-new,
+    .ofi-ptk-subedit__row:has(> .ofi-ptk-subedit__part) { flex-wrap: wrap; }
+    body > :not(#root) .ofi-ptk-subedit__row:has(> .ofi-ptk-subedit__part) > input.ofi-ptk-input { flex-basis: calc(100% - 28px); }
     body > :not(#root) .ofi-ptk-subedit__row.is-new > input.ofi-ptk-input { flex-basis: calc(100% - 28px); }
     .ofi-ptk-subedit__meta,
     .ofi-ptk-subedit__item > .ofi-ptk-field__error { padding-left: 0; }
-    .ofi-ptk-subedit__flags { margin-left: 0; }
+    .ofi-ptk-apchecklist { margin-left: 0; }
     .ofi-ptk-subedit__meta { flex-wrap: wrap; }
     .ofi-ptk-planbar__actions { margin-left: 0; }
 }
@@ -1712,7 +1807,8 @@ body > :not(#root) .ofi-ptk-sub__open {
 .ofi-ptk-subdetail {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    /* Oben ausgerichtet (28.09.2026): öffnet sich die Liste der Fassungen, bleibt alles an seinem Platz. */
+    align-items: flex-start;
     justify-content: space-between;
     gap: 8px 16px;
     padding: 8px 10px;
@@ -1722,8 +1818,9 @@ body > :not(#root) .ofi-ptk-sub__open {
 }
 
 /* «Dosyalar  [PDF BOM-…pdf · bugün 08:50 · Enver]  [+ Dosya ekle]» */
-.ofi-ptk-files { display: flex; flex: 1 1 420px; align-items: center; gap: 12px; min-width: 0; }
-.ofi-ptk-files__label { flex: none; color: var(--ptk-secondary); font-size: 12px; font-weight: 500; }
+.ofi-ptk-files { display: flex; flex: 1 1 420px; align-items: flex-start; gap: 12px; min-width: 0; }
+/* «Dateien» mittig zur ersten Reihe der Dateien (eine Datei ist 44px hoch). */
+.ofi-ptk-files__label { display: inline-flex; flex: none; align-items: center; min-height: 44px; color: var(--ptk-secondary); font-size: 12px; font-weight: 500; }
 .ofi-ptk-files__list { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .ofi-ptk-files__list.is-dialog { margin-top: 10px; }
 .ofi-ptk-files__list.is-stage { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); align-items: stretch; }
@@ -1790,6 +1887,117 @@ body > :not(#root) .ofi-ptk-filechip__remove {
 body > :not(#root) .ofi-ptk-filechip__remove:hover { background: color-mix(in srgb, var(--ptk-danger) 12%, transparent); color: var(--ptk-danger); }
 .ofi-ptk-filechip__remove > svg { width: 12px; height: 12px; }
 
+/* ── Fassungen einer Datei (28.09.2026): «v2», «Upload a revision», frühere Fassungen ── */
+.ofi-ptk-filechip { max-width: 440px; }
+.ofi-ptk-filechip.is-older { box-shadow: none; background: var(--ptk-zebra); opacity: 0.85; }
+.ofi-ptk-filechip__text > b { display: inline-flex; align-items: center; gap: 6px; }
+.ofi-ptk-versiontag {
+    flex: none;
+    padding: 0 5px;
+    border-radius: 5px;
+    background: var(--ptk-accent-soft);
+    color: var(--ptk-accent);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 16px;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ptk-versiontag.is-older { background: var(--ptk-fill-strong); color: var(--ptk-secondary); }
+#root .ofi-ptk .ofi-ptk-filechip__revise,
+body > :not(#root) .ofi-ptk-filechip__revise {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    min-height: 0;
+    margin: 0 4px 0 0;
+    padding: 0 8px;
+    border: 1px solid var(--ptk-field-border);
+    border-radius: 7px !important;
+    background: var(--ptk-surface);
+    box-shadow: none;
+    color: var(--ptk-text);
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+#root .ofi-ptk .ofi-ptk-filechip__revise:hover { background: var(--ptk-accent-soft); border-color: var(--ptk-accent); color: var(--ptk-accent); }
+.ofi-ptk-filechip__revise > svg { width: 13px; height: 13px; }
+/* Frühere Fassungen (28.09.2026): nur eine Uhr links in der Datei; ein Klick öffnet die Auswahlliste. */
+#root .ofi-ptk .ofi-ptk-filechip__history,
+body > :not(#root) .ofi-ptk-filechip__history {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    min-height: 0;
+    margin: 0 -4px 0 6px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-secondary);
+    cursor: pointer;
+}
+#root .ofi-ptk .ofi-ptk-filechip__history:hover,
+#root .ofi-ptk .ofi-ptk-filechip__history.is-open { background: var(--ptk-accent-soft); color: var(--ptk-accent); }
+.ofi-ptk-filechip__history > svg { width: 14px; height: 14px; }
+/* Datei und — geöffnet — ihre früheren Fassungen darunter, im Fluss: die Zeile (und die Tabelle) wächst mit. */
+.ofi-ptk-filechipwrap { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; max-width: 100%; }
+/* Luft über und unter der Liste der Fassungen (28.09.2026): sie klebt nicht an der Datei und nicht an den Knöpfen. */
+.ofi-ptk-filechipwrap > .ofi-ptk-versionmenu { margin: 10px 0 14px; }
+.ofi-ptk-files__list { align-items: flex-start; }
+/* «+ Datei hinzufügen» (32px) und «keine Dateien» mittig zur ersten Reihe der 44px hohen Dateien. */
+#root .ofi-ptk .ofi-ptk-files__list > .ofi-ptk-files__add,
+body > :not(#root) .ofi-ptk-files__list > .ofi-ptk-files__add { margin-top: 6px; }
+.ofi-ptk-files__list > .ofi-ptk-files__none { display: inline-flex; align-items: center; min-height: 44px; }
+.ofi-ptk-versionmenu {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: max-content;
+    min-width: 260px;
+    max-width: 360px;
+    max-height: 280px;
+    padding: 4px;
+    overflow-y: auto;
+    border: 1px solid var(--ptk-border);
+    border-radius: 10px;
+    background: var(--ptk-surface);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.16), 0 1px 3px rgb(0 0 0 / 0.1);
+}
+.ofi-ptk-versionmenu__row { display: flex; align-items: flex-start; gap: 2px; border-radius: 7px; }
+.ofi-ptk-versionmenu__row:hover { background: var(--ptk-row-hover); }
+#root .ofi-ptk .ofi-ptk-versionmenu__open,
+body > :not(#root) .ofi-ptk-versionmenu__open {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    min-width: 0;
+    min-height: 0;
+    padding: 6px 8px;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--ptk-text);
+    text-align: left;
+    cursor: pointer;
+}
+.ofi-ptk-versionmenu__open > b { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12.5px; font-weight: 500; }
+.ofi-ptk-versionmenu__open > b > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-ptk-versionmenu__open > small { color: var(--ptk-secondary); font-size: 11px; }
+.ofi-ptk-versionmenu__open > q { color: var(--ptk-secondary); font-size: 11.5px; white-space: pre-wrap; }
+.ofi-ptk-versionmenu__row > .ofi-ptk-filechip__remove { margin-top: 4px; }
+.ofi-ptk-revision__picked { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; }
+
 .ofi-ptk-fileglyph {
     display: inline-flex;
     flex: none;
@@ -1832,11 +2040,164 @@ body > :not(#root) .ofi-ptk-files__add {
 .is-spinning { animation: ofi-ptk-spin 900ms linear infinite; }
 @keyframes ofi-ptk-spin { to { transform: rotate(360deg); } }
 
-.ofi-ptk-subdetail__foot { display: inline-flex; flex: none; align-items: center; gap: 10px; margin-left: auto; }
+/* Die Knöpfe («Complete the task», «Approve the task» …) unten links in einer eigenen Zeile (28.09.2026). */
+.ofi-ptk-subdetail__foot { display: flex; flex: 1 0 100%; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 10px; }
+.ofi-ptk-subdetail__foot:empty { display: none; }
 .ofi-ptk-subdetail__need { color: var(--ptk-warning); font-size: 12px; font-weight: 500; }
-.ofi-ptk-subdetail__done { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 0 auto; color: var(--ptk-success); font-size: 12px; font-weight: 500; }
+/* «Freigegeben von …» steht dort, wo vorher die Knöpfe standen: unten links (28.09.2026). */
+.ofi-ptk-subdetail__done { display: flex; flex: 1 0 100%; align-items: center; gap: 6px; margin: 0; color: var(--ptk-success); font-size: 12px; font-weight: 500; }
 .ofi-ptk-subdetail__done > svg { flex: none; width: 15px; height: 15px; }
 .ofi-ptk-subdetail__done q { margin-left: 6px; color: var(--ptk-secondary); font-weight: 400; }
+/* Zurück zur Überarbeitung (28.09.2026): orange, mit der Notiz der Verwaltung. */
+.ofi-ptk-subdetail__revision { display: flex; align-items: flex-start; gap: 6px; width: 100%; margin: 6px 0; color: var(--ptk-warning); font-size: 12px; font-weight: 500; }
+.ofi-ptk-subdetail__revision > svg { flex: none; width: 14px; height: 14px; margin-top: 1px; }
+.ofi-ptk-subdetail__revision q { margin-left: 6px; color: var(--ptk-text); font-weight: 400; }
+
+/* ── «Approve the files» (28.09.2026): links die Datei; rechts Angaben, Checkliste, Notiz ── */
+body > :not(#root) .ofi-ptk-btn.ofi-ptk-reviewbtn { height: 28px; padding: 0 10px; font-size: 12px; }
+body > :not(#root) .ofi-ptk-btn.ofi-ptk-reviewbtn svg { width: 14px; height: 14px; }
+/* Freigegeben: grün — ein Klick öffnet die Prüfung wieder. */
+body > :not(#root) .ofi-ptk-btn.ofi-ptk-reviewbtn.is-approved {
+    border-color: color-mix(in srgb, var(--ptk-success) 45%, transparent);
+    background: color-mix(in srgb, var(--ptk-success) 10%, var(--ptk-surface));
+    color: var(--ptk-success);
+}
+.ofi-tp-dialog__body.ofi-ptk-review__body { padding: 0; overflow: hidden; }
+.ofi-ptk-review { display: grid; grid-template-columns: minmax(0, 1fr) 320px; height: min(72vh, 820px); min-height: 0; }
+.ofi-ptk-review__side {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    padding: 16px;
+    overflow-y: auto;
+    border-left: 1px solid var(--ptk-hairline);
+}
+.ofi-ptk-review__info { display: grid; gap: 8px; margin: 0; padding: 12px 14px; border: 1px solid var(--ptk-border); border-radius: 12px; background: var(--ptk-zebra); }
+.ofi-ptk-review__info-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; font-size: 12.5px; }
+.ofi-ptk-review__info-row > dt { margin: 0; color: var(--ptk-secondary); }
+.ofi-ptk-review__info-row > dd { margin: 0; color: var(--ptk-text); font-weight: 500; overflow-wrap: anywhere; white-space: pre-wrap; }
+/* Die Fassungen der gezeigten Datei als Auswahlliste (28.09.2026). */
+body > :not(#root) select.ofi-ptk-input.ofi-ptk-review__versionselect {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 150px;
+    max-width: 300px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+.ofi-ptk-review__olderbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--ptk-hairline);
+    background: var(--ptk-warning-soft);
+    color: var(--ptk-warning);
+    font-size: 12.5px;
+}
+.ofi-ptk-review__olderbar > svg { flex: none; width: 14px; height: 14px; }
+/* Rückgabe zur Überarbeitung und Verlauf (28.09.2026). */
+.ofi-ptk-review__request {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--ptk-danger) 30%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ptk-danger) 7%, transparent);
+    font-size: 12.5px;
+}
+.ofi-ptk-review__request-title { display: inline-flex; align-items: center; gap: 6px; color: var(--ptk-danger); font-weight: 600; }
+.ofi-ptk-review__request-title > svg { flex: none; width: 14px; height: 14px; }
+.ofi-ptk-review__request q { color: var(--ptk-text); white-space: pre-wrap; }
+.ofi-ptk-review__request-answer { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; color: var(--ptk-secondary); }
+#root .ofi-ptk .ofi-ptk-review__filelink,
+body > :not(#root) .ofi-ptk-review__filelink {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    min-height: 0;
+    padding: 2px 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--ptk-accent);
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+}
+body > :not(#root) .ofi-ptk-review__filelink:hover b { text-decoration: underline; }
+.ofi-ptk-review__filelink > b { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 500; }
+.ofi-ptk-review__filelink > small { color: var(--ptk-secondary); font-size: 11.5px; }
+.ofi-ptk-review__filelink > q { color: var(--ptk-text); font-size: 12px; white-space: pre-wrap; }
+.ofi-ptk-review__revisedtag { padding: 0 5px; border-radius: 5px; background: var(--ptk-warning-soft); color: var(--ptk-warning); font-size: 10.5px; font-weight: 600; line-height: 16px; }
+.ofi-ptk-review__timeline { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+.ofi-ptk-review__timeline > li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; padding: 6px 0 6px 10px; border-left: 2px solid var(--ptk-hairline); font-size: 12.5px; }
+.ofi-ptk-review__timeline > li.is-request { border-left-color: var(--ptk-danger); }
+.ofi-ptk-review__timeline > li.is-request b { color: var(--ptk-danger); font-weight: 600; }
+.ofi-ptk-review__timeline > li.is-request q { display: block; color: var(--ptk-text); white-space: pre-wrap; }
+.ofi-ptk-review__timeline > li.is-shown { border-left-color: var(--ptk-accent); background: var(--ptk-accent-soft); }
+.ofi-ptk-review__when { color: var(--ptk-secondary); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ofi-ptk-review__olderbar > span { flex: 1 1 auto; min-width: 0; }
+.ofi-ptk-review__label { display: inline-flex; align-items: center; gap: 6px; }
+.ofi-ptk-review__label > svg { width: 14px; height: 14px; }
+.ofi-ptk-review__label > em { margin-left: auto; }
+/* Die Checkliste in der Prüfansicht: ohne Trennlinien zwischen den Punkten. */
+.ofi-ptk-review .ofi-ptk-apticks > li { padding: 7px 14px; }
+.ofi-ptk-review .ofi-ptk-apticks > li + li { border-top: 0; }
+.ofi-ptk-review .ofi-ptk-apticks > li:first-child { padding-top: 10px; }
+.ofi-ptk-review .ofi-ptk-apticks > li:last-child { padding-bottom: 10px; }
+/* Neuer Punkt der Checkliste in der Prüfansicht — schlicht, ohne Zebra-Grund. */
+.ofi-ptk-review__additem.ofi-ptk-subedit__row.is-new { padding: 0; background: none; }
+/* Die Notiz der Prüfansicht füllt den Rest der Spalte (28.09.2026) — ohne Ziehgriff. */
+.ofi-ptk-review__noteblock { flex: 1 1 auto; min-height: 0; }
+body > :not(#root) textarea.ofi-ptk-input.ofi-ptk-review__note { flex: 1 1 auto; min-height: 96px; }
+.ofi-ptk-review__viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.ofi-ptk-review__toolbar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--ptk-hairline); }
+.ofi-ptk-review__nav,
+.ofi-ptk-review__zoom { display: inline-flex; flex: none; align-items: center; gap: 2px; }
+.ofi-ptk-review__count { min-width: 48px; color: var(--ptk-secondary); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: center; }
+.ofi-ptk-review__name { flex: 1 1 auto; min-width: 0; overflow: hidden; color: var(--ptk-text); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+body > :not(#root) .ofi-ptk-review__zoomlabel {
+    min-width: 52px;
+    height: 28px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--ptk-text);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+body > :not(#root) .ofi-ptk-review__zoomlabel:hover { background: var(--ptk-fill); }
+.ofi-ptk-review__area {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    min-height: 0;
+    padding: 16px;
+    overflow: auto;
+    scrollbar-gutter: stable;
+    background: var(--ptk-fill);
+}
+.ofi-ptk-review__page { flex: none; max-width: none; background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgb(0 0 0 / 0.18); }
+.ofi-ptk-review__area:has(.ofi-ptk-review__page) { align-items: safe center; }
+.ofi-ptk-review__state { display: inline-flex; align-items: center; gap: 8px; margin: auto; color: var(--ptk-secondary); font-size: 13px; }
+.ofi-ptk-review__state > svg { width: 16px; height: 16px; }
+@media (max-width: 860px) {
+    /* Schmal: die Datei oben, Angaben, Checkliste und Notiz darunter. */
+    .ofi-ptk-review { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(360px, 1fr) auto; height: auto; max-height: 78vh; overflow-y: auto; }
+    .ofi-ptk-review__side { border-left: 0; border-top: 1px solid var(--ptk-hairline); overflow: visible; }
+}
 #root .ofi-ptk .ofi-ptk-completebtn,
 body > :not(#root) .ofi-ptk-completebtn {
     display: inline-flex;
@@ -1889,6 +2250,12 @@ body > :not(#root) .ofi-ptk-completebtn {
 .ofi-ptk-checkrow__value { flex: none; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ofi-ptk-checkrow.is-ok .ofi-ptk-checkrow__value { color: var(--ptk-success); }
 .ofi-ptk-checkrow.is-warn .ofi-ptk-checkrow__value { color: var(--ptk-warning); }
+/* «Approve the files» am Ende der Zeile «Dokument» (28.09.2026). */
+.ofi-ptk-checkrow > .ofi-ptk-reviewbtn { flex: none; }
+@media (max-width: 560px) {
+    .ofi-ptk-checkrow:has(> .ofi-ptk-reviewbtn) { flex-wrap: wrap; }
+    body > :not(#root) .ofi-ptk-checkrow > .ofi-ptk-btn.ofi-ptk-reviewbtn { width: 100%; }
+}
 .ofi-ptk-complete__block { display: flex; flex-direction: column; gap: 8px; margin: 0; }
 .ofi-ptk-complete__label { margin: 0; color: var(--ptk-secondary); font-size: 13px; font-weight: 500; }
 .ofi-ptk-complete__label > em { color: var(--ptk-muted); font-style: normal; font-weight: 400; }
@@ -1905,6 +2272,12 @@ body > :not(#root) textarea.ofi-ptk-input.ofi-ptk-complete__note {
     font-size: 13px;
     line-height: 1.45;
     resize: vertical;
+}
+/* Die Notiz in «Approve the task» und «Approve the files» lässt sich NICHT ziehen (28.09.2026) —
+   feste Höhe bzw. der Rest der Spalte; langer Text rollt im Feld. */
+body > :not(#root) textarea.ofi-ptk-input.ofi-ptk-complete__note {
+    overflow: auto;
+    resize: none !important;
 }
 body > :not(#root) textarea.ofi-ptk-input.ofi-ptk-complete__note:focus { border-color: var(--ptk-accent); outline: none; box-shadow: 0 0 0 3px var(--ptk-ring); }
 .ofi-ptk-complete__hint { display: inline-flex; align-items: flex-start; gap: 7px; max-width: 290px; color: var(--ptk-secondary, #6e6e73); font-size: 11.5px; line-height: 1.35; }

@@ -26,6 +26,7 @@ import {
 } from './templateDraft';
 import {
     areaTone,
+    checkProblems,
     checkTemplate,
     formatPercent,
     isBuiltInArea,
@@ -146,21 +147,7 @@ export const TemplateEditor = ({
     const removalSection = removal ? draft.sections.find((entry) => entry.key === removal.area) ?? null : null;
     const removalStage = removal?.stage ? removalSection?.stages.find((entry) => entry.key === removal.stage) ?? null : null;
 
-    const problems: string[] = [];
-    if (!draft.sections.length) {
-        problems.push(t('productionTasks.check.noSections'));
-    } else {
-        if (!draft.tasks.length) problems.push(t('productionTasks.check.noTasks'));
-        if (!check.sharesOk) problems.push(t('productionTasks.check.shares', { sum: formatPercent(check.sharesSum) }));
-        for (const entry of check.areas) {
-            if (entry.ok) continue;
-            const target = draft.sections.find((row) => row.key === entry.area);
-            const label = target ? sectionLabel(target) : entry.area;
-            problems.push(entry.taskCount
-                ? t('productionTasks.check.weights', { area: label, sum: formatPercent(entry.weightSum) })
-                : t('productionTasks.check.noAreaTasks', { area: label, share: formatPercent(entry.share) }));
-        }
-    }
+    const problems = checkProblems(draft.sections, draft.tasks.length, check);
 
     const nameTaken = Boolean(draft.name.trim()) && isNameTaken(draft.name.replace(/\s+/g, ' ').trim());
 
@@ -472,6 +459,7 @@ export const TemplateEditor = ({
             )}
 
             <PopupDialog
+                closeOnBackdrop={false}
                 open={removal !== null}
                 onClose={() => setRemoval(null)}
                 title={removal?.stage ? t('productionTasks.template.removeStageTitle') : t('productionTasks.template.removeSectionTitle')}

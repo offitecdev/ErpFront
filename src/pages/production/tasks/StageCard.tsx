@@ -1,6 +1,7 @@
 import { useState, type MouseEvent } from 'react';
-import { Check, ChevronDown, ChevronRight, ChevronUp, Clock3, FileText, Paperclip, Plus, ShieldCheck, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ChevronUp, Clock3, FileText, Lock, Paperclip, Play, Plus, ShieldCheck, Square, Trash2, X } from 'lucide-react';
 
+import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { t } from '@/i18n/translate';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
 import type { ProductionTask, TaskArea, TaskSectionStage, TaskStage, TaskStatus, TaskSubtask } from '@/types/productionTasks';
@@ -10,7 +11,7 @@ import { CompleteSubtaskDialog } from './CompleteSubtaskDialog';
 import { NameInput } from './InlineName';
 import { PeopleCell, type PersonNames } from './PeopleCell';
 import { SubtaskDetail } from './SubtaskFiles';
-import type { SubtaskActions } from './subtaskFileModel';
+import { latestFiles, type SubtaskActions } from './subtaskFileModel';
 import {
     formatDay,
     formatPercent,
@@ -38,7 +39,10 @@ const FLAGS: ReadonlyArray<{ flag: SubtaskFlag; labelKey: string; Icon: typeof F
 ];
 
 const statusTone = (status: TaskStatus): string =>
-    status === 'DONE' ? 'is-done' : status === 'PENDING' ? 'is-pending' : status === 'IN_PROGRESS' ? 'is-progress' : 'is-todo';
+    status === 'DONE' ? 'is-done'
+        : status === 'PENDING' ? 'is-pending'
+            : status === 'REVISION' ? 'is-revision'
+                : status === 'IN_PROGRESS' ? 'is-progress' : 'is-todo';
 
 /** Was man an einer eigenen Stufe der Vorlage tun kann (umbenennen, verschieben, löschen). */
 export interface StageTools {
@@ -206,6 +210,7 @@ export const StageCard = ({
     tools,
     addDisabledReason,
     onClose,
+    showStageWeight = false,
 }: {
     area: TaskArea;
     stage: TaskSectionStage;
@@ -243,6 +248,11 @@ export const StageCard = ({
     addDisabledReason?: string;
     /** Mit ✕ im Kopf — die aufgeklappte Glaskarte der Stufen (27.09.2026). */
     onClose?: () => void;
+    /**
+     * Am Gerät das Gewicht der Stufe zeigen (28.09.2026): auf den Arbeitsstufen nicht
+     * (dort immer 100 %), in der Tafel der Zuweisungen schon. Die Vorlage zeigt es immer.
+     */
+    showStageWeight?: boolean;
 }) => {
     const weight = roundPercent(tasks.reduce((sum, task) => sum + task.weight, 0));
     // Tage und Stand gibt es nur am Gerät — eine Vorlage trägt keine (28.09.2026).
@@ -263,6 +273,8 @@ export const StageCard = ({
         else next.add(taskId);
         return next;
     });
+    // Die Sperre aufheben (28.09.2026): ein Klick der Verwaltung auf das Schloss — mit Rückfrage.
+    const [unlocking, setUnlocking] = useState<{ task: ProductionTask; subtask: TaskSubtask } | null>(null);
     const completingTask = completing ? tasks.find((task) => task.id === completing.taskId) : undefined;
     const completingIndex = completingTask ? completingTask.subtasks.findIndex((subtask) => subtask.id === completing?.subtaskId) : -1;
 
@@ -324,16 +336,18 @@ export const StageCard = ({
                         </button>
                     </span>
                 )}
-                {/* Gewicht und Beitrag der Stufe ganz rechts am Rand der Karte. */}
+                {/* Gewicht und Beitrag der Stufe ganz rechts am Rand der Karte. Auf den Arbeitsstufen
+                    des Geräts nur der Beitrag (28.09.2026: das Gewicht steht dort immer auf 100 %) —
+                    die Zuweisungen zeigen es (showStageWeight). */}
                 {tasks.length > 0 && (
                     <span
                         className="ofi-ptk-card__sum"
-                        title={t('productionTasks.stage.sumHint', {
+                        title={onDevice && !showStageWeight ? undefined : t('productionTasks.stage.sumHint', {
                             weight: formatPercent(weight),
                             overall: formatPercent(overallOf(weight, share), true),
                         })}
                     >
-                        <b>{formatPercent(weight)}</b>
+                        {(!onDevice || showStageWeight) && <b>{formatPercent(weight)}</b>}
                         <small>{t('productionTasks.overallShort', { value: formatPercent(overallOf(weight, share), true) })}</small>
                     </span>
                 )}
@@ -367,8 +381,9 @@ export const StageCard = ({
                             <span role="columnheader">{t('productionTasks.table.overall')}</span>
                             {/* Der Stand gehört zur Arbeit am Gerät — die Vorlage zeigt ihn nicht. */}
                             {onDevice && <span role="columnheader">{t('productionTasks.table.status')}</span>}
-                            <span role="columnheader" className="is-left">{t('productionTasks.table.people')}</span>
-                            <span role="columnheader" className="is-left">{t('productionTasks.table.required')}</span>
+                            {/* Personen und Pflicht: Überschrift mittig (28.09.2026). */}
+                            <span role="columnheader">{t('productionTasks.table.people')}</span>
+                            <span role="columnheader">{t('productionTasks.table.required')}</span>
                         </div>
                         {tasks.map((task) => {
                             const mine = Boolean(meId && task.assigneeIds.includes(meId));
@@ -469,6 +484,10 @@ export const StageCard = ({
                                     {isOpen && task.subtasks.map((subtask, index) => {
                                         const shown = shownSubtask === subtask.id;
                                         const completed = isSubtaskCompleted(subtask);
+                                        // Wartet auf die Freigabe: ebenfalls gesperrt (28.09.2026).
+                                        const awaiting = !completed && subtask.status === 'PENDING';
+                                        const locked = completed || awaiting;
+                                        const lockLabel = t(awaiting ? 'productionTasks.subtask.lockedAwaiting' : 'productionTasks.subtask.locked');
                                         return (
                                         <div key={subtask.id} className="ofi-ptk-subgroup">
                                         <div
@@ -476,7 +495,58 @@ export const StageCard = ({
                                             role="row"
                                             onClick={subtaskActions ? (event) => { if (!fromControl(event)) setShownSubtask(shown ? null : subtask.id); } : undefined}
                                         >
-                                            <span role="cell" className="ofi-ptk-code is-sub">{subtaskCode(task.code, index)}</span>
+                                            <span role="cell" className={`ofi-ptk-code is-sub ${onDevice ? 'has-lockslot' : ''} ${foldable ? 'is-under-fold' : ''}`}>
+                                                {/* Senkrecht unter dem Fortschrittskreis der Aufgabe (28.09.2026):
+                                                    offen ▶ «Start» (wer den Stand setzen darf) · freigegeben 🔒.
+                                                    Der Platz bleibt immer frei, damit die Kürzel untereinander stehen. */}
+                                                {onDevice && (
+                                                    <span className="ofi-ptk-lockslot">
+                                                        {!completed && subtask.status === 'TODO' && statusEditable && onSubtaskStatus && (
+                                                            <button
+                                                                type="button"
+                                                                className="ofi-ptk-lockbtn is-start ofi-nosize"
+                                                                disabled={busyTaskId === task.id}
+                                                                title={t('productionTasks.subtask.start')}
+                                                                aria-label={t('productionTasks.subtask.start')}
+                                                                onClick={() => onSubtaskStatus(task, subtask, 'IN_PROGRESS')}
+                                                            >
+                                                                <Play aria-hidden />
+                                                            </button>
+                                                        )}
+                                                        {/* ■ Stopp (28.09.2026): in Arbeit → wieder offen. */}
+                                                        {!completed && subtask.status === 'IN_PROGRESS' && statusEditable && onSubtaskStatus && (
+                                                            <button
+                                                                type="button"
+                                                                className="ofi-ptk-lockbtn is-stop ofi-nosize"
+                                                                disabled={busyTaskId === task.id}
+                                                                title={t('productionTasks.subtask.stop')}
+                                                                aria-label={t('productionTasks.subtask.stop')}
+                                                                onClick={() => onSubtaskStatus(task, subtask, 'TODO')}
+                                                            >
+                                                                <Square aria-hidden />
+                                                            </button>
+                                                        )}
+                                                        {/* Gesperrt: freigegeben — oder wartet auf die Freigabe (28.09.2026, dann gelb). */}
+                                                        {locked && (subtaskActions?.isAdmin ? (
+                                                            <button
+                                                                type="button"
+                                                                className={`ofi-ptk-lockbtn ofi-nosize ${awaiting ? 'is-awaiting' : ''}`}
+                                                                title={`${lockLabel} · ${t('productionTasks.subtask.unlock')}`}
+                                                                aria-label={t('productionTasks.subtask.unlock')}
+                                                                onClick={() => setUnlocking({ task, subtask })}
+                                                            >
+                                                                <Lock aria-hidden />
+                                                            </button>
+                                                        ) : (
+                                                            <Lock role="img" aria-label={lockLabel} className={awaiting ? 'is-awaiting' : undefined}>
+                                                                {/* SVG kennt kein title-Attribut — der Hinweis steht im <title>. */}
+                                                                <title>{lockLabel}</title>
+                                                            </Lock>
+                                                        ))}
+                                                    </span>
+                                                )}
+                                                {subtaskCode(task.code, index)}
+                                            </span>
                                             <span role="cell" className="ofi-ptk-cell-name">
                                                 {subtaskActions ? (
                                                     <button
@@ -487,10 +557,10 @@ export const StageCard = ({
                                                         onClick={() => setShownSubtask(shown ? null : subtask.id)}
                                                     >
                                                         <span className="ofi-ptk-task__name">{subtask.name}</span>
-                                                        {subtask.files.length > 0 && (
-                                                            <span className="ofi-ptk-sub__files" aria-label={t('productionTasks.files.count', { count: subtask.files.length })}>
+                                                        {latestFiles(subtask.files).length > 0 && (
+                                                            <span className="ofi-ptk-sub__files" aria-label={t('productionTasks.files.count', { count: latestFiles(subtask.files).length })}>
                                                                 <Paperclip aria-hidden />
-                                                                {subtask.files.length}
+                                                                {latestFiles(subtask.files).length}
                                                             </span>
                                                         )}
                                                     </button>
@@ -521,23 +591,13 @@ export const StageCard = ({
                                             </span>
                                             {onDevice && (
                                                 <span role="cell">
-                                                    {/* Abgeschlossen: den Stand ändert niemand mehr (28.09.2026). */}
+                                                    {/* Nur zu lesen (28.09.2026: «no one can change statuses manually»):
+                                                        ▶ vorne startet, «Complete the task» sendet zur Freigabe,
+                                                        «Approve the task» gibt frei. */}
                                                     <StatusCell
                                                         status={subtask.status}
                                                         busy={busyTaskId === task.id}
                                                         needsPdf={needsPdfFirst(subtask)}
-                                                        onChange={statusEditable && onSubtaskStatus && !completed
-                                                            ? (next) => {
-                                                                // «Approval»: erledigt heisst für die Leute «wartet auf
-                                                                // Freigabe»; die Verwaltung schliesst im Fenster ab.
-                                                                if (next === 'DONE' && subtask.requiresApproval) {
-                                                                    if (subtaskActions?.isAdmin) setCompleting({ taskId: task.id, subtaskId: subtask.id });
-                                                                    else if (subtask.status !== 'PENDING') onSubtaskStatus(task, subtask, 'PENDING');
-                                                                    return;
-                                                                }
-                                                                onSubtaskStatus(task, subtask, next);
-                                                            }
-                                                            : undefined}
                                                     />
                                                 </span>
                                             )}
@@ -593,6 +653,21 @@ export const StageCard = ({
                     onClose={() => setCompleting(null)}
                 />
             )}
+            <ConfirmDialog
+                closeOnBackdrop={false}
+                open={unlocking !== null}
+                tone="primary"
+                title={t('productionTasks.subtask.unlockTitle')}
+                message={unlocking ? t('productionTasks.subtask.unlockText', { name: unlocking.subtask.name }) : undefined}
+                confirmLabel={t('productionTasks.subtask.unlockConfirm')}
+                cancelLabel={t('productionTasks.actions.cancel')}
+                onCancel={() => setUnlocking(null)}
+                onConfirm={() => {
+                    const target = unlocking;
+                    setUnlocking(null);
+                    if (target && subtaskActions) void subtaskActions.unlock(target.task, target.subtask);
+                }}
+            />
         </section>
     );
 };

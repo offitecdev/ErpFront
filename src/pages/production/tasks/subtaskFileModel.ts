@@ -1,5 +1,5 @@
 import { t } from '@/i18n/translate';
-import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
+import type { ProductionTask, TaskStatus, TaskSubtask, TaskSubtaskFile, TaskSubtaskRevisionRequest } from '@/types/productionTasks';
 
 import { isSubtaskCompleted, SUBTASK_FILE_MAX_BYTES } from './taskModel';
 
@@ -11,17 +11,99 @@ export interface SubtaskActions {
     meId: string | null;
     /** Für die Unterzeile des Abschlussfensters. */
     deviceName: string;
-    upload: (task: ProductionTask, subtask: TaskSubtask, file: File) => Promise<boolean>;
+    /** Eine Datei hochladen — mit `revisionOf` als neue Fassung einer vorhandenen (28.09.2026). */
+    upload: (task: ProductionTask, subtask: TaskSubtask, file: File, revisionOf?: string, revisionNote?: string) => Promise<boolean>;
     removeFile: (task: ProductionTask, subtask: TaskSubtask, file: TaskSubtaskFile) => Promise<void>;
     openFile: (task: ProductionTask, subtask: TaskSubtask, file: TaskSubtaskFile) => void;
     /** Die Datei selbst (für das Vorschaubild). */
     loadFile: (task: ProductionTask, subtask: TaskSubtask, file: TaskSubtaskFile) => Promise<Blob>;
-    complete: (task: ProductionTask, subtask: TaskSubtask, note: string) => Promise<boolean>;
+    /** «Approve the task» — mit den abgehakten Punkten der Checkliste (der Server prüft sie). */
+    complete: (task: ProductionTask, subtask: TaskSubtask, note: string, checked: string[]) => Promise<boolean>;
+    /** «Request revision» beim Prüfen der Dateien — zurück in Arbeit. */
+    requestRevision: (task: ProductionTask, subtask: TaskSubtask, note: string) => Promise<boolean>;
+    /** Der Stand einer Unteraufgabe — «Complete the task» setzt «wartet auf Freigabe». */
+    setStatus: (task: ProductionTask, subtask: TaskSubtask, status: TaskStatus) => Promise<void>;
+    /** Ein Punkt mehr in der Freigabe-Checkliste — aus «Approve the files»; der Stand bleibt. */
+    addChecklistItem: (task: ProductionTask, subtask: TaskSubtask, text: string) => Promise<boolean>;
+    /** Die Sperre aufheben (Klick auf das Schloss) — wartet danach wieder auf die Freigabe. */
+    unlock: (task: ProductionTask, subtask: TaskSubtask) => Promise<boolean>;
 }
 
-/** Wer darf hier hochladen? — wie der Server. */
+const two = (value: number) => String(value).padStart(2, '0');
+
+/** Datum und Uhrzeit, immer vollständig: «28.09.2026 14:05». */
+export const formatDateTime = (iso: string | null): string => {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${two(date.getDate())}.${two(date.getMonth() + 1)}.${date.getFullYear()} ${two(date.getHours())}:${two(date.getMinutes())}`;
+};
+
+/** Dateien zu — wie der Server: freigegeben (gesperrt) oder «wartet auf Freigabe» (28.09.2026), für alle. */
+export const filesLocked = (subtask: TaskSubtask): boolean => isSubtaskCompleted(subtask) || subtask.status === 'PENDING';
+
+/** Wer darf hier hochladen? — wie der Server: gesperrt niemand, sonst die Verwaltung und wer in der Aufgabe steht. */
 export const canUploadTo = (actions: SubtaskActions, task: ProductionTask, subtask: TaskSubtask): boolean =>
-    actions.isAdmin || (!isSubtaskCompleted(subtask) && Boolean(actions.meId && task.assigneeIds.includes(actions.meId)));
+    !filesLocked(subtask) && (actions.isAdmin || Boolean(actions.meId && task.assigneeIds.includes(actions.meId)));
+
+/**
+ * Die Dateien einer Unteraufgabe, nach Fassungen gruppiert (28.09.2026: «each file … can
+ * have revised versions»): je Gruppe die aktuelle (höchste) Fassung und die früheren,
+ * neueste zuerst. Reihenfolge der Gruppen: wie ihre erste Fassung hochgeladen wurde.
+ */
+export interface FileGroup { latest: TaskSubtaskFile; older: TaskSubtaskFile[] }
+export const fileGroups = (files: readonly TaskSubtaskFile[]): FileGroup[] => {
+    const groups = new Map<string, TaskSubtaskFile[]>();
+    for (const file of files) {
+        const key = file.groupId || file.id;
+        groups.set(key, [...(groups.get(key) ?? []), file]);
+    }
+    return [...groups.values()].map((list) => {
+        const sorted = [...list].sort((a, b) => (b.version || 1) - (a.version || 1));
+        return { latest: sorted[0], older: sorted.slice(1) };
+    });
+};
+
+/**
+ * Der Verlauf der Prüfung (28.09.2026: «if a revision is asked show that and specify the
+ * revised version and order them by their dates»): alle hochgeladenen Fassungen und alle
+ * Rückgaben zur Überarbeitung in EINER Liste, nach Datum (älteste zuerst). Eine Rückgabe
+ * kennt die Fassungen, die danach (und vor der nächsten Rückgabe) kamen — die überarbeiteten;
+ * eine Fassung kennt die Rückgabe, auf die sie antwortet.
+ */
+export type ReviewEntry =
+    | { kind: 'upload'; at: string; file: TaskSubtaskFile; answers: TaskSubtaskRevisionRequest | null }
+    | { kind: 'request'; at: string; request: TaskSubtaskRevisionRequest; revised: TaskSubtaskFile[] };
+
+export const reviewTimeline = (subtask: Pick<TaskSubtask, 'files' | 'revisionHistory' | 'revisionAt' | 'revisionByName' | 'revisionById' | 'revisionNote'>): ReviewEntry[] => {
+    // Ältere Daten kennen nur die letzte Rückgabe (ohne Verlauf) — dann gilt sie allein.
+    const requests = [...(subtask.revisionHistory?.length
+        ? subtask.revisionHistory
+        : subtask.revisionAt
+            ? [{ byId: subtask.revisionById, byName: subtask.revisionByName, at: subtask.revisionAt, note: subtask.revisionNote }]
+            : [])].sort((a, b) => a.at.localeCompare(b.at));
+    const answering = (file: TaskSubtaskFile) =>
+        [...requests].reverse().find((request) => request.at < file.uploadedAt) ?? null;
+    const entries: ReviewEntry[] = [
+        ...subtask.files.map((file): ReviewEntry => ({ kind: 'upload', at: file.uploadedAt, file, answers: answering(file) })),
+        ...requests.map((request, index): ReviewEntry => ({
+            kind: 'request',
+            at: request.at,
+            request,
+            revised: subtask.files
+                .filter((file) => file.uploadedAt > request.at && (!requests[index + 1] || file.uploadedAt < requests[index + 1].at))
+                .sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt)),
+        })),
+    ];
+    return entries.sort((a, b) => a.at.localeCompare(b.at));
+};
+
+/** Die letzte Rückgabe zur Überarbeitung — und die Fassungen, die darauf kamen. */
+export const lastRevisionRequest = (timeline: readonly ReviewEntry[]) =>
+    [...timeline].reverse().find((entry): entry is Extract<ReviewEntry, { kind: 'request' }> => entry.kind === 'request') ?? null;
+
+/** Nur die aktuellen Fassungen — das, was geprüft und gezählt wird. */
+export const latestFiles = (files: readonly TaskSubtaskFile[]): TaskSubtaskFile[] => fileGroups(files).map((group) => group.latest);
 
 export const isPdf = (file: { type: string }): boolean => file.type === 'application/pdf';
 export const isImage = (file: { type: string }): boolean => file.type.startsWith('image/');
@@ -33,8 +115,6 @@ export const fileProblem = (file: File): string | null => {
     if (file.size > SUBTASK_FILE_MAX_BYTES) return t('productionTasks.files.tooLarge');
     return null;
 };
-
-const two = (value: number) => String(value).padStart(2, '0');
 
 /** «heute 08:50», «gestern 17:10» oder «26.09.2026 08:50». */
 export const formatMoment = (iso: string | null): string => {
@@ -50,9 +130,9 @@ export const formatMoment = (iso: string | null): string => {
     return `${two(date.getDate())}.${two(date.getMonth() + 1)}.${date.getFullYear()} ${time}`;
 };
 
-/** Wer darf diese Datei entfernen? — wie der Server. */
+/** Wer darf diese Datei entfernen? — wie der Server: gesperrt niemand, sonst die Verwaltung oder wer sie hochgeladen hat. */
 export const canRemoveFile = (actions: SubtaskActions, task: ProductionTask, subtask: TaskSubtask, file: TaskSubtaskFile): boolean =>
-    actions.isAdmin || (
-        !isSubtaskCompleted(subtask)
-        && Boolean(actions.meId && task.assigneeIds.includes(actions.meId) && file.uploadedById === actions.meId)
+    !filesLocked(subtask) && (
+        actions.isAdmin
+        || Boolean(actions.meId && task.assigneeIds.includes(actions.meId) && file.uploadedById === actions.meId)
     );

@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
-import { ArrowDown, ArrowUp, Info, ListChecks, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ClipboardCheck, Info, ListChecks, Plus, Trash2, X } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
@@ -15,9 +15,11 @@ import {
     dateRangeLabel,
     formatPercent,
     localToday,
+    newChecklistItemId,
     newSubtaskId,
     overallOf,
     parsePercent,
+    requirementsAdded,
     sectionLabel,
     stageLabel,
     subtaskDatesProblem,
@@ -52,6 +54,11 @@ const emptySubtask = (name: string): TaskSubtask => ({
     completedByName: null,
     completedAt: null,
     completionNote: null,
+    revisionById: null,
+    revisionByName: null,
+    revisionAt: null,
+    revisionNote: null,
+    revisionHistory: [],
     name,
     createdAt: localToday(),
     weight: null,
@@ -59,6 +66,7 @@ const emptySubtask = (name: string): TaskSubtask => ({
     dueDate: null,
     requiresDocument: false,
     requiresApproval: false,
+    approvalChecklist: [],
 });
 
 /**
@@ -117,6 +125,9 @@ export const TaskEditDialog = ({
     const [subtaskWeights, setSubtaskWeights] = useState<Record<string, string>>(() =>
         Object.fromEntries(task.subtasks.map((subtask) => [subtask.id, subtask.weight === null ? '' : weightText(subtask.weight)])));
     const [newSubtask, setNewSubtask] = useState('');
+    // Die Freigabe-Checkliste (28.09.2026): offen je Unteraufgabe, dazu der Text des neuen Punkts.
+    const [openChecklists, setOpenChecklists] = useState<ReadonlySet<string>>(() => new Set());
+    const [newChecklistItems, setNewChecklistItems] = useState<Record<string, string>>({});
     const [tried, setTried] = useState(false);
 
     const section = sections.find((entry) => entry.key === task.area) ?? null;
@@ -154,6 +165,13 @@ export const TaskEditDialog = ({
     const datesInvalid = datesReversed || [...dateProblems.values()].some(Boolean);
     const valid = !nameMissing && !weightInvalid && !subtaskWeightsExceeded && !subtaskWeightInvalid && !datesInvalid;
 
+    // Am Gerät: wie die Unteraufgaben beim Öffnen des Fensters waren — kommt an einer
+    // begonnenen eine Pflicht dazu, beginnt sie nach dem Speichern offen von vorn.
+    const original = new Map(task.subtasks.map((entry) => [entry.id, entry]));
+    const reopens = (subtask: TaskSubtask): boolean => {
+        const before = original.get(subtask.id);
+        return withDates && Boolean(before) && before!.status !== 'TODO' && requirementsAdded(before!, subtask);
+    };
     const patchSubtask = (id: string, patch: Partial<TaskSubtask>) =>
         setSubtasks((current) => current.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)));
     const moveSubtask = (index: number, offset: -1 | 1) =>
@@ -171,6 +189,25 @@ export const TaskEditDialog = ({
         setSubtasks((current) => [...current, emptySubtask(clean)]);
         setNewSubtask('');
     };
+    const toggleChecklist = (id: string) =>
+        setOpenChecklists((current) => {
+            const next = new Set(current);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    const addChecklistItem = (subtask: TaskSubtask) => {
+        const clean = (newChecklistItems[subtask.id] ?? '').replace(/\s+/g, ' ').trim();
+        if (!clean || subtask.approvalChecklist.length >= TASK_LIMITS.checklistItems) return;
+        patchSubtask(subtask.id, { approvalChecklist: [...subtask.approvalChecklist, { id: newChecklistItemId(), text: clean }] });
+        setNewChecklistItems((current) => ({ ...current, [subtask.id]: '' }));
+    };
+    const patchChecklistItem = (subtask: TaskSubtask, itemId: string, text: string) =>
+        patchSubtask(subtask.id, {
+            approvalChecklist: subtask.approvalChecklist.map((item) => (item.id === itemId ? { ...item, text } : item)),
+        });
+    const removeChecklistItem = (subtask: TaskSubtask, itemId: string) =>
+        patchSubtask(subtask.id, { approvalChecklist: subtask.approvalChecklist.filter((item) => item.id !== itemId) });
     const onNewSubtaskKey = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.key !== 'Enter') return;
         // Enter im Feld der neuen Unteraufgabe fügt an — es übernimmt nicht die ganze Aufgabe.
@@ -186,7 +223,21 @@ export const TaskEditDialog = ({
         // Was noch im Feld der neuen Unteraufgabe steht, kommt mit.
         const pending = newSubtask.replace(/\s+/g, ' ').trim();
         const list = [...subtasks, ...(pending && !subtasksFull && subtasks.length < TASK_LIMITS.subtasks ? [emptySubtask(pending)] : [])]
-            .map((entry) => ({ ...entry, name: entry.name.replace(/\s+/g, ' ').trim() }))
+            .map((entry) => ({
+                ...entry,
+                name: entry.name.replace(/\s+/g, ' ').trim(),
+                // Was noch im Feld des neuen Punkts steht, kommt mit; ohne «Approval» keine Checkliste.
+                approvalChecklist: entry.requiresApproval
+                    ? [
+                        ...entry.approvalChecklist,
+                        ...(newChecklistItems[entry.id]?.trim() && entry.approvalChecklist.length < TASK_LIMITS.checklistItems
+                            ? [{ id: newChecklistItemId(), text: newChecklistItems[entry.id] }]
+                            : []),
+                    ]
+                        .map((item) => ({ ...item, text: item.text.replace(/\s+/g, ' ').trim() }))
+                        .filter((item) => item.text)
+                    : [],
+            }))
             .filter((entry) => entry.name)
             // Eine Vorlage trägt keine Tage (28.09.2026) — auch keine alten; ohne
             // Gewicht der Aufgabe auch keine Gewichte der Unteraufgaben.
@@ -212,6 +263,7 @@ export const TaskEditDialog = ({
 
     return (
         <PopupDialog
+            closeOnBackdrop={false}
             open
             onClose={onClose}
             title={isNew ? t('productionTasks.task.newTitle') : t('productionTasks.task.editTitle', { code: task.code })}
@@ -331,67 +383,6 @@ export const TaskEditDialog = ({
                                             placeholder={t('productionTasks.subtask.name')}
                                             onChange={(event) => patchSubtask(subtask.id, { name: event.target.value })}
                                         />
-                                        <span className="ofi-ptk-subedit__tools">
-                                            <button
-                                                type="button"
-                                                className="ofi-ptk-toolbtn ofi-nosize"
-                                                disabled={index === 0}
-                                                title={t('productionTasks.subtask.moveUp')}
-                                                aria-label={t('productionTasks.subtask.moveUp')}
-                                                onClick={() => moveSubtask(index, -1)}
-                                            >
-                                                <ArrowUp aria-hidden />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="ofi-ptk-toolbtn ofi-nosize"
-                                                disabled={index === subtasks.length - 1}
-                                                title={t('productionTasks.subtask.moveDown')}
-                                                aria-label={t('productionTasks.subtask.moveDown')}
-                                                onClick={() => moveSubtask(index, 1)}
-                                            >
-                                                <ArrowDown aria-hidden />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="ofi-ptk-toolbtn is-danger ofi-nosize"
-                                                title={t('productionTasks.subtask.remove')}
-                                                aria-label={t('productionTasks.subtask.remove')}
-                                                onClick={() => setRemovingSubtask(subtask)}
-                                            >
-                                                <X aria-hidden />
-                                            </button>
-                                        </span>
-                                    </div>
-                                    <div className="ofi-ptk-subedit__meta">
-                                        {withDates && (
-                                            <>
-                                                <span className="ofi-ptk-subedit__part">
-                                                    <span>{t('productionTasks.subtask.startDate')}</span>
-                                                    <MacDatePicker
-                                                        className="is-compact"
-                                                        value={subtask.startDate ?? ''}
-                                                        min={startDate ?? undefined}
-                                                        max={(subtask.dueDate && dueDate ? (subtask.dueDate < dueDate ? subtask.dueDate : dueDate) : subtask.dueDate ?? dueDate) ?? undefined}
-                                                        clearable
-                                                        ariaLabel={t('productionTasks.subtask.startDate')}
-                                                        onChange={(day) => patchSubtask(subtask.id, { startDate: day || null })}
-                                                    />
-                                                </span>
-                                                <span className="ofi-ptk-subedit__part">
-                                                    <span>{t('productionTasks.subtask.dueDate')}</span>
-                                                    <MacDatePicker
-                                                        className="is-compact"
-                                                        value={subtask.dueDate ?? ''}
-                                                        min={(subtask.startDate && startDate ? (subtask.startDate > startDate ? subtask.startDate : startDate) : subtask.startDate ?? startDate) ?? undefined}
-                                                        max={dueDate ?? undefined}
-                                                        clearable
-                                                        ariaLabel={t('productionTasks.subtask.dueDate')}
-                                                        onChange={(day) => patchSubtask(subtask.id, { dueDate: day || null })}
-                                                    />
-                                                </span>
-                                            </>
-                                        )}
                                         <span className="ofi-ptk-subedit__part">
                                             <span>{t('productionTasks.subtask.weight')}</span>
                                             <span className={`ofi-ptk-percent is-subtask ${subtaskWeightsExceeded || parsePercent(subtaskWeights[subtask.id] ?? '') === null && (subtaskWeights[subtask.id] ?? '').trim() ? 'is-invalid' : ''}`}>
@@ -430,6 +421,67 @@ export const TaskEditDialog = ({
                                                     : formatPercent(overallOf(subtaskSectionWeight(taskWeight, subtask.weight), section?.share ?? 0), true)}
                                             </span>
                                         </span>
+                                        <span className="ofi-ptk-subedit__tools">
+                                            <button
+                                                type="button"
+                                                className="ofi-ptk-toolbtn ofi-nosize"
+                                                disabled={index === 0}
+                                                title={t('productionTasks.subtask.moveUp')}
+                                                aria-label={t('productionTasks.subtask.moveUp')}
+                                                onClick={() => moveSubtask(index, -1)}
+                                            >
+                                                <ArrowUp aria-hidden />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="ofi-ptk-toolbtn ofi-nosize"
+                                                disabled={index === subtasks.length - 1}
+                                                title={t('productionTasks.subtask.moveDown')}
+                                                aria-label={t('productionTasks.subtask.moveDown')}
+                                                onClick={() => moveSubtask(index, 1)}
+                                            >
+                                                <ArrowDown aria-hidden />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="ofi-ptk-toolbtn is-danger ofi-nosize"
+                                                title={t('productionTasks.subtask.remove')}
+                                                aria-label={t('productionTasks.subtask.remove')}
+                                                onClick={() => setRemovingSubtask(subtask)}
+                                            >
+                                                <X aria-hidden />
+                                            </button>
+                                        </span>
+                                    </div>
+                                    <div className="ofi-ptk-subedit__meta">
+                                        {withDates && (
+                                            <span className="ofi-ptk-subedit__dates">
+                                                <span className="ofi-ptk-subedit__part">
+                                                    <span>{t('productionTasks.subtask.startDate')}</span>
+                                                    <MacDatePicker
+                                                        className="is-compact"
+                                                        value={subtask.startDate ?? ''}
+                                                        min={startDate ?? undefined}
+                                                        max={(subtask.dueDate && dueDate ? (subtask.dueDate < dueDate ? subtask.dueDate : dueDate) : subtask.dueDate ?? dueDate) ?? undefined}
+                                                        clearable
+                                                        ariaLabel={t('productionTasks.subtask.startDate')}
+                                                        onChange={(day) => patchSubtask(subtask.id, { startDate: day || null })}
+                                                    />
+                                                </span>
+                                                <span className="ofi-ptk-subedit__part">
+                                                    <span>{t('productionTasks.subtask.dueDate')}</span>
+                                                    <MacDatePicker
+                                                        className="is-compact"
+                                                        value={subtask.dueDate ?? ''}
+                                                        min={(subtask.startDate && startDate ? (subtask.startDate > startDate ? subtask.startDate : startDate) : subtask.startDate ?? startDate) ?? undefined}
+                                                        max={dueDate ?? undefined}
+                                                        clearable
+                                                        ariaLabel={t('productionTasks.subtask.dueDate')}
+                                                        onChange={(day) => patchSubtask(subtask.id, { dueDate: day || null })}
+                                                    />
+                                                </span>
+                                            </span>
+                                        )}
                                         <span className="ofi-ptk-subedit__flags">
                                             {FLAGS.map(({ flag, labelKey }) => (
                                                 <label key={flag} className="ofi-ptk-flag">
@@ -444,8 +496,96 @@ export const TaskEditDialog = ({
                                                     {t(labelKey)}
                                                 </label>
                                             ))}
+                                            {/* «Approval» gewählt: daneben die Checkliste (28.09.2026). */}
+                                            {subtask.requiresApproval && (
+                                                <button
+                                                    type="button"
+                                                    className={`ofi-ptk-btn is-small ofi-nosize ofi-ptk-checklistbtn ${openChecklists.has(subtask.id) ? 'is-open' : ''}`}
+                                                    aria-expanded={openChecklists.has(subtask.id)}
+                                                    // Kurz im Knopf, ausgeschrieben beim Zeigen und für Vorleser.
+                                                    title={subtask.approvalChecklist.length
+                                                        ? t('productionTasks.subtask.checklistEdit', { count: subtask.approvalChecklist.length })
+                                                        : t('productionTasks.subtask.checklistAdd')}
+                                                    aria-label={subtask.approvalChecklist.length
+                                                        ? t('productionTasks.subtask.checklistEdit', { count: subtask.approvalChecklist.length })
+                                                        : t('productionTasks.subtask.checklistAdd')}
+                                                    onClick={() => toggleChecklist(subtask.id)}
+                                                >
+                                                    {subtask.approvalChecklist.length ? <ClipboardCheck aria-hidden /> : <Plus aria-hidden />}
+                                                    {t('productionTasks.subtask.checklistShort')}
+                                                    {subtask.approvalChecklist.length > 0 && (
+                                                        <span className="ofi-ptk-checklistbtn__count" aria-hidden>{subtask.approvalChecklist.length}</span>
+                                                    )}
+                                                </button>
+                                            )}
                                         </span>
                                     </div>
+                                    {subtask.requiresApproval && openChecklists.has(subtask.id) && (
+                                        <div className="ofi-ptk-apchecklist" role="group" aria-label={t('productionTasks.subtask.checklistTitle')}>
+                                            <span className="ofi-ptk-apchecklist__title">
+                                                <ClipboardCheck aria-hidden />
+                                                {t('productionTasks.subtask.checklistTitle')}
+                                            </span>
+                                            {subtask.approvalChecklist.map((item, itemIndex) => (
+                                                <div key={item.id} className="ofi-ptk-subedit__row">
+                                                    <span className="ofi-ptk-subedit__num" aria-hidden>{itemIndex + 1}</span>
+                                                    <input
+                                                        className="ofi-ptk-input"
+                                                        value={item.text}
+                                                        maxLength={TASK_LIMITS.checklistItemText}
+                                                        aria-label={t('productionTasks.subtask.checklistItem')}
+                                                        onChange={(event) => patchChecklistItem(subtask, item.id, event.target.value)}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="ofi-ptk-toolbtn is-danger ofi-nosize"
+                                                        title={t('productionTasks.subtask.checklistRemove')}
+                                                        aria-label={t('productionTasks.subtask.checklistRemove')}
+                                                        onClick={() => removeChecklistItem(subtask, item.id)}
+                                                    >
+                                                        <X aria-hidden />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {subtask.approvalChecklist.length < TASK_LIMITS.checklistItems && (
+                                                <div className="ofi-ptk-subedit__row is-new">
+                                                    <span className="ofi-ptk-subedit__num" aria-hidden><Plus /></span>
+                                                    <input
+                                                        className="ofi-ptk-input"
+                                                        value={newChecklistItems[subtask.id] ?? ''}
+                                                        maxLength={TASK_LIMITS.checklistItemText}
+                                                        autoFocus={!subtask.approvalChecklist.length}
+                                                        aria-label={t('productionTasks.subtask.checklistAddItem')}
+                                                        placeholder={t('productionTasks.subtask.checklistPlaceholder')}
+                                                        onChange={(event) => setNewChecklistItems((current) => ({ ...current, [subtask.id]: event.target.value }))}
+                                                        onKeyDown={(event) => {
+                                                            if (event.key !== 'Enter') return;
+                                                            // Enter fügt den Punkt an — es übernimmt nicht die ganze Aufgabe.
+                                                            event.preventDefault();
+                                                            event.stopPropagation();
+                                                            addChecklistItem(subtask);
+                                                        }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="ofi-ptk-btn is-small ofi-nosize"
+                                                        disabled={!(newChecklistItems[subtask.id] ?? '').trim()}
+                                                        onClick={() => addChecklistItem(subtask)}
+                                                    >
+                                                        {t('productionTasks.subtask.checklistAddItem')}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <span className="ofi-ptk-field__hint">{t('productionTasks.subtask.checklistHint')}</span>
+                                        </div>
+                                    )}
+                                    {/* Neue Pflicht an einer begonnenen Unteraufgabe (28.09.2026): Speichern öffnet sie wieder. */}
+                                    {reopens(subtask) && (
+                                        <div className="ofi-ptk-note is-info ofi-ptk-reopennote" role="status">
+                                            <Info aria-hidden />
+                                            <span>{t('productionTasks.subtask.reopenNote')}</span>
+                                        </div>
+                                    )}
                                     {dateProblems.get(subtask.id) && (
                                         <span className="ofi-ptk-field__error" role="alert">
                                             {dateProblems.get(subtask.id) === 'order'
@@ -503,6 +643,7 @@ export const TaskEditDialog = ({
             </form>
             {/* Löschen fragt immer nach (28.09.2026: «always show a warning»). */}
             <ConfirmDialog
+                closeOnBackdrop={false}
                 open={confirmDelete}
                 tone="danger"
                 title={t('productionTasks.task.deleteTitle')}
@@ -513,6 +654,7 @@ export const TaskEditDialog = ({
                 onConfirm={() => { setConfirmDelete(false); onDelete?.(); }}
             />
             <ConfirmDialog
+                closeOnBackdrop={false}
                 open={removingSubtask !== null}
                 tone="danger"
                 title={t('productionTasks.subtask.removeTitle')}

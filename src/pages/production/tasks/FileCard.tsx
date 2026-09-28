@@ -68,7 +68,15 @@ export const FileCard = ({
                         <span>{label}</span>
                     </span>
                     <span className="ofi-ptk-filecard__text">
-                        <b>{file.name}</b>
+                        <b>
+                            {file.name}
+                            {/* Eine spätere Fassung (28.09.2026) — «v2». */}
+                            {(file.version || 1) > 1 && (
+                                <span className="ofi-ptk-versiontag" title={t('productionTasks.files.versionHint', { version: file.version })}>
+                                    {t('productionTasks.files.versionShort', { version: file.version })}
+                                </span>
+                            )}
+                        </b>
                         <small>{meta}</small>
                     </span>
                 </span>

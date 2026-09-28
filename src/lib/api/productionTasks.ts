@@ -56,6 +56,9 @@ export const productionTasksApi = {
      */
     updateTasks: async (deviceId: string, tasks: ProductionTask[]): Promise<DeviceTasks> =>
         (await apiClient.put(`/production/devices/${encodeURIComponent(deviceId)}/tasks`, { tasks })).data,
+    /** Eine neue Stufe in der Kopie am Gerät — nur solange der Bereich unter 100 % wiegt (28.09.2026). */
+    addStage: async (deviceId: string, area: string, name: string): Promise<DeviceTasks> =>
+        (await apiClient.post(`/production/devices/${encodeURIComponent(deviceId)}/stages`, { area, name })).data,
     /** Der Stand einer Unteraufgabe — dieselben Leute; die Aufgabe folgt ihren Unteraufgaben. */
     setSubtaskStatus: async (deviceId: string, taskId: string, subtaskId: string, status: TaskStatus): Promise<{ task: ProductionTask }> =>
         (await apiClient.patch(
@@ -63,11 +66,31 @@ export const productionTasksApi = {
             { status },
         )).data,
     /** «Complete the task» — nur die Verwaltung; mit kurzer Notiz. */
-    completeSubtask: async (deviceId: string, taskId: string, subtaskId: string, note: string): Promise<{ task: ProductionTask }> =>
-        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/complete`, { note })).data,
+    completeSubtask: async (deviceId: string, taskId: string, subtaskId: string, note: string, checked: string[]): Promise<{ task: ProductionTask }> =>
+        // `checked`: die abgehakten Punkte der Freigabe-Checkliste — der Server prüft, dass alle dabei sind.
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/complete`, { note, checked })).data,
+    /** Ein Punkt mehr in der Freigabe-Checkliste — aus der Prüfansicht, nur die Verwaltung; der Stand bleibt. */
+    addChecklistItem: async (deviceId: string, taskId: string, subtaskId: string, text: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/checklist`, { text })).data,
+    /** Die Sperre aufheben — nur die Verwaltung; wartet danach wieder auf die Freigabe. */
+    unlockSubtask: async (deviceId: string, taskId: string, subtaskId: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/unlock`, {})).data,
+    /** «Request revision» — nur die Verwaltung: zurück in Arbeit, mit dem, was zu ändern ist. */
+    requestSubtaskRevision: async (deviceId: string, taskId: string, subtaskId: string, note: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/revision`, { note })).data,
     /** Eine Datei an eine Unteraufgabe (PDF/Foto). */
-    uploadSubtaskFile: async (deviceId: string, taskId: string, subtaskId: string, file: File): Promise<{ task: ProductionTask }> => {
+    uploadSubtaskFile: async (
+        deviceId: string,
+        taskId: string,
+        subtaskId: string,
+        file: File,
+        revisionOf?: string,
+        revisionNote?: string,
+    ): Promise<{ task: ProductionTask }> => {
         const form = new FormData();
+        // Zuerst die Felder, dann die Datei — multer liest die Felder vor der Datei.
+        if (revisionOf) form.append('revisionOf', revisionOf);
+        if (revisionNote) form.append('revisionNote', revisionNote);
         form.append('file', file, file.name);
         return (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/files`, form)).data;
     },

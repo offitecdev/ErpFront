@@ -56,6 +56,7 @@ export const TemplateLoadDialog = ({
 
     return (
         <PopupDialog
+            closeOnBackdrop={false}
             open
             onClose={() => { if (!busy) onClose(); }}
             title={plan ? t('productionTasks.device.replaceTitle') : t('productionTasks.device.loadTitle')}
