@@ -127,7 +127,7 @@
       "STAGE_NAME_REQUIRED": "Jede Stufe braucht einen Namen.",
       "STAGE_NAME_TAKEN": "Im Bereich «{{section}}» heissen zwei Stufen «{{name}}».",
       "STATUS_INVALID": "Unbekannter Stand.",
-      "STATUS_FORBIDDEN": "Den Stand ändern nur Administratoren und die Personen dieser Aufgabe.",
+      "STATUS_FORBIDDEN": "Den Stand ändern nur die Personen dieser Unteraufgabe — die Verwaltung gibt frei, gibt zurück oder hebt die Sperre auf.",
       "statusFailed": "Der Stand konnte nicht gespeichert werden.",
       "SUBTASK_WEIGHTS_INVALID": "Aufgabe {{row}}: die Unteraufgaben ergeben zusammen {{sum}} % der Aufgabe — höchstens 100 %.",
       "TASK_DATES_INVALID": "Die Tage der Aufgabe {{row}} passen nicht zusammen: der Beginn muss vor dem Termin liegen, die Unteraufgaben innerhalb der Tage der Aufgabe.",
@@ -144,7 +144,7 @@
       "FILE_TOO_LARGE": "Die Datei ist zu gross (max. {{max}} MB).",
       "FILES_TOO_MANY": "Eine Unteraufgabe fasst höchstens {{max}} Dateien.",
       "FILE_NOT_FOUND": "Datei nicht gefunden.",
-      "FILE_FORBIDDEN": "Das dürfen nur die Verwaltung und die Personen dieser Aufgabe."
+      "FILE_FORBIDDEN": "Das dürfen nur die Verwaltung und die Personen dieser Unteraufgabe."
     },
     "people": {
       "assign": "Person zuweisen",
@@ -200,7 +200,7 @@
       "overall": "Gesamtbeitrag",
       "overallHint": "Gewicht × Anteil des Bereichs",
       "people": "Personen",
-      "peopleHint": "Wird die Vorlage auf ein Gerät geladen, werden diese Personen zugewiesen und benachrichtigt.",
+      "peopleFromSubtasks": "Personen werden an den Unteraufgaben zugewiesen — hier stehen alle von ihnen.",
       "weight": "Gewicht",
       "weightHint": "Gewicht im Bereich {{weight}} · Beitrag zur Gesamtfertigstellung {{overall}}",
       "weightInvalid": "Bitte einen Wert zwischen 0 und 100 eingeben.",
@@ -208,14 +208,13 @@
       "startDate": "Beginn",
       "dueDate": "Termin",
       "dueBeforeStart": "Der Termin liegt vor dem Beginn.",
-      "peopleHintDevice": "Diese Personen werden an diesem Gerät zugewiesen und benachrichtigt.",
       "deleteTitle": "Aufgabe löschen?",
       "deleteText": "Die Aufgabe {{code}} «{{name}}» und ihre Unteraufgaben werden gelöscht."
     },
     "subtask": {
       "stop": "Stoppen — zurück auf «Offen»",
       "lockedAwaiting": "Wartet auf Freigabe — gesperrt",
-      "reopenNote": "Neue Pflicht — nach dem Speichern beginnt diese Unteraufgabe wieder bei «Offen»: die Leute der Aufgabe prüfen sie (▶) und schliessen sie neu ab. Sie bekommen eine Nachricht.",
+      "reopenNote": "Neue Pflicht — nach dem Speichern beginnt diese Unteraufgabe wieder bei «Offen»: die Leute der Unteraufgabe prüfen sie (▶) und schliessen sie neu ab. Sie bekommen eine Nachricht.",
       "start": "Starten — auf «In Arbeit» setzen",
       "startFirst": "Zuerst auf «In Arbeit» setzen — erst dann lässt sie sich abschliessen und zur Freigabe senden.",
       "completeHint": "Zur Freigabe senden — die Verwaltung gibt sie frei.",

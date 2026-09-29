@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
 import { ChevronRight, FileStack, ListChecks } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
@@ -10,7 +10,7 @@ import { StageCard } from '../tasks/StageCard';
 import type { SubtaskActions } from '../tasks/subtaskFileModel';
 import { StageFilesCard } from './StageFilesCard';
 import { stageFilesOf } from './stageFileModel';
-import { initialsOf, stageLabel } from '../tasks/taskModel';
+import { initialsOf, personTone, stageLabel } from '../tasks/taskModel';
 
 /** Bleibt die Karte offen, wenn man die Stufe wechselt? — solange das Fenster lebt. */
 const OPEN_KEY = 'ofi:ptk-stage-float-open';
@@ -88,7 +88,6 @@ export const StageTasksFloat = ({
     staffLoading,
     meId,
     busyTaskId,
-    onAssign,
     onStatus,
     onSubtaskStatus,
     canSetStatus,
@@ -105,10 +104,9 @@ export const StageTasksFloat = ({
     staffLoading: boolean;
     meId: string | null;
     busyTaskId: string | null;
-    onAssign?: (task: ProductionTask, assigneeIds: string[]) => void;
     onStatus?: (task: ProductionTask, status: TaskStatus) => void;
     onSubtaskStatus?: (task: ProductionTask, subtask: TaskSubtask, status: TaskStatus) => void;
-    canSetStatus?: (task: ProductionTask) => boolean;
+    canSetStatus?: (task: ProductionTask, subtask: TaskSubtask | null) => boolean;
     /** Dateien und Abschluss der Unteraufgaben; mit `isAdmin` auch das Plättchen «Dateien». */
     subtaskActions?: SubtaskActions;
 }) => {
@@ -182,7 +180,6 @@ export const StageTasksFloat = ({
                             staffLoading={staffLoading}
                             meId={meId}
                             busyTaskId={busyTaskId}
-                            onAssign={onAssign}
                             onStatus={onStatus}
                             onSubtaskStatus={onSubtaskStatus}
                             canSetStatus={canSetStatus}
@@ -210,7 +207,12 @@ export const StageTasksFloat = ({
                         {faces.length > 0 && (
                             <span className="ofi-ptk-float__faces" aria-hidden>
                                 {faces.slice(0, 3).map((id) => (
-                                    <span key={id} className={`ofi-ptk-float__face ${id === meId ? 'is-me' : ''}`} title={names.get(id)?.name}>
+                                    <span
+                                        key={id}
+                                        className={`ofi-ptk-float__face ${id === meId ? 'is-me' : ''}`}
+                                        title={names.get(id)?.name}
+                                        style={{ '--ptk-person-tone': personTone(id) } as CSSProperties}
+                                    >
                                         {initialsOf(names.get(id)?.name ?? '?')}
                                     </span>
                                 ))}

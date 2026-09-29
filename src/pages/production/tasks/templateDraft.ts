@@ -1,6 +1,6 @@
 import type { ProductionTask, TaskArea, TaskSection, TaskStage, TaskTemplate, TaskTemplateInput } from '@/types/productionTasks';
 
-import { localToday, newSectionKey, newStageKey, numberTasks, orderTasks, roundPercent } from './taskModel';
+import { localToday, newSectionKey, newStageKey, numberTasks, orderTasks, roundPercent, taskAssigneesOf } from './taskModel';
 
 /**
  * ── DER ENTWURF EINER VORLAGE (26.09.2026) ──────────────────────────────────
@@ -33,7 +33,7 @@ const copySections = (sections: readonly TaskSection[]): TaskSection[] =>
 const copyTask = (task: ProductionTask): ProductionTask => ({
     ...task,
     assigneeIds: [...task.assigneeIds],
-    subtasks: task.subtasks.map((subtask) => ({ ...subtask })),
+    subtasks: task.subtasks.map((subtask) => ({ ...subtask, assigneeIds: [...subtask.assigneeIds] })),
 });
 
 export const draftFromTemplate = (template: TaskTemplate): TemplateDraft => ({
@@ -74,7 +74,8 @@ export const draftInput = (draft: TemplateDraft): TaskTemplateInput => ({
         code: task.code,
         name: task.name,
         weight: task.weight,
-        assigneeIds: [...task.assigneeIds],
+        // Personen stehen nur an den Unteraufgaben (29.09.2026) — die Aufgabe trägt ihre Summe.
+        assigneeIds: taskAssigneesOf(task.subtasks),
         // Eine Vorlage trägt keine Tage (28.09.2026) — auch alte gehen nicht mit.
         startDate: null,
         dueDate: null,

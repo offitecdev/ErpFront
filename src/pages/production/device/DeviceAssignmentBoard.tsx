@@ -30,7 +30,8 @@ import type { DeviceTasksHandle } from './useDeviceTasks';
  * Aufgaben, steht in der Mitte «Şablondan yükle». Danach eine schmale Leiste
  * (welche Vorlage, wer sie geladen hat, wie viele Aufgaben schon Personen
  * haben) und für JEDE Stufe des gewählten Bereichs ihre kleine Karte — ein
- * Klick auf die Personen einer Aufgabe öffnet die Auswahl. Die Bereiche und
+ * Klick auf die Personen einer Unteraufgabe öffnet die Auswahl (29.09.2026:
+ * Personen nur an Unteraufgaben). Die Bereiche und
  * Stufen sind die der geladenen Vorlage (28.09.2026).
  */
 export const DeviceAssignmentBoard = ({
@@ -51,7 +52,7 @@ export const DeviceAssignmentBoard = ({
     staffLoading: boolean;
     meId: string | null;
 }) => {
-    const { data, error, loading, busyTaskId, reload, assign, saveTasks, load, unload, addStage } = handle;
+    const { data, error, loading, busyTaskId, reload, assignSubtask, saveTasks, load, unload, addStage } = handle;
     // Eine Aufgabe dieses Geräts im Fenster — bestehend oder neu in einer Stufe.
     const [taskEdit, setTaskEdit] = useState<{ task: ProductionTask; isNew: boolean } | null>(null);
     const [loadOpen, setLoadOpen] = useState(false);
@@ -231,7 +232,8 @@ export const DeviceAssignmentBoard = ({
                                 staffLoading={staffLoading}
                                 meId={meId}
                                 busyTaskId={busyTaskId}
-                                onAssign={(task, ids) => void assign(task, ids, known(ids))}
+                                // Personen nur an den Unteraufgaben (29.09.2026); die Aufgabe zeigt ihre Summe.
+                                onAssignSubtask={(task, subtask, ids) => void assignSubtask(task, subtask, ids, known(ids))}
                                 // Den Stand setzt man auf den Stufen selbst, nicht hier beim Anpassen.
                                 onOpenTask={(task) => setTaskEdit({ task, isNew: false })}
                                 onAddTask={(area, stageKey) => setTaskEdit({ task: newTask(area, stageKey), isNew: true })}

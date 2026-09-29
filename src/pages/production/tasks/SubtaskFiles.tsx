@@ -204,9 +204,10 @@ export const SubtaskDetail = ({
     // Entfernen fragt immer nach (28.09.2026).
     const [removing, setRemoving] = useState<TaskSubtaskFile | null>(null);
     const completed = isSubtaskCompleted(subtask);
-    const mayUpload = canUploadTo(actions, task, subtask);
-    // «Complete the task» dürfen dieselben wie den Stand setzen: die Verwaltung und wer in der Aufgabe steht.
-    const mayMark = !completed && (actions.isAdmin || Boolean(actions.meId && task.assigneeIds.includes(actions.meId)));
+    const mayUpload = canUploadTo(actions, subtask);
+    // «Complete the task» dürfen dieselben wie den Stand setzen: nur wer an der Unteraufgabe steht —
+    // die Verwaltung nicht von Hand (29.09.2026); sie gibt frei («Approve the task»).
+    const mayMark = !completed && Boolean(actions.meId && subtask.assigneeIds.includes(actions.meId));
     const [marking, setMarking] = useState(false);
     const markComplete = async () => {
         setMarking(true);
@@ -254,11 +255,11 @@ export const SubtaskDetail = ({
                             file={latest}
                             showVersion={older.length > 0 || (latest.version || 1) > 1}
                             onOpen={() => actions.openFile(task, subtask, latest)}
-                            onRemove={canRemoveFile(actions, task, subtask, latest) ? () => setRemoving(latest) : undefined}
+                            onRemove={canRemoveFile(actions, subtask, latest) ? () => setRemoving(latest) : undefined}
                             onRevise={mayUpload ? () => pickRevision(latest) : undefined}
                             history={older}
                             onOpenVersion={(file) => actions.openFile(task, subtask, file)}
-                            canRemoveVersion={(file) => canRemoveFile(actions, task, subtask, file)}
+                            canRemoveVersion={(file) => canRemoveFile(actions, subtask, file)}
                             onRemoveVersion={(file) => setRemoving(file)}
                         />
                     ))}

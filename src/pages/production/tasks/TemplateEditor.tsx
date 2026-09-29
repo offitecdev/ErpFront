@@ -38,6 +38,7 @@ import {
     stageNameTaken,
     TASK_LIMITS,
     tasksByStage,
+    withSubtaskAssignees,
 } from './taskModel';
 
 const shareText = (value: number) => String(value).replace('.', ',');
@@ -412,9 +413,10 @@ export const TemplateEditor = ({
                                     onOpenTask={onOpenTask}
                                     onAddTask={onAddTask}
                                     addDisabledReason={sectionFull(section.key) ? t('productionTasks.template.sectionFull') : undefined}
-                                    onAssign={canEdit ? (task, assigneeIds) => onChange({
+                                    // Personen nur an den Unteraufgaben (29.09.2026); die Aufgabe zeigt ihre Summe.
+                                    onAssignSubtask={canEdit ? (task, subtask, assigneeIds) => onChange({
                                         ...draft,
-                                        tasks: draft.tasks.map((entry) => (entry.id === task.id ? { ...entry, assigneeIds } : entry)),
+                                        tasks: draft.tasks.map((entry) => (entry.id === task.id ? withSubtaskAssignees(entry, subtask.id, assigneeIds) : entry)),
                                     }) : undefined}
                                     tools={canEdit ? {
                                         // Eine feste Stufe trägt ihren Namen aus der Übersetzung.

@@ -127,7 +127,7 @@
       "STAGE_NAME_REQUIRED": "Her aşamanın bir adı olmalı.",
       "STAGE_NAME_TAKEN": "«{{section}}» bölümünde iki aşamanın adı «{{name}}».",
       "STATUS_INVALID": "Bilinmeyen durum.",
-      "STATUS_FORBIDDEN": "Durumu yalnız yöneticiler ve bu göreve atanmış kişiler değiştirebilir.",
+      "STATUS_FORBIDDEN": "Durumu yalnız bu alt göreve atanmış kişiler değiştirir — yöneticiler onaylar, geri gönderir veya kilidi açar.",
       "statusFailed": "Durum kaydedilemedi.",
       "SUBTASK_WEIGHTS_INVALID": "{{row}}. görev: alt görevler toplamda görevin %{{sum}} kadarı — en fazla %100 olabilir.",
       "TASK_DATES_INVALID": "{{row}}. görevin tarihleri uyuşmuyor: başlangıç terminden önce olmalı, alt görevler görevin tarihleri içinde kalmalı.",
@@ -144,7 +144,7 @@
       "FILE_TOO_LARGE": "Dosya çok büyük (en fazla {{max}} MB).",
       "FILES_TOO_MANY": "Bir alt görevde en fazla {{max}} dosya olabilir.",
       "FILE_NOT_FOUND": "Dosya bulunamadı.",
-      "FILE_FORBIDDEN": "Bunu yalnızca yöneticiler ve bu görevdeki kişiler yapabilir."
+      "FILE_FORBIDDEN": "Bunu yalnızca yöneticiler ve bu alt görevdeki kişiler yapabilir."
     },
     "people": {
       "assign": "Kişi ata",
@@ -200,7 +200,7 @@
       "overall": "Genel katkı",
       "overallHint": "Ağırlık × bölüm payı",
       "people": "Kişiler",
-      "peopleHint": "Şablon bir cihaza yüklenince bu kişiler görevlendirilir ve bildirim alır.",
+      "peopleFromSubtasks": "Kişiler alt görevlere atanır — burada hepsi görünür.",
       "weight": "Ağırlık",
       "weightHint": "Bölüm içindeki ağırlığı {{weight}} · genel tamamlanmaya katkısı {{overall}}",
       "weightInvalid": "0 ile 100 arasında bir değer girin.",
@@ -208,14 +208,13 @@
       "startDate": "Başlangıç tarihi",
       "dueDate": "Termin tarihi",
       "dueBeforeStart": "Termin tarihi başlangıç tarihinden önce.",
-      "peopleHintDevice": "Bu kişiler bu cihazda görevlendirilir ve bildirim alır.",
       "deleteTitle": "Görev silinsin mi?",
       "deleteText": "{{code}} «{{name}}» görevi ve alt görevleri silinecek."
     },
     "subtask": {
       "stop": "Durdur — yapılacak’a geri al",
       "lockedAwaiting": "Onay bekliyor — kilitli",
-      "reopenNote": "Yeni gereksinim — kaydettikten sonra bu alt görev yeniden “Yapılacak” durumuna döner: görevdeki kişiler kontrol edip (▶) yeniden tamamlar. Bildirim alırlar.",
+      "reopenNote": "Yeni gereksinim — kaydettikten sonra bu alt görev yeniden “Yapılacak” durumuna döner: alt görevdeki kişiler kontrol edip (▶) yeniden tamamlar. Bildirim alırlar.",
       "start": "Başlat — devam ediyor olarak ayarla",
       "startFirst": "Önce “Devam ediyor” olarak ayarlayın — ancak o zaman tamamlanıp onaya gönderilebilir.",
       "completeHint": "Onaya gönder — bir yönetici onaylar.",

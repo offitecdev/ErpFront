@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { UserPlus } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
@@ -6,7 +6,7 @@ import type { StaffDirectoryRow } from '@/lib/api/directory';
 import type { TaskPerson } from '@/types/productionTasks';
 
 import { PersonPicker } from './PersonPicker';
-import { initialsOf, shortName } from './taskModel';
+import { initialsOf, personTone, shortName } from './taskModel';
 
 /** Wie viele Namen eine Zeile zeigt — der Rest steht als «+n» (Tipp: alle). */
 const VISIBLE = 2;
@@ -30,7 +30,10 @@ export const PersonChips = ({ ids, names, meId }: { ids: readonly string[]; name
                     key={person.id}
                     className={`ofi-ptk-person ${person.id === meId ? 'is-me' : ''} ${person.active ? '' : 'is-inactive'}`}
                 >
-                    <span className="ofi-ptk-person__dot" aria-hidden>{initialsOf(person.name)}</span>
+                    {/* Jede Person in ihrer eigenen Farbe (29.09.2026). */}
+                    <span className="ofi-ptk-person__dot" aria-hidden style={{ '--ptk-person-tone': personTone(person.id) } as CSSProperties}>
+                        {initialsOf(person.name)}
+                    </span>
                     <span className="ofi-ptk-person__name">{shortName(person.name)}</span>
                 </span>
             ))}

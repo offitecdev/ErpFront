@@ -26,6 +26,7 @@ import {
     subtaskSectionWeight,
     subtaskWeightSum,
     TASK_LIMITS,
+    taskAssigneesOf,
 } from './taskModel';
 
 const weightText = (value: number): string => (Number.isFinite(value) ? String(value).replace('.', ',') : '');
@@ -64,6 +65,7 @@ const emptySubtask = (name: string): TaskSubtask => ({
     weight: null,
     startDate: null,
     dueDate: null,
+    assigneeIds: [],
     requiresDocument: false,
     requiresApproval: false,
     approvalChecklist: [],
@@ -117,7 +119,6 @@ export const TaskEditDialog = ({
     useBackDismiss(true, onClose);
     const [name, setName] = useState(task.name);
     const [weight, setWeight] = useState(isNew && !task.weight ? '' : weightText(task.weight));
-    const [assigneeIds, setAssigneeIds] = useState<string[]>(task.assigneeIds);
     const [startDate, setStartDate] = useState<string | null>(task.startDate);
     const [dueDate, setDueDate] = useState<string | null>(task.dueDate);
     const [subtasks, setSubtasks] = useState<TaskSubtask[]>(task.subtasks);
@@ -253,7 +254,8 @@ export const TaskEditDialog = ({
             weight: parsedWeight,
             startDate: withDates ? startDate : null,
             dueDate: withDates ? dueDate : null,
-            assigneeIds,
+            // Personen stehen nur an den Unteraufgaben (29.09.2026) — die Aufgabe trägt ihre Summe.
+            assigneeIds: taskAssigneesOf(list),
             subtasks: list,
         });
     };
@@ -356,15 +358,16 @@ export const TaskEditDialog = ({
 
                 <div className="ofi-ptk-field">
                     <span className="ofi-ptk-field__label">{t('productionTasks.task.people')}</span>
+                    {/* Nur zu lesen (29.09.2026: «only assign people to subtasks») — alle Personen der
+                        Unteraufgaben; zugewiesen wird in der Tabelle, an jeder Unteraufgabe. */}
                     <PeopleCell
-                        ids={assigneeIds}
+                        ids={taskAssigneesOf(subtasks)}
                         names={names}
-                        editable
+                        editable={false}
                         staff={staff}
                         staffLoading={staffLoading}
-                        onCommit={setAssigneeIds}
                     />
-                    <span className="ofi-ptk-field__hint">{t(withDates ? 'productionTasks.task.peopleHintDevice' : 'productionTasks.task.peopleHint')}</span>
+                    <span className="ofi-ptk-field__hint">{t('productionTasks.task.peopleFromSubtasks')}</span>
                 </div>
 
                 <div className="ofi-ptk-field">
@@ -454,34 +457,49 @@ export const TaskEditDialog = ({
                                         </span>
                                     </div>
                                     <div className="ofi-ptk-subedit__meta">
-                                        {withDates && (
-                                            <span className="ofi-ptk-subedit__dates">
-                                                <span className="ofi-ptk-subedit__part">
-                                                    <span>{t('productionTasks.subtask.startDate')}</span>
-                                                    <MacDatePicker
-                                                        className="is-compact"
-                                                        value={subtask.startDate ?? ''}
-                                                        min={startDate ?? undefined}
-                                                        max={(subtask.dueDate && dueDate ? (subtask.dueDate < dueDate ? subtask.dueDate : dueDate) : subtask.dueDate ?? dueDate) ?? undefined}
-                                                        clearable
-                                                        ariaLabel={t('productionTasks.subtask.startDate')}
-                                                        onChange={(day) => patchSubtask(subtask.id, { startDate: day || null })}
-                                                    />
-                                                </span>
-                                                <span className="ofi-ptk-subedit__part">
-                                                    <span>{t('productionTasks.subtask.dueDate')}</span>
-                                                    <MacDatePicker
-                                                        className="is-compact"
-                                                        value={subtask.dueDate ?? ''}
-                                                        min={(subtask.startDate && startDate ? (subtask.startDate > startDate ? subtask.startDate : startDate) : subtask.startDate ?? startDate) ?? undefined}
-                                                        max={dueDate ?? undefined}
-                                                        clearable
-                                                        ariaLabel={t('productionTasks.subtask.dueDate')}
-                                                        onChange={(day) => patchSubtask(subtask.id, { dueDate: day || null })}
-                                                    />
-                                                </span>
+                                        <span className="ofi-ptk-subedit__lead">
+                                            {/* Personen gleich beim Anlegen (29.09.2026: «when admins create a subtask they
+                                                should be able to assign people in the same modal») — nur an Unteraufgaben. */}
+                                            <span className="ofi-ptk-subedit__part">
+                                                <span>{t('productionTasks.task.people')}</span>
+                                                <PeopleCell
+                                                    ids={subtask.assigneeIds}
+                                                    names={names}
+                                                    editable
+                                                    staff={staff}
+                                                    staffLoading={staffLoading}
+                                                    onCommit={(next) => patchSubtask(subtask.id, { assigneeIds: next })}
+                                                />
                                             </span>
-                                        )}
+                                            {withDates && (
+                                                <span className="ofi-ptk-subedit__dates">
+                                                    <span className="ofi-ptk-subedit__part">
+                                                        <span>{t('productionTasks.subtask.startDate')}</span>
+                                                        <MacDatePicker
+                                                            className="is-compact"
+                                                            value={subtask.startDate ?? ''}
+                                                            min={startDate ?? undefined}
+                                                            max={(subtask.dueDate && dueDate ? (subtask.dueDate < dueDate ? subtask.dueDate : dueDate) : subtask.dueDate ?? dueDate) ?? undefined}
+                                                            clearable
+                                                            ariaLabel={t('productionTasks.subtask.startDate')}
+                                                            onChange={(day) => patchSubtask(subtask.id, { startDate: day || null })}
+                                                        />
+                                                    </span>
+                                                    <span className="ofi-ptk-subedit__part">
+                                                        <span>{t('productionTasks.subtask.dueDate')}</span>
+                                                        <MacDatePicker
+                                                            className="is-compact"
+                                                            value={subtask.dueDate ?? ''}
+                                                            min={(subtask.startDate && startDate ? (subtask.startDate > startDate ? subtask.startDate : startDate) : subtask.startDate ?? startDate) ?? undefined}
+                                                            max={dueDate ?? undefined}
+                                                            clearable
+                                                            ariaLabel={t('productionTasks.subtask.dueDate')}
+                                                            onChange={(day) => patchSubtask(subtask.id, { dueDate: day || null })}
+                                                        />
+                                                    </span>
+                                                </span>
+                                            )}
+                                        </span>
                                         <span className="ofi-ptk-subedit__flags">
                                             {FLAGS.map(({ flag, labelKey }) => (
                                                 <label key={flag} className="ofi-ptk-flag">

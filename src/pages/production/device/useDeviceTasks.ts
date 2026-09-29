@@ -12,7 +12,7 @@ import type { DeviceTasks, ProductionTask, TaskPerson, TaskStatus, TaskSubtask, 
 
 import { openBlob } from '../bom/device/bomFiles';
 
-import { statusOfSubtasks } from '../tasks/taskModel';
+import { statusOfSubtasks, withSubtaskAssignees } from '../tasks/taskModel';
 
 interface State {
     deviceId: string;
@@ -25,7 +25,7 @@ interface State {
  *
  * Liest den Plan des Geräts (Speicher zuerst, dann still die Antwort des
  * Servers) und hält die Handlungen der Administratorrolle bereit:
- *   assign  Personen einer Aufgabe — sofort sichtbar, der Server folgt
+ *   assignSubtask  Personen einer Unteraufgabe (29.09.2026: nur dort) — sofort sichtbar, der Server folgt
  *   status  der Stand einer Aufgabe (auch wer in ihr steht) — ebenso
  *   saveTasks  die Aufgaben des Geräts anpassen (nur diese Kopie, nie die Vorlage)
  *   load    eine Vorlage auf das Gerät legen (auch ersetzen)
@@ -62,23 +62,24 @@ export const useDeviceTasks = (deviceId: string) => {
         void primeDeviceTasks(deviceId, next);
     }, [deviceId]);
 
-    const assign = useCallback(async (task: ProductionTask, assigneeIds: string[], known: TaskPerson[] = []) => {
+    const assignSubtask = useCallback(async (task: ProductionTask, subtask: TaskSubtask, assigneeIds: string[], known: TaskPerson[] = []) => {
         const before = dataRef.current;
         if (!before) return;
-        const previousIds = before.tasks.find((entry) => entry.id === task.id)?.assigneeIds ?? task.assigneeIds;
-        /* Sofort zeigen — die Namen kennt die Auswahl schon. Jeder Schritt
-           geht vom NEUESTEN Stand aus (zwei Zeilen kurz nacheinander). */
-        const withTask = (base: DeviceTasks, ids: string[], extra: TaskPerson[] = []): DeviceTasks => {
+        const previousIds = before.tasks.find((entry) => entry.id === task.id)?.subtasks.find((entry) => entry.id === subtask.id)?.assigneeIds
+            ?? subtask.assigneeIds;
+        /* Sofort zeigen — die Namen kennt die Auswahl schon; die Aufgabe zeigt die Summe
+           ihrer Unteraufgaben. Jeder Schritt geht vom NEUESTEN Stand aus (zwei Zeilen kurz nacheinander). */
+        const withSubtask = (base: DeviceTasks, ids: string[], extra: TaskPerson[] = []): DeviceTasks => {
             const people = [...base.people];
             for (const person of extra) if (!people.some((entry) => entry.id === person.id)) people.push(person);
-            return { ...base, people, tasks: base.tasks.map((entry) => (entry.id === task.id ? { ...entry, assigneeIds: ids } : entry)) };
+            return { ...base, people, tasks: base.tasks.map((entry) => (entry.id === task.id ? withSubtaskAssignees(entry, subtask.id, ids) : entry)) };
         };
-        const optimistic = withTask(before, assigneeIds, known);
+        const optimistic = withSubtask(before, assigneeIds, known);
         dataRef.current = optimistic;
         setState({ deviceId, data: optimistic, error: null });
         setBusyTaskId(task.id);
         try {
-            const result = await productionTasksApi.assign(deviceId, task.id, assigneeIds);
+            const result = await productionTasksApi.assignSubtask(deviceId, task.id, subtask.id, assigneeIds);
             const latest = dataRef.current ?? optimistic;
             commit({
                 ...latest,
@@ -87,7 +88,7 @@ export const useDeviceTasks = (deviceId: string) => {
             });
         } catch (error) {
             toast.error(productionTaskErrorText(error, 'productionTasks.err.assignFailed'));
-            const restored = withTask(dataRef.current ?? before, previousIds);
+            const restored = withSubtask(dataRef.current ?? before, previousIds);
             dataRef.current = restored;
             setState({ deviceId, data: restored, error: null });
         } finally {
@@ -290,7 +291,7 @@ export const useDeviceTasks = (deviceId: string) => {
         loading: !shown.data && !shown.error,
         busyTaskId,
         reload: () => setTick((value) => value + 1),
-        assign,
+        assignSubtask,
         setStatus,
         setSubtaskStatus,
         uploadSubtaskFile,

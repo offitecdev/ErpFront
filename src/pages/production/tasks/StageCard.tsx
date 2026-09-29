@@ -77,8 +77,8 @@ const RequiredCell = ({ flags }: { flags: typeof FLAGS }) => (
 
 /**
  * Der Stand einer Aufgabe: eine farbige Kapsel. Wer ihn setzen darf (am
- * Gerät: die Verwaltung und wer in der Aufgabe steht), bekommt ein kleines
- * Aufklappmenü in derselben Kapsel. Nur am Gerät — die Vorlage zeigt keinen
+ * Gerät: wer in der Aufgabe steht — die Verwaltung nicht von Hand,
+ * 29.09.2026), bekommt ein kleines Aufklappmenü in derselben Kapsel. Nur am Gerät — die Vorlage zeigt keinen
  * Stand (28.09.2026). Unteraufgaben tragen ihren eigenen.
  */
 const StatusCell = ({
@@ -178,14 +178,17 @@ const ProgressCell = ({ done, total, complete }: { done: number; total: number; 
  * Flucht; Tage, Gewicht, Beitrag und Stand mittig in ihrer Spalte.
  *
  *   template  in der Vorlage: ein Klick auf den Namen öffnet die Aufgabe,
+ *             Personen stehen an den Unteraufgaben (29.09.2026),
  *             der Stand zeigt den Anfang (Yapılacak), unten «+ Görev ekle»;
  *             eine eigene Stufe heisst, wie man sie im Kopf tippt, und lässt
  *             sich verschieben und löschen
- *   device    am Gerät: Personen setzt die Verwaltung, den Stand die
- *             Verwaltung und wer in der Aufgabe steht; eigene Aufgaben der
- *             lesenden Person tragen ein blaues Zeichen. Auf der Tafel der
- *             Zuweisungen öffnet die Verwaltung eine Aufgabe (mit Tagen) und
- *             legt neue an — nur für dieses Gerät (28.09.2026)
+ *   device    am Gerät: Personen setzt die Verwaltung — nur an den
+ *             Unteraufgaben (29.09.2026), die Aufgabe zeigt ihre Summe; den
+ *             Stand setzt nur, wer an der Unteraufgabe steht, die Verwaltung
+ *             nicht von Hand. Eigene Aufgaben der lesenden Person tragen ein
+ *             blaues Zeichen. Auf der Tafel der Zuweisungen öffnet die
+ *             Verwaltung eine Aufgabe (mit Tagen) und legt neue an — nur für
+ *             dieses Gerät (28.09.2026)
  */
 export const StageCard = ({
     area,
@@ -200,7 +203,7 @@ export const StageCard = ({
     staffLoading,
     meId,
     busyTaskId,
-    onAssign,
+    onAssignSubtask,
     onStatus,
     onSubtaskStatus,
     canSetStatus,
@@ -226,13 +229,17 @@ export const StageCard = ({
     staffLoading: boolean;
     meId?: string | null;
     busyTaskId?: string | null;
-    onAssign?: (task: ProductionTask, assigneeIds: string[]) => void;
+    /**
+     * Die Personen einer Unteraufgabe setzen (29.09.2026: «only assign people to
+     * subtasks»). Die Zeile der Aufgabe zeigt alle Personen ihrer Unteraufgaben, nur zu lesen.
+     */
+    onAssignSubtask?: (task: ProductionTask, subtask: TaskSubtask, assigneeIds: string[]) => void;
     /** Am Gerät: den Stand einer Aufgabe setzen. */
     onStatus?: (task: ProductionTask, status: TaskStatus) => void;
     /** Am Gerät: den Stand einer Unteraufgabe setzen (die Aufgabe folgt ihren Unteraufgaben). */
     onSubtaskStatus?: (task: ProductionTask, subtask: TaskSubtask, status: TaskStatus) => void;
-    /** Darf die lesende Person den Stand DIESER Aufgabe setzen? */
-    canSetStatus?: (task: ProductionTask) => boolean;
+    /** Darf die lesende Person den Stand DIESER Aufgabe (subtask null) bzw. Unteraufgabe setzen? */
+    canSetStatus?: (task: ProductionTask, subtask: TaskSubtask | null) => boolean;
     /**
      * Auf den Stufen des Geräts (28.09.2026): die Unteraufgaben sind zu, ein
      * Klick auf die Aufgabe klappt sie auf; ein Klick auf eine Unteraufgabe
@@ -388,7 +395,7 @@ export const StageCard = ({
                         {tasks.map((task) => {
                             const mine = Boolean(meId && task.assigneeIds.includes(meId));
                             const overall = formatPercent(overallOf(task.weight, share), true);
-                            const statusEditable = onDevice && (canSetStatus?.(task) ?? false);
+                            const statusEditable = onDevice && (canSetStatus?.(task, null) ?? false);
                             const progress = taskProgress(task);
                             const foldable = collapsible && task.subtasks.length > 0;
                             const isOpen = !collapsible || expanded.has(task.id);
@@ -468,15 +475,14 @@ export const StageCard = ({
                                             </span>
                                         )}
                                         <span role="cell" className="ofi-ptk-cell-people">
+                                            {/* Alle Personen der Unteraufgaben — nur zu lesen (29.09.2026). */}
                                             <PeopleCell
                                                 ids={task.assigneeIds}
                                                 names={names}
-                                                editable={editable && Boolean(onAssign)}
+                                                editable={false}
                                                 staff={staff}
                                                 staffLoading={staffLoading}
                                                 meId={meId}
-                                                busy={busyTaskId === task.id}
-                                                onCommit={onAssign ? (next) => onAssign(task, next) : undefined}
                                             />
                                         </span>
                                         <span role="cell" className="ofi-ptk-cell-required" />
@@ -488,6 +494,8 @@ export const StageCard = ({
                                         const awaiting = !completed && subtask.status === 'PENDING';
                                         const locked = completed || awaiting;
                                         const lockLabel = t(awaiting ? 'productionTasks.subtask.lockedAwaiting' : 'productionTasks.subtask.locked');
+                                        // ▶ / ■ nur für wer an der Unteraufgabe steht (29.09.2026).
+                                        const subtaskEditable = onDevice && (canSetStatus?.(task, subtask) ?? false);
                                         return (
                                         <div key={subtask.id} className="ofi-ptk-subgroup">
                                         <div
@@ -497,11 +505,11 @@ export const StageCard = ({
                                         >
                                             <span role="cell" className={`ofi-ptk-code is-sub ${onDevice ? 'has-lockslot' : ''} ${foldable ? 'is-under-fold' : ''}`}>
                                                 {/* Senkrecht unter dem Fortschrittskreis der Aufgabe (28.09.2026):
-                                                    offen ▶ «Start» (wer den Stand setzen darf) · freigegeben 🔒.
+                                                    offen ▶ «Start» (wer an der Unteraufgabe steht) · freigegeben 🔒.
                                                     Der Platz bleibt immer frei, damit die Kürzel untereinander stehen. */}
                                                 {onDevice && (
                                                     <span className="ofi-ptk-lockslot">
-                                                        {!completed && subtask.status === 'TODO' && statusEditable && onSubtaskStatus && (
+                                                        {!completed && subtask.status === 'TODO' && subtaskEditable && onSubtaskStatus && (
                                                             <button
                                                                 type="button"
                                                                 className="ofi-ptk-lockbtn is-start ofi-nosize"
@@ -514,7 +522,7 @@ export const StageCard = ({
                                                             </button>
                                                         )}
                                                         {/* ■ Stopp (28.09.2026): in Arbeit → wieder offen. */}
-                                                        {!completed && subtask.status === 'IN_PROGRESS' && statusEditable && onSubtaskStatus && (
+                                                        {!completed && subtask.status === 'IN_PROGRESS' && subtaskEditable && onSubtaskStatus && (
                                                             <button
                                                                 type="button"
                                                                 className="ofi-ptk-lockbtn is-stop ofi-nosize"
@@ -601,8 +609,19 @@ export const StageCard = ({
                                                     />
                                                 </span>
                                             )}
-                                            {/* Personen gehören der Aufgabe. */}
-                                            <span role="cell" />
+                                            {/* Personen stehen an der Unteraufgabe (29.09.2026); die Verwaltung setzt sie. */}
+                                            <span role="cell" className="ofi-ptk-cell-people">
+                                                <PeopleCell
+                                                    ids={subtask.assigneeIds}
+                                                    names={names}
+                                                    editable={editable && Boolean(onAssignSubtask)}
+                                                    staff={staff}
+                                                    staffLoading={staffLoading}
+                                                    meId={meId}
+                                                    busy={busyTaskId === task.id}
+                                                    onCommit={onAssignSubtask ? (next) => onAssignSubtask(task, subtask, next) : undefined}
+                                                />
+                                            </span>
                                             <RequiredCell flags={FLAGS.filter(({ flag }) => subtask[flag])} />
                                         </div>
                                         {shown && subtaskActions && (

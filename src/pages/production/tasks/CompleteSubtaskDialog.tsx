@@ -93,7 +93,8 @@ export const CompleteSubtaskDialog = ({
     const pdfs = current.filter(isPdf);
     const images = current.filter(isImage);
     const documentOk = !subtask.requiresDocument || hasSubtaskDocument(subtask);
-    const people = task.assigneeIds.map((id) => {
+    // Die Personen DIESER Unteraufgabe (29.09.2026: Personen stehen nur an Unteraufgaben).
+    const people = subtask.assigneeIds.map((id) => {
         const name = names.get(id)?.name ?? '—';
         return id === actions.meId ? `${name} ${t('productionTasks.complete.you')}` : name;
     });

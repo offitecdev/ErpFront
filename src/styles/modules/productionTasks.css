@@ -1188,16 +1188,17 @@ body > :not(#root) .ofi-ptk-form .ofi-ptk-people {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: color-mix(in srgb, var(--ptk-secondary) 26%, transparent);
-    color: var(--ptk-text);
+    /* Jede Person in ihrer eigenen Farbe (personTone, 29.09.2026). */
+    background: var(--ptk-person-tone, color-mix(in srgb, var(--ptk-secondary) 26%, transparent));
+    color: #fff;
     font-size: 8.5px;
     font-weight: 700;
     letter-spacing: 0.02em;
 }
 .ofi-ptk-person__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ofi-ptk-person.is-me { background: var(--ptk-accent-soft); color: var(--ptk-accent-text); }
-.ofi-ptk-person.is-me .ofi-ptk-person__dot { background: var(--ptk-accent); color: #fff; }
 .ofi-ptk-person.is-inactive { color: var(--ptk-muted); text-decoration: line-through; }
+.ofi-ptk-person.is-inactive .ofi-ptk-person__dot { opacity: 0.55; }
 .ofi-ptk-person.is-more { padding: 0 7px; color: var(--ptk-secondary); font-variant-numeric: tabular-nums; }
 
 #root .ofi-ptk .ofi-ptk-addtask {
@@ -1461,15 +1462,16 @@ body > :not(#root) input[type="checkbox"].ofi-ptk-check:disabled { cursor: defau
     margin-left: -6px;
     border: 2px solid var(--float-surface);
     border-radius: 50%;
-    background: color-mix(in srgb, var(--ptk-secondary) 30%, #ffffff);
-    color: var(--ptk-text);
+    background: var(--ptk-person-tone, color-mix(in srgb, var(--ptk-secondary) 30%, #ffffff));
+    color: #fff;
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.02em;
 }
 .ofi-ptk-float__face:first-child { margin-left: 0; }
-.dark .ofi-ptk-float__face { background: #48484a; border-color: #2c2d31; }
-.ofi-ptk-float__face.is-me { background: var(--ptk-accent); color: #fff; }
+.dark .ofi-ptk-float__face { background: var(--ptk-person-tone, #48484a); border-color: #2c2d31; }
+/* Die eigene Person: ihre Farbe, dazu ein Ring in der Hausfarbe. */
+.ofi-ptk-float__face.is-me { box-shadow: 0 0 0 1.5px var(--ptk-accent); }
 .ofi-ptk-float__face.is-more { background: var(--ptk-fill-strong); color: var(--ptk-secondary); font-size: 9.5px; }
 .ofi-ptk-float__chevron { flex: none; width: 16px; height: 16px; color: var(--ptk-muted); transition: transform 160ms ease, color 160ms ease; }
 .ofi-ptk-float__summary:hover .ofi-ptk-float__chevron { transform: translateX(2px); color: var(--ptk-accent); }
@@ -1543,6 +1545,8 @@ body > :not(#root) .ofi-ptk-card__close {
 .ofi-ptk-subedit__item > .ofi-ptk-reopennote { margin-left: 28px; }
 /* Unter dem Namen (28.09.2026), mit etwas Luft: links die Tage (am Gerät), rechts die Pflichtfelder. */
 .ofi-ptk-subedit__meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-width: 0; margin-top: 6px; padding-left: 28px; }
+/* Links in der zweiten Zeile: Personen (29.09.2026), am Gerät dahinter die Tage. */
+.ofi-ptk-subedit__lead { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
 .ofi-ptk-subedit__dates { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .ofi-ptk-subedit__overall {
     display: inline-flex;

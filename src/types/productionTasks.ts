@@ -96,6 +96,8 @@ export interface TaskSubtask {
     weight: number | null;
     startDate: TaskDay | null;
     dueDate: TaskDay | null;
+    /** Wer an der Unteraufgabe arbeitet (29.09.2026) — Personen stehen nur hier, nicht an der Aufgabe. */
+    assigneeIds: string[];
     requiresDocument: boolean;
     requiresApproval: boolean;
     /** Die Freigabe-Checkliste (nur mit «Approval», sonst leer). */
@@ -132,6 +134,7 @@ export interface ProductionTask {
     name: string;
     /** Gewicht innerhalb des Bereichs, in Prozent. */
     weight: number;
+    /** Alle Personen ihrer Unteraufgaben (29.09.2026) — nur zu lesen; ohne Unteraufgaben leer. */
     assigneeIds: string[];
     /** Beginn und Termin (28.09.2026) — frei lassbar. */
     startDate: TaskDay | null;

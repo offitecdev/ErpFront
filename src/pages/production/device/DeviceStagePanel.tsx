@@ -53,14 +53,10 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
     const tasks = workStage && handle.data
         ? handle.data.tasks.filter((task) => task.area === section.key && task.stage === workStage.key)
         : [];
-    const onAssign = isAdmin
-        ? (task: (typeof tasks)[number], ids: string[]) => void handle.assign(task, ids, ids.flatMap((id) => {
-            const person = names.get(id);
-            return person ? [person] : [];
-        }))
-        : undefined;
-    // Den Stand setzen die Verwaltung und wer in der Aufgabe steht.
-    const canSetStatus = (task: (typeof tasks)[number]) => isAdmin || Boolean(meId && task.assigneeIds.includes(meId));
+    // Personen setzt die Verwaltung nur auf der Tafel «Görevlendirmeler», an den Unteraufgaben (29.09.2026).
+    // Den Stand setzt nur, wer an der Unteraufgabe steht — die Verwaltung nicht von Hand (29.09.2026).
+    const canSetStatus: StageCardProps['canSetStatus'] = (task, subtask) =>
+        Boolean(meId && (subtask ?? task).assigneeIds.includes(meId));
     const onStatus = (task: (typeof tasks)[number], status: (typeof tasks)[number]['status']) => void handle.setStatus(task, status);
     const onSubtaskStatus: StageCardProps['onSubtaskStatus'] = (task, subtask, status) => void handle.setSubtaskStatus(task, subtask, status);
     // Dateien und «Complete the task» der Unteraufgaben (28.09.2026).
@@ -100,7 +96,6 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
                     staffLoading={staffLoading}
                     meId={meId}
                     busyTaskId={handle.busyTaskId}
-                    onAssign={onAssign}
                     onStatus={onStatus}
                     onSubtaskStatus={onSubtaskStatus}
                     canSetStatus={canSetStatus}
@@ -145,7 +140,6 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
                     staffLoading={staffLoading}
                     meId={meId}
                     busyTaskId={handle.busyTaskId}
-                    onAssign={onAssign}
                     onStatus={onStatus}
                     onSubtaskStatus={onSubtaskStatus}
                     canSetStatus={canSetStatus}

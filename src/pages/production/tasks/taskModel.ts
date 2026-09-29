@@ -135,6 +135,21 @@ export const sectionNameTaken = (sections: readonly TaskSection[], name: string,
 export const stageNameTaken = (section: TaskSection, name: string, exceptKey?: string): boolean =>
     section.stages.some((stage) => stage.key !== exceptKey && sameName(stageLabel(stage), name));
 
+/* ── Personen ──────────────────────────────────────────────────────────── */
+
+/**
+ * Die Personen einer Aufgabe (29.09.2026) — wie der Server: die Summe ihrer
+ * Unteraufgaben; zugewiesen wird nur an Unteraufgaben.
+ */
+export const taskAssigneesOf = (subtasks: ReadonlyArray<Pick<TaskSubtask, 'assigneeIds'>>): string[] =>
+    [...new Set(subtasks.flatMap((subtask) => subtask.assigneeIds))];
+
+/** Die Aufgabe mit neuen Personen an EINER Unteraufgabe — ihre eigenen Personen rechnen sich mit. */
+export const withSubtaskAssignees = (task: ProductionTask, subtaskId: string, assigneeIds: string[]): ProductionTask => {
+    const subtasks = task.subtasks.map((subtask) => (subtask.id === subtaskId ? { ...subtask, assigneeIds } : subtask));
+    return { ...task, subtasks, assigneeIds: taskAssigneesOf(subtasks) };
+};
+
 /* ── Kennungen ─────────────────────────────────────────────────────────── */
 
 const randomPart = (): string => Math.random().toString(36).slice(2, 10).padEnd(8, '0');
@@ -444,6 +459,24 @@ export const shortName = (name: string): string => {
 };
 
 /** Zwei Buchstaben für den runden Namenspunkt. */
+/**
+ * Die Farbe des Kreises einer Person (29.09.2026: «make the image circles
+ * colored, different for each person»). Fest an der Kennung — dieselbe Person
+ * trägt überall dieselbe Farbe. Zwölf satte Töne, auf denen weisse Initialen
+ * hell wie dunkel lesbar bleiben (Kontrast je mindestens 4,5:1); bei mehr
+ * Personen können sich Farben wiederholen.
+ */
+const PERSON_TONES = [
+    '#c92a2a', '#a61e4d', '#862e9c', '#5f3dc4', '#364fc7', '#1864ab',
+    '#0b7285', '#087f5b', '#237a36', '#4d7c0f', '#c2410c', '#b35c00',
+] as const;
+
+export const personTone = (id: string): string => {
+    let sum = 0;
+    for (let index = 0; index < id.length; index += 1) sum = (sum * 31 + id.charCodeAt(index)) % 100_000;
+    return PERSON_TONES[sum % PERSON_TONES.length];
+};
+
 export const initialsOf = (name: string): string => {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     const first = parts[0]?.charAt(0) ?? '';

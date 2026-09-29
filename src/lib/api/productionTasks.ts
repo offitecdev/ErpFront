@@ -45,9 +45,10 @@ export const productionTasksApi = {
     /** Eine Vorlage auf das Gerät legen; `replace` ersetzt einen bestehenden Plan. */
     loadTemplate: async (deviceId: string, templateId: string, replace: boolean): Promise<DeviceTasks> =>
         (await apiClient.post(`/production/devices/${encodeURIComponent(deviceId)}/tasks`, { templateId, replace })).data,
-    assign: async (deviceId: string, taskId: string, assigneeIds: string[]): Promise<{ task: ProductionTask; people: TaskPerson[] }> =>
+    /** Die Personen einer Unteraufgabe (29.09.2026) — nur die Verwaltung; die Aufgabe zeigt danach ihre Summe. */
+    assignSubtask: async (deviceId: string, taskId: string, subtaskId: string, assigneeIds: string[]): Promise<{ task: ProductionTask; people: TaskPerson[] }> =>
         (await apiClient.patch(
-            `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}`,
+            `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}`,
             { assigneeIds },
         )).data,
     /**
@@ -59,7 +60,7 @@ export const productionTasksApi = {
     /** Eine neue Stufe in der Kopie am Gerät — nur solange der Bereich unter 100 % wiegt (28.09.2026). */
     addStage: async (deviceId: string, area: string, name: string): Promise<DeviceTasks> =>
         (await apiClient.post(`/production/devices/${encodeURIComponent(deviceId)}/stages`, { area, name })).data,
-    /** Der Stand einer Unteraufgabe — dieselben Leute; die Aufgabe folgt ihren Unteraufgaben. */
+    /** Der Stand einer Unteraufgabe — nur wer an ihr steht (29.09.2026); die Aufgabe folgt ihren Unteraufgaben. */
     setSubtaskStatus: async (deviceId: string, taskId: string, subtaskId: string, status: TaskStatus): Promise<{ task: ProductionTask }> =>
         (await apiClient.patch(
             `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}/status`,

@@ -42,9 +42,9 @@ export const formatDateTime = (iso: string | null): string => {
 /** Dateien zu — wie der Server: freigegeben (gesperrt) oder «wartet auf Freigabe» (28.09.2026), für alle. */
 export const filesLocked = (subtask: TaskSubtask): boolean => isSubtaskCompleted(subtask) || subtask.status === 'PENDING';
 
-/** Wer darf hier hochladen? — wie der Server: gesperrt niemand, sonst die Verwaltung und wer in der Aufgabe steht. */
-export const canUploadTo = (actions: SubtaskActions, task: ProductionTask, subtask: TaskSubtask): boolean =>
-    !filesLocked(subtask) && (actions.isAdmin || Boolean(actions.meId && task.assigneeIds.includes(actions.meId)));
+/** Wer darf hier hochladen? — wie der Server: gesperrt niemand, sonst die Verwaltung und wer an der Unteraufgabe steht. */
+export const canUploadTo = (actions: SubtaskActions, subtask: TaskSubtask): boolean =>
+    !filesLocked(subtask) && (actions.isAdmin || Boolean(actions.meId && subtask.assigneeIds.includes(actions.meId)));
 
 /**
  * Die Dateien einer Unteraufgabe, nach Fassungen gruppiert (28.09.2026: «each file … can
@@ -131,8 +131,8 @@ export const formatMoment = (iso: string | null): string => {
 };
 
 /** Wer darf diese Datei entfernen? — wie der Server: gesperrt niemand, sonst die Verwaltung oder wer sie hochgeladen hat. */
-export const canRemoveFile = (actions: SubtaskActions, task: ProductionTask, subtask: TaskSubtask, file: TaskSubtaskFile): boolean =>
+export const canRemoveFile = (actions: SubtaskActions, subtask: TaskSubtask, file: TaskSubtaskFile): boolean =>
     !filesLocked(subtask) && (
         actions.isAdmin
-        || Boolean(actions.meId && task.assigneeIds.includes(actions.meId) && file.uploadedById === actions.meId)
+        || Boolean(actions.meId && subtask.assigneeIds.includes(actions.meId) && file.uploadedById === actions.meId)
     );

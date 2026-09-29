@@ -127,7 +127,7 @@
       "STAGE_NAME_REQUIRED": "Every stage needs a name.",
       "STAGE_NAME_TAKEN": "The section “{{section}}” has two stages named “{{name}}”.",
       "STATUS_INVALID": "Unknown status.",
-      "STATUS_FORBIDDEN": "Only administrators and the people on this task can change its status.",
+      "STATUS_FORBIDDEN": "Only the people on this subtask change its status — admins approve, return or unlock it.",
       "statusFailed": "The status couldn't be saved.",
       "SUBTASK_WEIGHTS_INVALID": "Task {{row}}: the subtasks add up to {{sum}}% of the task — at most 100%.",
       "TASK_DATES_INVALID": "The dates of task {{row}} don't fit together: the start must come before the due date, and subtasks must lie within the task's dates.",
@@ -144,7 +144,7 @@
       "FILE_TOO_LARGE": "The file is too large (max. {{max}} MB).",
       "FILES_TOO_MANY": "A subtask can hold at most {{max}} files.",
       "FILE_NOT_FOUND": "File not found.",
-      "FILE_FORBIDDEN": "Only admins and the people on this task can do this."
+      "FILE_FORBIDDEN": "Only admins and the people on this subtask can do this."
     },
     "people": {
       "assign": "Assign person",
@@ -200,7 +200,7 @@
       "overall": "Overall contribution",
       "overallHint": "Weight × section share",
       "people": "People",
-      "peopleHint": "When the template is loaded onto a device, these people are assigned and notified.",
+      "peopleFromSubtasks": "People are assigned on the subtasks — this shows everyone on them.",
       "weight": "Weight",
       "weightHint": "Weight within the section {{weight}} · contribution to overall completion {{overall}}",
       "weightInvalid": "Enter a value between 0 and 100.",
@@ -208,14 +208,13 @@
       "startDate": "Start date",
       "dueDate": "Due date",
       "dueBeforeStart": "The due date is before the start date.",
-      "peopleHintDevice": "These people are assigned on this device and notified.",
       "deleteTitle": "Delete the task?",
       "deleteText": "The task {{code}} “{{name}}” and its subtasks will be deleted."
     },
     "subtask": {
       "stop": "Stop — back to to do",
       "lockedAwaiting": "Waiting for approval — locked",
-      "reopenNote": "New requirement — after saving, this subtask starts again at “To do”: the people on the task check it (▶) and complete it again. They get a notification.",
+      "reopenNote": "New requirement — after saving, this subtask starts again at “To do”: the people on the subtask check it (▶) and complete it again. They get a notification.",
       "start": "Start — set to in progress",
       "startFirst": "Set it to “In progress” first — only then can it be completed and sent for approval.",
       "completeHint": "Send it for approval — an admin approves it.",
