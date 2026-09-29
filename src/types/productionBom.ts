@@ -3,7 +3,7 @@
  * Spiegel von Erp_Backend `application/use-cases/production/bom/bomReadModel.ts`
  * und `DeviceBomsUseCase.ts`.
  */
-import type { TaskArea } from './productionTasks';
+import type { BuiltInArea } from './productionTasks';
 
 export type BomCategory = 'MACHINE' | 'ELECTRICAL';
 export type BomStatus = 'DRAFT' | 'APPROVED' | 'COMPLETED';
@@ -13,7 +13,7 @@ export type BomUnit = 'PCS' | 'M' | 'KG' | 'SET' | 'PACK';
 export const BOM_UNITS: BomUnit[] = ['PCS', 'M', 'KG', 'SET', 'PACK'];
 
 /** Makine ↔ Mekanik, Elektrik ↔ Elektrik. */
-export const CATEGORY_OF_AREA: Record<TaskArea, BomCategory> = { MECHANICAL: 'MACHINE', ELECTRICAL: 'ELECTRICAL' };
+export const CATEGORY_OF_AREA: Record<BuiltInArea, BomCategory> = { MECHANICAL: 'MACHINE', ELECTRICAL: 'ELECTRICAL' };
 
 /** Ein Alt-BOM-Kod der Einstellungen (MAK-COOL · Soğutma devresi). */
 export interface BomCode {
@@ -24,7 +24,7 @@ export interface BomCode {
 export interface BomSettings {
     /** Höchstzahl der Alt-BOMs unter einer Haupt-BOM. */
     maxPerArea: number;
-    codes: Record<TaskArea, BomCode[]>;
+    codes: Record<BuiltInArea, BomCode[]>;
     canEdit: boolean;
 }
 
@@ -324,7 +324,7 @@ export interface Bom {
     templateId: string | null;
     templateName: string;
     mainCard: string | null;
-    area: TaskArea;
+    area: BuiltInArea;
     status: BomStatus;
     approvedAt: string | null;
     completedAt: string | null;
@@ -349,11 +349,11 @@ export interface Bom {
 
 export interface BomAreaView {
     settings: { maxPerArea: number };
-    area: TaskArea;
+    area: BuiltInArea;
     device: { id: string; name: string; quantity: number; positionNumber: string | null; isActive: boolean };
     project: { id: string; projectNumber: string; projectName: string; customerName: string | null; deliveryDate: string | null };
     canEdit: boolean;
-    counts: Record<TaskArea, number>;
+    counts: Record<BuiltInArea, number>;
     /** Die Haupt-BOM — `null` nur für Lesende, solange keine angelegt ist. */
     main: Bom | null;
     /** Die Alt-BOMs darunter. */

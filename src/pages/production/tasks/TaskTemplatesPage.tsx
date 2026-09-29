@@ -34,7 +34,7 @@ import {
     upsertTask,
     type TemplateDraft,
 } from './templateDraft';
-import { staffName } from './taskModel';
+import { roundPercent, sameName, staffName } from './taskModel';
 
 const NEW = 'new';
 
@@ -45,10 +45,11 @@ const NEW = 'new';
  *  ekleyebiliyoruz … apple mac ui, swift ui tasarımı, üretim depo modülü
  *  nasılsa o şekilde; temiz ve profesyonel.»
  *
- * Links die Vorlagen (Quellliste), rechts die gewählte: Name, Anteile der
- * Bereiche (Mekanik / Elektrik), und je Stufe die kleine Görevlendirme-Karte
- * mit den Aufgaben, ihrem Gewicht und den Personen. Das Beispiel «Chiller»
- * legt der Server beim ersten Öffnen an.
+ * Links die Vorlagen (Quellliste), rechts die gewählte: Name, die Bereiche
+ * mit ihren Anteilen, und je Stufe die kleine Görevlendirme-Karte mit den
+ * Aufgaben, ihrem Gewicht und den Personen. Das Beispiel «Chiller» legt der
+ * Server beim ersten Öffnen an. Eine neue Vorlage beginnt seit dem
+ * 28.09.2026 ohne Bereiche — sie und ihre Stufen legt man selbst an.
  *
  * Bearbeiten darf nur die Administratorrolle; alle anderen lesen. Die
  * gewählte Vorlage steht in der Adresse (`?t=`), eine neue als `?t=new`.
@@ -76,7 +77,8 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [switchTo, setSwitchTo] = useState<string | null>(null);
     const [taskEdit, setTaskEdit] = useState<{ task: ProductionTask; isNew: boolean } | null>(null);
-    const [area, setArea] = useState<TaskArea>('MECHANICAL');
+    // Leer: der erste Bereich der Vorlage.
+    const [area, setArea] = useState<TaskArea>('');
 
     const savedRef = useRef<TaskTemplate | null>(null);
     const draftRef = useRef<TemplateDraft | null>(null);
@@ -152,6 +154,11 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
 
     const guard = useUnsavedChangesGuard(dirty && !saving && !deleting);
 
+    /* Ein Name, den schon eine ANDERE Vorlage trägt — das Feld sagt es beim
+       Tippen, entscheiden tut der Server. */
+    const isNameTaken = useCallback((name: string) =>
+        (list ?? []).some((item) => item.id !== draftRef.current?.id && sameName(item.name, name)), [list]);
+
     /* Namen: zuerst die des Servers (mit «ausgetreten»), dann das Verzeichnis. */
     const names = useMemo(() => {
         const map = new Map<string, TaskPerson>();
@@ -168,7 +175,7 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
             savedRef.current = null;
             setSaved(null);
             resetDraft(emptyDraft());
-            setArea('MECHANICAL');
+            setArea('');
         } else if (draftRef.current?.id === null) {
             // Eine verworfene neue Vorlage verschwindet ganz.
             resetDraft(null);
@@ -188,6 +195,10 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
         if (!current || saving) return false;
         if (!current.name.trim()) {
             toast.error(t('productionTasks.err.NAME_REQUIRED'));
+            return false;
+        }
+        if (isNameTaken(current.name.replace(/\s+/g, ' ').trim())) {
+            toast.error(t('productionTasks.err.NAME_TAKEN', { name: current.name.trim() }));
             return false;
         }
         setSaving(true);
@@ -210,7 +221,7 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
         } finally {
             setSaving(false);
         }
-    }, [saving, resetDraft, setParams, reloadList]);
+    }, [saving, isNameTaken, resetDraft, setParams, reloadList]);
 
     /* ⌘S / Strg+S speichert — wie in jeder Mac-App. */
     useEffect(() => {
@@ -261,9 +272,10 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
 
     /* ── Aufgaben ──────────────────────────────────────────────────── */
     const openTask = (task: ProductionTask) => setTaskEdit({ task, isNew: false });
+    // Die Stufe ist gewählt — das Fenster fragt nicht noch einmal danach.
     const addTask = (targetArea: TaskArea, stage: TaskStage) => {
         if (!shownDraft) return;
-        setTaskEdit({ task: newTask(shownDraft, targetArea, stage), isNew: true });
+        setTaskEdit({ task: newTask(targetArea, stage), isNew: true });
     };
     const saveTask = (task: ProductionTask) => {
         const current = draftRef.current;
@@ -344,6 +356,7 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
                                 onDelete={() => setConfirmDelete(true)}
                                 onOpenTask={openTask}
                                 onAddTask={addTask}
+                                isNameTaken={isNameTaken}
                             />
                         ) : templateError ? (
                             <div className="ofi-ptk-state is-error">
@@ -380,8 +393,10 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
                 <TaskEditDialog
                     task={taskEdit.task}
                     isNew={taskEdit.isNew}
-                    otherCodes={shownDraft.tasks.filter((task) => task.id !== taskEdit.task.id).map((task) => task.code)}
-                    areaShares={shownDraft.areaShares}
+                    sections={shownDraft.sections}
+                    otherWeight={roundPercent(shownDraft.tasks
+                        .filter((task) => task.area === taskEdit.task.area && task.id !== taskEdit.task.id)
+                        .reduce((sum, task) => sum + task.weight, 0))}
                     names={names}
                     staff={staff}
                     staffLoading={staffLoading}
@@ -392,6 +407,7 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
             )}
 
             <PopupDialog
+                closeOnBackdrop={false}
                 open={confirmDelete}
                 onClose={() => { if (!deleting) setConfirmDelete(false); }}
                 title={t('productionTasks.template.deleteTitle')}
@@ -411,6 +427,7 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
 
             {/* Wechsel zu einer anderen Vorlage mit ungespeicherten Änderungen. */}
             <PopupDialog
+                closeOnBackdrop={false}
                 open={switchTo !== null}
                 onClose={() => setSwitchTo(null)}
                 title={t('productionTasks.template.unsavedTitle')}
@@ -439,6 +456,7 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
 
             {/* Verlassen der Seite mit ungespeicherten Änderungen. */}
             <PopupDialog
+                closeOnBackdrop={false}
                 open={guard.isOpen}
                 onClose={guard.cancel}
                 title={t('productionTasks.template.unsavedTitle')}

@@ -57,6 +57,8 @@ const glyphFor = (type: string): { tone: Tone; icon: React.ReactNode } => {
     if (kind === 'WAREHOUSE_IMPORT_REJECTED') return { tone: 'red', icon: <AlertCircle size={18} /> };
     // Üretim · Görevlendirme (26.09.2026): eine Aufgabe eines Geräts zugewiesen.
     if (kind === 'PRODUCTION_TASK_ASSIGNED') return { tone: 'blue', icon: <ListChecks size={18} /> };
+    // … und wieder geöffnet, weil neue Pflichten dazukamen (28.09.2026): neu prüfen.
+    if (kind === 'PRODUCTION_SUBTASK_REOPENED') return { tone: 'orange', icon: <ListChecks size={18} /> };
     if (kind.includes('SIGNATURE')) return { tone: 'indigo', icon: <Edit01 size={18} /> };
     if (kind.includes('REPORT')) return { tone: 'green', icon: <FileCheck02 size={18} /> };
     if (kind.includes('MAINTENANCE') || kind.includes('INSTALLATION')) return { tone: 'orange', icon: <Wrench size={18} /> };

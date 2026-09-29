@@ -3,7 +3,10 @@ import { toast } from 'sonner';
 import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBom';
 
 /** Ein Blob in einem neuen Tab (das Fenster öffnet sofort — sonst hält der Browser es für ein Popup). */
-export const openBlob = async (load: () => Promise<Blob>): Promise<void> => {
+export const openBlob = async (
+    load: () => Promise<Blob>,
+    errorText: (error: unknown) => string = productionBomErrorText,
+): Promise<void> => {
     const opened = window.open('', '_blank');
     try {
         const url = URL.createObjectURL(await load());
@@ -12,7 +15,7 @@ export const openBlob = async (load: () => Promise<Blob>): Promise<void> => {
         window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
         opened?.close();
-        toast.error(productionBomErrorText(error));
+        toast.error(errorText(error));
     }
 };
 

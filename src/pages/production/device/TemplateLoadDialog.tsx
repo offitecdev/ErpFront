@@ -8,14 +8,15 @@ import { useBackDismiss } from '@/lib/backDismiss';
 import { productionTaskErrorText, readTaskTemplates } from '@/lib/api/productionTasks';
 import type { DeviceTaskPlan, TaskTemplateSummary } from '@/types/productionTasks';
 
-import { formatPercent } from '../tasks/taskModel';
+import { formatPercent, sectionLabel } from '../tasks/taskModel';
 
 /**
  * ── ŞABLONDAN YÜKLE (26.09.2026, Vorgabe Samet) ─────────────────────────────
  *
  * «Üretimde görevlere eğer administrator isek görevleri yükleyebiliyoruz.»
  * Die Vorlagen der Firma zur Wahl — jede mit Aufgabenzahl und den Anteilen
- * der Bereiche. Eine Vorlage, deren Summen nicht aufgehen, steht ausgegraut
+ * ihrer Bereiche (seit dem 28.09.2026 die eigenen der Vorlage; sie werden
+ * zum Weg des Geräts). Eine Vorlage, deren Summen nicht aufgehen, steht ausgegraut
  * da (der Server nähme sie nicht). Liegen am Gerät schon Aufgaben, sagt das
  * Fenster, dass sie samt Personen ersetzt werden.
  */
@@ -55,6 +56,7 @@ export const TemplateLoadDialog = ({
 
     return (
         <PopupDialog
+            closeOnBackdrop={false}
             open
             onClose={() => { if (!busy) onClose(); }}
             title={plan ? t('productionTasks.device.replaceTitle') : t('productionTasks.device.loadTitle')}
@@ -117,10 +119,12 @@ export const TemplateLoadDialog = ({
                                         <b>{item.name}</b>
                                         <small>
                                             {t('productionTasks.templates.taskCount', { count: item.taskCount })}
-                                            <span className="ofi-ptk-dot" aria-hidden>·</span>
-                                            {t('productionTasks.area.mechanical')} {formatPercent(item.areaShares.MECHANICAL)}
-                                            <span className="ofi-ptk-dot" aria-hidden>·</span>
-                                            {t('productionTasks.area.electrical')} {formatPercent(item.areaShares.ELECTRICAL)}
+                                            {item.sections.map((section) => (
+                                                <span key={section.key}>
+                                                    <span className="ofi-ptk-dot" aria-hidden>·</span>
+                                                    {sectionLabel(section)} {formatPercent(section.share)}
+                                                </span>
+                                            ))}
                                         </small>
                                     </span>
                                     {item.id === plan?.templateId && <span className="ofi-ptk-tag">{t('productionTasks.device.current')}</span>}

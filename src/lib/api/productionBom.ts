@@ -26,7 +26,7 @@ import type {
     CostingProject,
     CostingProjectSummary,
 } from '../../types/productionBom';
-import type { TaskArea } from '../../types/productionTasks';
+import type { BuiltInArea } from '../../types/productionTasks';
 
 /**
  * ── BOM DER PRODUKTION (27.09.2026) ──────────────────────────────────────────
@@ -39,7 +39,7 @@ const TAGS = ['production', 'warehouse'];
 const PAGE_CACHE = { freshMs: 15_000, staleMs: 600_000, tags: TAGS };
 const enc = encodeURIComponent;
 
-const areaParam = (area: TaskArea) => (area === 'ELECTRICAL' ? 'electrical' : 'mechanical');
+const areaParam = (area: BuiltInArea) => (area === 'ELECTRICAL' ? 'electrical' : 'mechanical');
 
 export const productionBomApi = {
     settings: async (): Promise<BomSettings> => (await apiClient.get('/production/bom/settings')).data,
@@ -62,10 +62,10 @@ export const productionBomApi = {
     searchProducts: async (q: string, signal?: AbortSignal): Promise<BomProduct[]> =>
         ((await apiClient.get('/production/bom/products', { params: { q }, signal })).data as { items: BomProduct[] }).items,
 
-    deviceView: async (deviceId: string, area: TaskArea): Promise<BomAreaView> =>
+    deviceView: async (deviceId: string, area: BuiltInArea): Promise<BomAreaView> =>
         (await apiClient.get(`/production/bom/devices/${enc(deviceId)}`, { params: { area: areaParam(area) } })).data,
     /** Eine leere Alt-BOM unter der Haupt-BOM — ihr Kod kommt aus den Einstellungen. */
-    createSub: async (deviceId: string, area: TaskArea, prefix: string): Promise<{ bom: Bom }> =>
+    createSub: async (deviceId: string, area: BuiltInArea, prefix: string): Promise<{ bom: Bom }> =>
         (await apiClient.post(`/production/bom/devices/${enc(deviceId)}`, { area, prefix })).data,
     bom: async (bomId: string): Promise<{ bom: Bom }> => (await apiClient.get(`/production/bom/boms/${enc(bomId)}`)).data,
     saveLines: async (bomId: string, lines: BomLineInput[]): Promise<{ bom: Bom }> =>

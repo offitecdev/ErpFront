@@ -6,6 +6,7 @@ import type {
     DeviceTasks,
     ProductionTask,
     TaskPerson,
+    TaskStatus,
     TaskTemplate,
     TaskTemplateInput,
     TaskTemplateSummary,
@@ -21,6 +22,10 @@ import type {
 
 const TAGS = ['production'];
 const PAGE_CACHE = { freshMs: 15_000, staleMs: 600_000, tags: TAGS };
+
+/** Der Weg zu einer Unteraufgabe am Gerät. */
+const subtaskPath = (deviceId: string, taskId: string, subtaskId: string): string =>
+    `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}`;
 
 export const productionTasksApi = {
     templates: async (): Promise<TaskTemplateSummary[]> =>
@@ -40,10 +45,65 @@ export const productionTasksApi = {
     /** Eine Vorlage auf das Gerät legen; `replace` ersetzt einen bestehenden Plan. */
     loadTemplate: async (deviceId: string, templateId: string, replace: boolean): Promise<DeviceTasks> =>
         (await apiClient.post(`/production/devices/${encodeURIComponent(deviceId)}/tasks`, { templateId, replace })).data,
-    assign: async (deviceId: string, taskId: string, assigneeIds: string[]): Promise<{ task: ProductionTask; people: TaskPerson[] }> =>
+    /** Die Personen einer Unteraufgabe (29.09.2026) — nur die Verwaltung; die Aufgabe zeigt danach ihre Summe. */
+    assignSubtask: async (deviceId: string, taskId: string, subtaskId: string, assigneeIds: string[]): Promise<{ task: ProductionTask; people: TaskPerson[] }> =>
         (await apiClient.patch(
-            `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}`,
+            `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}`,
             { assigneeIds },
+        )).data,
+    /**
+     * Die Aufgaben des Geräts anpassen — nur die Kopie am Gerät, nie die
+     * Vorlage (28.09.2026). Schickt ALLE Aufgaben; neue ohne bekannte Kennung.
+     */
+    updateTasks: async (deviceId: string, tasks: ProductionTask[]): Promise<DeviceTasks> =>
+        (await apiClient.put(`/production/devices/${encodeURIComponent(deviceId)}/tasks`, { tasks })).data,
+    /** Eine neue Stufe in der Kopie am Gerät — nur solange der Bereich unter 100 % wiegt (28.09.2026). */
+    addStage: async (deviceId: string, area: string, name: string): Promise<DeviceTasks> =>
+        (await apiClient.post(`/production/devices/${encodeURIComponent(deviceId)}/stages`, { area, name })).data,
+    /** Der Stand einer Unteraufgabe — nur wer an ihr steht (29.09.2026); die Aufgabe folgt ihren Unteraufgaben. */
+    setSubtaskStatus: async (deviceId: string, taskId: string, subtaskId: string, status: TaskStatus): Promise<{ task: ProductionTask }> =>
+        (await apiClient.patch(
+            `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}/status`,
+            { status },
+        )).data,
+    /** «Complete the task» — nur die Verwaltung; mit kurzer Notiz. */
+    completeSubtask: async (deviceId: string, taskId: string, subtaskId: string, note: string, checked: string[]): Promise<{ task: ProductionTask }> =>
+        // `checked`: die abgehakten Punkte der Freigabe-Checkliste — der Server prüft, dass alle dabei sind.
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/complete`, { note, checked })).data,
+    /** Ein Punkt mehr in der Freigabe-Checkliste — aus der Prüfansicht, nur die Verwaltung; der Stand bleibt. */
+    addChecklistItem: async (deviceId: string, taskId: string, subtaskId: string, text: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/checklist`, { text })).data,
+    /** Die Sperre aufheben — nur die Verwaltung; wartet danach wieder auf die Freigabe. */
+    unlockSubtask: async (deviceId: string, taskId: string, subtaskId: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/unlock`, {})).data,
+    /** «Request revision» — nur die Verwaltung: zurück in Arbeit, mit dem, was zu ändern ist. */
+    requestSubtaskRevision: async (deviceId: string, taskId: string, subtaskId: string, note: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/revision`, { note })).data,
+    /** Eine Datei an eine Unteraufgabe (PDF/Foto). */
+    uploadSubtaskFile: async (
+        deviceId: string,
+        taskId: string,
+        subtaskId: string,
+        file: File,
+        revisionOf?: string,
+        revisionNote?: string,
+    ): Promise<{ task: ProductionTask }> => {
+        const form = new FormData();
+        // Zuerst die Felder, dann die Datei — multer liest die Felder vor der Datei.
+        if (revisionOf) form.append('revisionOf', revisionOf);
+        if (revisionNote) form.append('revisionNote', revisionNote);
+        form.append('file', file, file.name);
+        return (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/files`, form)).data;
+    },
+    subtaskFile: async (deviceId: string, taskId: string, subtaskId: string, fileId: string): Promise<Blob> =>
+        (await apiClient.get(`${subtaskPath(deviceId, taskId, subtaskId)}/files/${encodeURIComponent(fileId)}`, { responseType: 'blob' })).data,
+    removeSubtaskFile: async (deviceId: string, taskId: string, subtaskId: string, fileId: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.delete(`${subtaskPath(deviceId, taskId, subtaskId)}/files/${encodeURIComponent(fileId)}`)).data,
+    /** Der Stand einer Aufgabe — die Verwaltung und wer in der Aufgabe steht. */
+    setStatus: async (deviceId: string, taskId: string, status: TaskStatus): Promise<{ task: ProductionTask }> =>
+        (await apiClient.patch(
+            `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/status`,
+            { status },
         )).data,
     unload: async (deviceId: string): Promise<void> => {
         await apiClient.delete(`/production/devices/${encodeURIComponent(deviceId)}/tasks`);

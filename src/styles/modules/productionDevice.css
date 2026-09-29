@@ -187,6 +187,9 @@
 }
 #root .ofi-list-apple .ofi-pdev-steps__seg:hover { background: rgba(255, 255, 255, 0.55); color: var(--la-text); }
 .dark #root .ofi-list-apple .ofi-pdev-steps__seg:hover { background: rgba(255, 255, 255, 0.06); }
+/* Gesperrt (28.09.2026): die Kopie am Gerät geht nicht auf 100 % — erst die Zuweisungen richten. */
+#root .ofi-list-apple :is(.ofi-pdev-steps__seg, .ofi-pdev-steps__finish):disabled { opacity: 0.4; cursor: not-allowed; }
+#root .ofi-list-apple :is(.ofi-pdev-steps__seg, .ofi-pdev-steps__finish):disabled:hover { background: transparent; color: inherit; }
 #root .ofi-list-apple .ofi-pdev-steps__seg[aria-selected="true"] {
     background: #ffffff;
     color: var(--la-text);
@@ -223,6 +226,31 @@
     box-shadow: none;
     color: #ffffff;
 }
+/* Alle Aufgaben der Stufe erledigt: grüner Kreis mit weissem Haken (28.09.2026). */
+.ofi-pdev-steps__num.is-done,
+.ofi-pdev-steps__seg[aria-selected="true"] .ofi-pdev-steps__num.is-done { background: #1f8a3b; box-shadow: none; color: #ffffff; }
+.dark .ofi-pdev-steps__num.is-done,
+.dark .ofi-pdev-steps__seg[aria-selected="true"] .ofi-pdev-steps__num.is-done { background: #30d158; }
+.ofi-pdev-steps__num.is-done > svg { display: block; }
+/* Wartet auf Freigabe (28.09.2026): die Zahl der Unteraufgaben neben dem Namen. */
+.ofi-pdev-steps__pending {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #ff9f0a;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+.dark .ofi-pdev-steps__pending { background: #ffb340; color: #1c1c1e; }
+/* Die Zuweisungen: ein Zeichen statt einer Nummer (sie sind keine Stufe des Bereichs). */
+.ofi-pdev-steps__num.is-icon > svg { display: block; }
 .ofi-pdev-steps__label { white-space: nowrap; }
 
 /* Die Zuweisungen sieht nur die Leitung — der kleine Schild sagt es. */
@@ -331,8 +359,11 @@
     pointer-events: none;
 }
 .ofi-pdev-area.is-electrical .ofi-pdev-area__icon { color: #b77900; }
+/* Ein eigener Bereich der geladenen Vorlage (28.09.2026). */
+.ofi-pdev-area.is-custom .ofi-pdev-area__icon { color: #0a7aff; }
 .dark .ofi-pdev-area__icon { color: #aeaeb2; }
 .dark .ofi-pdev-area.is-electrical .ofi-pdev-area__icon { color: #ffcc4d; }
+.dark .ofi-pdev-area.is-custom .ofi-pdev-area__icon { color: #3b8dff; }
 #root .ofi-list-apple [data-production-select-scope] .ofi-pdev-head select.ofi-pdev-area__select:not([multiple]):not([size]) {
     appearance: none;
     -webkit-appearance: none;

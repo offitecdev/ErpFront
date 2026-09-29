@@ -7,6 +7,15 @@ import type { TaskTemplateSummary } from '@/types/productionTasks';
 import { formatPercent } from './taskModel';
 
 /**
+ * Die Anteile der Bereiche in einer Zeile («%60 / %40»); bei mehr als drei
+ * Bereichen nur ihre Zahl.
+ */
+const sharesLine = (item: TaskTemplateSummary): string =>
+    item.sections.length > 3
+        ? t('productionTasks.templates.sectionCount', { count: item.sections.length })
+        : item.sections.map((section) => formatPercent(section.share)).join(' / ');
+
+/**
  * Die Vorlagen links — eine Quellliste wie in den Mac-Apps: die gewählte
  * Zeile in Systemblau, jede zweite hellgrau, darunter Aufgabenzahl und die
  * Anteile der Bereiche. Ein oranges Dreieck sagt: die Summen gehen noch
@@ -90,8 +99,12 @@ export const TemplateList = ({
                                 <b title={item.name}>{item.name}</b>
                                 <small>
                                     {t('productionTasks.templates.taskCount', { count: item.taskCount })}
-                                    <span className="ofi-ptk-dot" aria-hidden>·</span>
-                                    {formatPercent(item.areaShares.MECHANICAL)} / {formatPercent(item.areaShares.ELECTRICAL)}
+                                    {item.sections.length > 0 && (
+                                        <>
+                                            <span className="ofi-ptk-dot" aria-hidden>·</span>
+                                            {sharesLine(item)}
+                                        </>
+                                    )}
                                 </small>
                             </span>
                             {item.isExample && <span className="ofi-ptk-tag">{t('productionTasks.templates.example')}</span>}
