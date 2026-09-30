@@ -1047,3 +1047,29 @@ html:not(.dark) #root [data-page-scrollport]:has(.ofi-home) { background-color: 
 @media (min-width: 1280px) {
     .ofi-home__workspace:has(> .ofi-home__main > .ofi-home-panel:first-child) > .ofi-home__aside { padding-top: 0; }
 }
+
+/* Alle eigenen Unteraufgaben erledigt (30.09.2026): grüner Kreis mit weissem Haken statt der Zahl. */
+.ofi-home-mytasks__project > em.is-done {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0;
+    background: #30a46c;
+}
+.ofi-home-mytasks__project > em.is-done > svg { width: 11px; height: 11px; color: #fff; stroke-width: 3.2; }
+
+/* Offene eigene Unteraufgaben als Text hinter einem grauen Strich (30.09.2026): «… | 1 open subtask». */
+.ofi-home-mytasks__open {
+    flex: none;
+    padding-left: 8px;
+    border-left: 1px solid var(--ofi-win-border);
+    color: var(--ofi-win-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.ofi-home-mytasks__project > em.is-done { margin-left: 2px; }
+.ofi-home-mytasks__project:has(> em.is-done) > span { padding-right: 8px; border-right: 1px solid var(--ofi-win-border); }

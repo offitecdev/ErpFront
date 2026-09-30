@@ -255,6 +255,7 @@ export const StageCard = ({
     showStageWeight = false,
     onStageWeight,
     hidePending = false,
+    hideStageDone = false,
     focusSubtaskId = null,
 }: {
     area: TaskArea;
@@ -306,6 +307,8 @@ export const StageCard = ({
     onStageWeight?: (weight: number) => void;
     /** Ohne das Zeichen «wartet auf Freigabe» (30.09.2026, «Görevlerim»: das gehört zu den Anfragen). */
     hidePending?: boolean;
+    /** Ohne den grünen Haken vor dem Namen einer erledigten Stufe (30.09.2026, Startseite) — die Nummer bleibt. */
+    hideStageDone?: boolean;
     /** Diese Unteraufgabe gleich zeigen (30.09.2026, «Go to subtask»): Aufgabe auf, Unteraufgabe gewählt, in Sicht. */
     focusSubtaskId?: string | null;
 }) => {
@@ -319,7 +322,7 @@ export const StageCard = ({
     const stageName = stageLabel(stage);
     const isFinish = number === null;
     // Alle Aufgaben der Stufe erledigt: die Nummer wird ein grüner Kreis mit Haken.
-    const stageDone = onDevice && tasks.length > 0 && tasks.every((task) => task.status === 'DONE');
+    const stageDone = onDevice && !hideStageDone && tasks.length > 0 && tasks.every((task) => task.status === 'DONE');
     const collapsible = onDevice && Boolean(subtaskActions);
     const pending = onDevice && !hidePending ? pendingApprovals(tasks) : 0;
     // «At first hide the subtasks» — aufgeklappte Aufgaben, die gezeigte Unteraufgabe, das Abschlussfenster.

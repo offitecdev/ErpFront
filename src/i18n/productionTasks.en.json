@@ -693,7 +693,10 @@
       "open_one": "{{count}} open subtask",
       "open_other": "{{count}} open subtasks",
       "projects": "Projects",
-      "openDevice": "Open device"
+      "openDevice": "Open device",
+      "openHint_one": "{{count}} of your subtasks is still open",
+      "openHint_other": "{{count}} of your subtasks are still open",
+      "allDone": "All your subtasks here are done"
     },
     "requests": {
       "title": "Requests",

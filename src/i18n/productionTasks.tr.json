@@ -693,7 +693,10 @@
       "open_one": "{{count}} açık alt görev",
       "open_other": "{{count}} açık alt görev",
       "projects": "Projeler",
-      "openDevice": "Cihazı aç"
+      "openDevice": "Cihazı aç",
+      "openHint_one": "{{count}} alt göreviniz henüz açık",
+      "openHint_other": "{{count}} alt göreviniz henüz açık",
+      "allDone": "Buradaki tüm alt görevleriniz tamamlandı"
     },
     "requests": {
       "title": "Talepler",

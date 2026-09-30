@@ -693,7 +693,10 @@
       "open_one": "{{count}} offene Unteraufgabe",
       "open_other": "{{count}} offene Unteraufgaben",
       "projects": "Projekte",
-      "openDevice": "Gerät öffnen"
+      "openDevice": "Gerät öffnen",
+      "openHint_one": "{{count}} Ihrer Unteraufgaben ist noch offen",
+      "openHint_other": "{{count}} Ihrer Unteraufgaben sind noch offen",
+      "allDone": "Alle Ihre Unteraufgaben hier sind erledigt"
     },
     "requests": {
       "title": "Anfragen",

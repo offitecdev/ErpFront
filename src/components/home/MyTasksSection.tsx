@@ -1,6 +1,6 @@
 import { useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Check } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
 import { hrefFor, isModifiedClick } from '@/lib/navLink';
@@ -34,6 +34,34 @@ const writeChoice = (userId: string | null, choice: Choice) => {
 const openOf = (tasks: readonly ProductionTask[], meId: string | null): number =>
     tasks.reduce((sum, task) => sum + task.subtasks.filter((subtask) =>
         Boolean(meId && subtask.assigneeIds.includes(meId)) && subtask.status !== 'DONE').length, 0);
+
+/** Wie viele Unteraufgaben die Person hier überhaupt hat — ohne eigene kein Zeichen. */
+const mineOf = (tasks: readonly ProductionTask[], meId: string | null): number =>
+    tasks.reduce((sum, task) => sum + task.subtasks.filter((subtask) => Boolean(meId && subtask.assigneeIds.includes(meId))).length, 0);
+
+/**
+ * Das Zeichen am Knopf: offene eigene Unteraufgaben als blaue Zahl — sind alle erledigt, ein
+ * grüner Kreis mit weissem Haken (30.09.2026: «show green circle and white checkmark if all
+ * tasks that are assigned to that user are completed»).
+ */
+const MineBadge = ({ open, mine }: { open: number; mine: number }) => {
+    // Offene als Text hinter einem grauen Strich (30.09.2026: «xxxxx | 1 open subtask») statt des blauen Kreises.
+    if (open > 0) {
+        return (
+            <small className="ofi-home-mytasks__open" title={t('productionTasks.myTasks.openHint', { count: open })}>
+                {t('productionTasks.myTasks.open', { count: open })}
+            </small>
+        );
+    }
+    if (mine > 0) {
+        return (
+            <em className="is-done" title={t('productionTasks.myTasks.allDone')}>
+                <Check aria-hidden />
+            </em>
+        );
+    }
+    return null;
+};
 
 /**
  * ── «GÖREVLERİM» AUF DER STARTSEITE (30.09.2026, Vorgabe Samet) ────────────
@@ -113,6 +141,7 @@ export const MyTasksSection = () => {
                 <div className="ofi-home-mytasks__projects" role="tablist" aria-label={t('productionTasks.myTasks.projects')}>
                     {projects.map((entry) => {
                         const open = entry.devices.reduce((sum, device) => sum + openOf(device.tasks, meId), 0);
+                        const mine = entry.devices.reduce((sum, device) => sum + mineOf(device.tasks, meId), 0);
                         const selected = entry.id === project.id;
                         return (
                             <button
@@ -126,7 +155,7 @@ export const MyTasksSection = () => {
                             >
                                 <b>{entry.projectNumber}</b>
                                 <span>{entry.projectName}</span>
-                                {open > 0 && <em>{open}</em>}
+                                <MineBadge open={open} mine={mine} />
                             </button>
                         );
                     })}
@@ -138,6 +167,7 @@ export const MyTasksSection = () => {
                 <div className="ofi-home-mytasks__projects is-devices" role="tablist" aria-label={t('productionTasks.myTasks.devices')}>
                     {project.devices.map((entry) => {
                         const open = openOf(entry.tasks, meId);
+                        const mine = mineOf(entry.tasks, meId);
                         const selected = entry.device.id === current?.device.id;
                         return (
                             <button
@@ -151,7 +181,7 @@ export const MyTasksSection = () => {
                             >
                                 {entry.device.positionNumber && <b>{entry.device.positionNumber}</b>}
                                 <span>{entry.device.name}</span>
-                                {open > 0 && <em>{open}</em>}
+                                <MineBadge open={open} mine={mine} />
                             </button>
                         );
                     })}
@@ -205,6 +235,8 @@ export const MyTasksSection = () => {
                                                     subtaskActions={actions}
                                                     // «Wartet auf Freigabe» gehört zu den Anfragen, nicht hierher (30.09.2026).
                                                     hidePending
+                                                    // Kein grüner Haken vor dem Namen der Stufe — die Nummer bleibt (30.09.2026).
+                                                    hideStageDone
                                                 />
                                             ))}
                                         </div>
