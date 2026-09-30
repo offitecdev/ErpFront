@@ -24,6 +24,7 @@ import {
     stageLabel,
     subtaskDatesProblem,
     subtaskSectionWeight,
+    taskSectionWeight,
     subtaskWeightSum,
     TASK_LIMITS,
     taskAssigneesOf,
@@ -102,7 +103,10 @@ export const TaskEditDialog = ({
     task: ProductionTask;
     isNew: boolean;
     sections: readonly TaskSection[];
-    /** Was die ÜBRIGEN Aufgaben des Bereichs schon wiegen — diese hier bekommt höchstens den Rest. */
+    /**
+     * Was die ÜBRIGEN Aufgaben derselben STUFE schon wiegen (30.09.2026: «the weights of the
+     * task only should fill the weight of its stage») — diese hier bekommt höchstens den Rest.
+     */
     otherWeight: number;
     /**
      * Am Gerät (28.09.2026): Beginn und Termin für Aufgabe und Unteraufgaben —
@@ -136,8 +140,10 @@ export const TaskEditDialog = ({
     const location = section && stageEntry ? `${sectionLabel(section)} › ${stageLabel(stageEntry)}` : '';
 
     const parsedWeight = parsePercent(weight);
-    // Was im Bereich noch frei ist: 100 % minus die übrigen Aufgaben.
+    // Was in der Stufe noch frei ist: 100 % minus die übrigen Aufgaben der Stufe (30.09.2026).
     const weightLeft = Math.max(0, Math.round((100 - otherWeight) * 100) / 100);
+    // Das Gewicht der Stufe im Bereich — für den Beitrag zur Gesamtfertigstellung.
+    const stageWeight = stageEntry?.weight ?? 0;
     const nameMissing = !name.trim();
     const weightInvalid = parsedWeight === null;
     /* Das Gewicht einer Unteraufgabe ist ein Anteil an ihrer Aufgabe («10 means
@@ -323,7 +329,7 @@ export const TaskEditDialog = ({
                     <div className="ofi-ptk-field is-overall">
                         <span className="ofi-ptk-field__label">{t('productionTasks.task.overall')}</span>
                         <span className="ofi-ptk-readout" title={t('productionTasks.task.overallHint')}>
-                            {parsedWeight === null ? '—' : formatPercent(overallOf(parsedWeight, section?.share ?? 0), true)}
+                            {parsedWeight === null ? '—' : formatPercent(overallOf(taskSectionWeight(stageWeight, parsedWeight), section?.share ?? 0), true)}
                         </span>
                     </div>
                 </div>
@@ -416,12 +422,12 @@ export const TaskEditDialog = ({
                                                 className="ofi-ptk-subedit__overall"
                                                 title={subtask.weight === null || noSubtaskWeights ? undefined : t('productionTasks.subtask.weightOfTask', {
                                                     weight: formatPercent(subtask.weight),
-                                                    section: formatPercent(subtaskSectionWeight(taskWeight, subtask.weight)),
+                                                    section: formatPercent(subtaskSectionWeight(taskSectionWeight(stageWeight, taskWeight), subtask.weight)),
                                                 })}
                                             >
                                                 {subtask.weight === null || noSubtaskWeights
                                                     ? '—'
-                                                    : formatPercent(overallOf(subtaskSectionWeight(taskWeight, subtask.weight), section?.share ?? 0), true)}
+                                                    : formatPercent(overallOf(subtaskSectionWeight(taskSectionWeight(stageWeight, taskWeight), subtask.weight), section?.share ?? 0), true)}
                                             </span>
                                         </span>
                                         <span className="ofi-ptk-subedit__tools">

@@ -4,8 +4,15 @@ import { apiClient } from '../axios';
 import { readQuery, refreshQuery } from './queryCache';
 import type {
     DeviceTasks,
+    MyProductionTasks,
     ProductionTask,
+    TaskActivityPage,
+    TaskActivityQuery,
+    TaskDeviceDirectory,
+    TaskRequest,
+    TaskRequestList,
     TaskPerson,
+    TaskSection,
     TaskStatus,
     TaskTemplate,
     TaskTemplateInput,
@@ -26,6 +33,10 @@ const PAGE_CACHE = { freshMs: 15_000, staleMs: 600_000, tags: TAGS };
 /** Der Weg zu einer Unteraufgabe am Gerät. */
 const subtaskPath = (deviceId: string, taskId: string, subtaskId: string): string =>
     `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}`;
+
+/** Der Weg zu einer EIGENEN Unteraufgabe («Görevlerim», 30.09.2026). */
+const mySubtaskPath = (deviceId: string, taskId: string, subtaskId: string): string =>
+    `/production/my-tasks/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}`;
 
 export const productionTasksApi = {
     templates: async (): Promise<TaskTemplateSummary[]> =>
@@ -55,8 +66,9 @@ export const productionTasksApi = {
      * Die Aufgaben des Geräts anpassen — nur die Kopie am Gerät, nie die
      * Vorlage (28.09.2026). Schickt ALLE Aufgaben; neue ohne bekannte Kennung.
      */
-    updateTasks: async (deviceId: string, tasks: ProductionTask[]): Promise<DeviceTasks> =>
-        (await apiClient.put(`/production/devices/${encodeURIComponent(deviceId)}/tasks`, { tasks })).data,
+    updateTasks: async (deviceId: string, tasks: ProductionTask[], sections?: TaskSection[]): Promise<DeviceTasks> =>
+        // `sections` (30.09.2026): die Gewichte der Stufen — ohne bleiben sie, wie sie sind.
+        (await apiClient.put(`/production/devices/${encodeURIComponent(deviceId)}/tasks`, sections ? { tasks, sections } : { tasks })).data,
     /** Eine neue Stufe in der Kopie am Gerät — nur solange der Bereich unter 100 % wiegt (28.09.2026). */
     addStage: async (deviceId: string, area: string, name: string): Promise<DeviceTasks> =>
         (await apiClient.post(`/production/devices/${encodeURIComponent(deviceId)}/stages`, { area, name })).data,
@@ -105,6 +117,64 @@ export const productionTasksApi = {
             `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/status`,
             { status },
         )).data,
+    /**
+     * Eine Seite des Verlaufs einer Stufe (30.09.2026), neueste zuerst — nur die
+     * Verwaltung; gefiltert nach Arten, Person und Zeitraum.
+     */
+    // `area`/`stage` null (30.09.2026): der Verlauf des ganzen Geräts.
+    activities: async (deviceId: string, area: string | null, stage: string | null, query: TaskActivityQuery): Promise<TaskActivityPage> =>
+        (await apiClient.get(`/production/devices/${encodeURIComponent(deviceId)}/activities`, {
+            params: {
+                ...(area && stage ? { area, stage } : {}),
+                page: query.page,
+                ...(query.pageSize ? { pageSize: query.pageSize } : {}),
+                ...(query.kinds?.length ? { kinds: query.kinds.join(',') } : {}),
+                ...(query.actorId ? { actorId: query.actorId } : {}),
+                ...(query.from ? { from: query.from } : {}),
+                ...(query.to ? { to: query.to } : {}),
+            },
+        })).data,
+    /* ── «Görevlerim» (30.09.2026): die eigenen Aufgaben — ohne Produktionsrechte, nur Eigenes ── */
+    myTasks: async (): Promise<MyProductionTasks> => (await apiClient.get('/production/my-tasks')).data,
+    mySubtaskStatus: async (deviceId: string, taskId: string, subtaskId: string, status: TaskStatus): Promise<{ task: ProductionTask }> =>
+        (await apiClient.patch(`${mySubtaskPath(deviceId, taskId, subtaskId)}/status`, { status })).data,
+    myUploadSubtaskFile: async (
+        deviceId: string,
+        taskId: string,
+        subtaskId: string,
+        file: File,
+        revisionOf?: string,
+        revisionNote?: string,
+    ): Promise<{ task: ProductionTask }> => {
+        const form = new FormData();
+        // Zuerst die Felder, dann die Datei — multer liest die Felder vor der Datei.
+        if (revisionOf) form.append('revisionOf', revisionOf);
+        if (revisionNote) form.append('revisionNote', revisionNote);
+        form.append('file', file, file.name);
+        return (await apiClient.post(`${mySubtaskPath(deviceId, taskId, subtaskId)}/files`, form)).data;
+    },
+    mySubtaskFile: async (deviceId: string, taskId: string, subtaskId: string, fileId: string): Promise<Blob> =>
+        (await apiClient.get(`${mySubtaskPath(deviceId, taskId, subtaskId)}/files/${encodeURIComponent(fileId)}`, { responseType: 'blob' })).data,
+    myRemoveSubtaskFile: async (deviceId: string, taskId: string, subtaskId: string, fileId: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.delete(`${mySubtaskPath(deviceId, taskId, subtaskId)}/files/${encodeURIComponent(fileId)}`)).data,
+    /* ── Anfragen an die Verwaltung (30.09.2026) ── */
+    /** Bitte um Entsperren — auf dem Gerät (mit Produktionsrecht). */
+    requestUnlock: async (deviceId: string, taskId: string, subtaskId: string, note: string): Promise<{ request: TaskRequest }> =>
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/unlock-request`, { note })).data,
+    /** … und über «Görevlerim» (ohne Produktionsrecht). */
+    myRequestUnlock: async (deviceId: string, taskId: string, subtaskId: string, note: string): Promise<{ request: TaskRequest }> =>
+        (await apiClient.post(`${mySubtaskPath(deviceId, taskId, subtaskId)}/unlock-request`, { note })).data,
+    /** Die Anfragen einer Stufe — nur die Verwaltung. */
+    // `area`/`stage` null (30.09.2026): die Anfragen des ganzen Geräts.
+    requests: async (deviceId: string, area: string | null, stage: string | null, status: 'open' | 'solved' | 'all'): Promise<TaskRequestList> =>
+        (await apiClient.get(`/production/devices/${encodeURIComponent(deviceId)}/requests`, {
+            params: { ...(area && stage ? { area, stage } : {}), status },
+        })).data,
+    /** Projekte und Geräte mit Aufgaben, samt offener Anfragen — nur die Verwaltung (30.09.2026). */
+    taskDevices: async (): Promise<TaskDeviceDirectory> => (await apiClient.get('/production/task-devices')).data,
+    /** «Mark as solved» — nur die Verwaltung. */
+    solveRequest: async (deviceId: string, requestId: string): Promise<{ request: TaskRequest }> =>
+        (await apiClient.post(`/production/devices/${encodeURIComponent(deviceId)}/requests/${encodeURIComponent(requestId)}/solve`, {})).data,
     unload: async (deviceId: string): Promise<void> => {
         await apiClient.delete(`/production/devices/${encodeURIComponent(deviceId)}/tasks`);
     },

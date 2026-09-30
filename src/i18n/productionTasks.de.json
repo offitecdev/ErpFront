@@ -19,6 +19,51 @@
       "title": "Produktion: neu prüfen",
       "message": "{{actor}} hat neue Pflichten ergänzt — bitte neu prüfen und abschliessen: {{tasks}} — {{device}} ({{project}})",
       "messageNoActor": "Neue Pflichten ergänzt — bitte neu prüfen und abschliessen: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskRemoved": {
+      "title": "Produktion: nicht mehr zugewiesen",
+      "message": "{{actor}} hat Sie entfernt von: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Sie wurden entfernt von: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskDeleted": {
+      "title": "Produktion: Aufgabe gelöscht",
+      "message": "{{actor}} hat gelöscht: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Gelöscht: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskUpdated": {
+      "title": "Produktion: Aufgabe geändert",
+      "message": "{{actor}} hat geändert: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Geändert: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskApproved": {
+      "title": "Produktion: freigegeben",
+      "message": "{{actor}} hat freigegeben: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Freigegeben: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskRevision": {
+      "title": "Produktion: Überarbeitung verlangt",
+      "message": "{{actor}} verlangt eine Überarbeitung: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Überarbeitung verlangt: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskRevisionNote": {
+      "title": "Produktion: Überarbeitung verlangt",
+      "message": "{{actor}} verlangt eine Überarbeitung: {{tasks}} — {{device}} ({{project}}) — «{{note}}»",
+      "messageNoActor": "Überarbeitung verlangt: {{tasks}} — {{device}} ({{project}}) — «{{note}}»"
+    },
+    "productionTaskUnlocked": {
+      "title": "Produktion: Sperre aufgehoben",
+      "message": "{{actor}} hat die Sperre aufgehoben — wieder in Arbeit: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Sperre aufgehoben — wieder in Arbeit: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionUnlockRequested": {
+      "title": "Produktion: Bitte um Entsperren",
+      "message": "{{actor}} bittet, die Sperre aufzuheben: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Bitte um Entsperren: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionUnlockRequestedNote": {
+      "title": "Produktion: Bitte um Entsperren",
+      "message": "{{actor}} bittet, die Sperre aufzuheben: {{tasks}} — {{device}} ({{project}}) — «{{note}}»",
+      "messageNoActor": "Bitte um Entsperren: {{tasks}} — {{device}} ({{project}}) — «{{note}}»"
     }
   },
   "productionTasks": {
@@ -50,8 +95,10 @@
       "ready": "Bereit",
       "readyHint": "Anteile und Gewichte ergeben 100 % — die Vorlage kann auf Geräte geladen werden.",
       "shares": "Die Anteile der Bereiche ergeben {{sum}}; es müssen 100 % sein.",
-      "weights": "Die Gewichte der Aufgaben im Bereich {{area}} ergeben {{sum}}; es müssen 100 % sein.",
-      "noSections": "Noch keine Bereiche."
+      "weights": "Die Gewichte der Stufen im Bereich {{area}} ergeben {{sum}}; es müssen 100 % sein.",
+      "noSections": "Noch keine Bereiche.",
+      "stageTasks": "Die Aufgaben von {{stage}} ({{area}}) ergeben {{sum}} der Stufe; es müssen 100 % sein.",
+      "stageEmpty": "{{stage}} ({{area}}) wiegt {{weight}}, hat aber keine Aufgaben — Aufgaben anlegen oder das Gewicht auf 0 % setzen."
     },
     "device": {
       "stageAdded": "Stufe «{{name}}» hinzugefügt — jetzt ihre Aufgaben anlegen.",
@@ -88,11 +135,23 @@
       "unloadTitle": "Aufgaben entfernen?",
       "unloadText": "Alle Aufgaben aus der Vorlage «{{name}}» und ihre Zuweisungen werden von diesem Gerät gelöscht. Die Vorlage selbst bleibt.",
       "tasksSaved": "Für dieses Gerät gespeichert — die Vorlage bleibt unverändert.",
-      "customizeHint": "Änderungen hier gelten nur für dieses Gerät, nicht für die Vorlage."
+      "customizeHint": "Änderungen hier gelten nur für dieses Gerät, nicht für die Vorlage.",
+      "saveToTemplate": "In Vorlage speichern",
+      "saveToHint": "Diese Fassung in die Vorlage «{{name}}» zurückschreiben",
+      "saveToTitle": "In «{{name}}» speichern?",
+      "saveToWarning": "Das ändert die Hauptvorlage «{{name}}» selbst, nicht nur dieses Gerät.",
+      "saveToWhat": "Die Vorlage erhält Bereiche, Stufen, Gewichte, Aufgaben, Unteraufgaben und zugewiesene Personen dieses Geräts. Stand, Dateien und Tage bleiben am Gerät.",
+      "saveToOthers_one": "{{count}} weiteres Gerät nutzt diese Vorlage. Seine Kopie bleibt, wie sie ist — erst Geräte, die die Vorlage ab jetzt laden, bekommen diese Fassung.",
+      "saveToOthers_other": "{{count}} weitere Geräte nutzen diese Vorlage. Ihre Kopien bleiben, wie sie sind — erst Geräte, die die Vorlage ab jetzt laden, bekommen diese Fassung.",
+      "saveToNoOthers": "Kein anderes Gerät nutzt diese Vorlage. Geräte, die sie ab jetzt laden, bekommen diese Fassung.",
+      "saveToIncomplete": "Diese Fassung geht noch nicht auf 100 % auf — auch die Vorlage ist dann unvollständig und lässt sich erst nach der Korrektur laden.",
+      "saveToConfirm": "Vorlage ändern",
+      "savedToTemplate": "Die Vorlage «{{name}}» wurde aktualisiert.",
+      "saveToGone": "Die Vorlage «{{name}}» gibt es nicht mehr — bitte «Als Vorlage speichern» verwenden."
     },
     "err": {
       "REVISION_NOTE_REQUIRED": "Zu einer Überarbeitung gehört eine Notiz, was sich geändert hat.",
-      "SECTION_FULL": "Die Aufgaben von «{{section}}» ergeben schon 100 % — erst das Gewicht einer Aufgabe senken, dann eine Stufe hinzufügen.",
+      "SECTION_FULL": "Die Stufen von «{{section}}» wiegen schon 100 % — erst das Gewicht einer Stufe senken, dann eine hinzufügen.",
       "SUBTASK_AWAITING": "Diese Unteraufgabe wartet auf die Freigabe und ist gesperrt — keine Dateiänderungen, bis die Verwaltung freigibt oder eine Überarbeitung anfordert.",
       "CHECKLIST_TOO_MANY": "Die Checkliste hat höchstens {{max}} Punkte.",
       "CHECKLIST_ITEM_REQUIRED": "Bitte einen Text für den Punkt eingeben.",
@@ -144,7 +203,10 @@
       "FILE_TOO_LARGE": "Die Datei ist zu gross (max. {{max}} MB).",
       "FILES_TOO_MANY": "Eine Unteraufgabe fasst höchstens {{max}} Dateien.",
       "FILE_NOT_FOUND": "Datei nicht gefunden.",
-      "FILE_FORBIDDEN": "Das dürfen nur die Verwaltung und die Personen dieser Unteraufgabe."
+      "FILE_FORBIDDEN": "Das dürfen nur die Verwaltung und die Personen dieser Unteraufgabe.",
+      "STAGE_WEIGHT_INVALID": "Das Gewicht einer Stufe muss zwischen 0 und 100 liegen.",
+      "UNLOCK_ALREADY_REQUESTED": "Um das Entsperren dieser Unteraufgabe wurde schon gebeten.",
+      "REQUEST_NOT_FOUND": "Die Anfrage gibt es nicht oder sie ist schon erledigt."
     },
     "people": {
       "assign": "Person zuweisen",
@@ -165,7 +227,11 @@
       "pending_one": "{{count}} wartet auf Freigabe",
       "pending_other": "{{count}} warten auf Freigabe",
       "pendingHint_one": "{{count}} Unteraufgabe wartet auf die Freigabe",
-      "pendingHint_other": "{{count}} Unteraufgaben warten auf die Freigabe"
+      "pendingHint_other": "{{count}} Unteraufgaben warten auf die Freigabe",
+      "full": "Die Aufgaben dieser Stufe ergeben schon 100 % — zuerst eine Aufgabe leichter machen.",
+      "tasksSum": "Aufgaben {{sum}}",
+      "tasksOff": "Die Aufgaben dieser Stufe ergeben {{sum}} — es müssen 100 % der Stufe sein.",
+      "weightAria": "Gewicht von {{stage}} im Bereich"
     },
     "table": {
       "code": "Kürzel",
@@ -202,9 +268,9 @@
       "people": "Personen",
       "peopleFromSubtasks": "Personen werden an den Unteraufgaben zugewiesen — hier stehen alle von ihnen.",
       "weight": "Gewicht",
-      "weightHint": "Gewicht im Bereich {{weight}} · Beitrag zur Gesamtfertigstellung {{overall}}",
+      "weightHint": "Gewicht in der Stufe {{weight}} · Beitrag zur Gesamtfertigstellung {{overall}}",
       "weightInvalid": "Bitte einen Wert zwischen 0 und 100 eingeben.",
-      "weightLeft": "Im Bereich noch frei: {{left}} — ein höherer Wert wird darauf gesenkt.",
+      "weightLeft": "In der Stufe noch frei: {{left}} — ein höherer Wert wird darauf gesenkt.",
       "startDate": "Beginn",
       "dueDate": "Termin",
       "dueBeforeStart": "Der Termin liegt vor dem Beginn.",
@@ -294,7 +360,7 @@
       "unsavedLeave": "Diese Vorlage hat ungespeicherte Änderungen. Möchten Sie sie vor dem Verlassen der Seite speichern?",
       "usedBy_one": "Auf {{count}} Gerät verwendet",
       "usedBy_other": "Auf {{count}} Geräten verwendet",
-      "weightSum": "Summe der Aufgaben {{sum}}",
+      "weightSum": "Stufen {{sum}}",
       "areaUnused": "In dieser Vorlage nicht verwendet",
       "addSection": "Bereich hinzufügen",
       "sectionName": "Name des Bereichs",
@@ -319,7 +385,7 @@
       "removeStageText_other": "Die Stufe «{{name}}» wird samt {{count}} Aufgaben aus dieser Vorlage entfernt.",
       "nameInUse": "Name schon vergeben",
       "nameRequired": "Name fehlt",
-      "sectionFull": "In diesem Bereich ist kein Gewicht mehr frei — seine Aufgaben ergeben schon 100 %. Zuerst eine Aufgabe leichter machen.",
+      "sectionFull": "Die Stufen dieses Bereichs wiegen schon 100 % — zuerst das Gewicht einer Stufe senken.",
       "removeStageEmpty": "Die Stufe «{{name}}» wird aus dieser Vorlage entfernt.",
       "removeSectionEmpty": "Der Bereich «{{name}}» wird aus dieser Vorlage entfernt."
     },
@@ -517,6 +583,186 @@
       "cellFree": "An diesem Tag keine Aufgabe",
       "legendUpcoming": "Aufgabentag steht noch bevor",
       "cellUpcoming": "{{name}} · {{day}} steht noch bevor"
+    },
+    "activity": {
+      "title": "Aktivitäten",
+      "region": "Aktivitäten {{stage}}",
+      "open": "Aktivitäten von {{stage}} öffnen",
+      "summary": "Wer was wann getan hat",
+      "filterLabel": "Zeigen",
+      "filter": {
+        "all": "Alle",
+        "work": "Arbeit",
+        "approval": "Freigaben",
+        "files": "Dateien",
+        "changes": "Änderungen"
+      },
+      "person": "Person",
+      "allPeople": "Alle Personen",
+      "loading": "Wird geladen …",
+      "loadFailed": "Die Aktivitäten konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "empty": "In dieser Stufe ist noch nichts geschehen.",
+      "emptyFiltered": "Keine Aktivitäten passen zu diesen Filtern.",
+      "today": "Heute",
+      "yesterday": "Gestern",
+      "someone": "Jemand",
+      "says": {
+        "SUBTASK_STARTED": "{{actor}} hat {{target}} gestartet",
+        "SUBTASK_STOPPED": "{{actor}} hat {{target}} angehalten",
+        "SUBTASK_SUBMITTED": "{{actor}} hat {{target}} zur Freigabe geschickt",
+        "SUBTASK_DONE": "{{actor}} hat {{target}} erledigt",
+        "SUBTASK_APPROVED": "{{actor}} hat {{target}} freigegeben",
+        "REVISION_REQUESTED": "{{actor}} hat für {{target}} eine Überarbeitung angefordert",
+        "SUBTASK_UNLOCKED": "{{actor}} hat die Sperre von {{target}} aufgehoben",
+        "CHECKLIST_ITEM_ADDED": "{{actor}} hat der Checkliste von {{target}} einen Punkt hinzugefügt",
+        "FILE_UPLOADED": "{{actor}} hat {{file}} zu {{target}} hochgeladen",
+        "FILE_REVISED": "{{actor}} hat Fassung {{version}} von {{file}} zu {{target}} hochgeladen",
+        "FILES_UPLOADED_one": "{{actor}} hat {{count}} Datei zu {{target}} hochgeladen",
+        "FILES_UPLOADED_other": "{{actor}} hat {{count}} Dateien zu {{target}} hochgeladen",
+        "FILE_DELETED": "{{actor}} hat {{file}} aus {{target}} gelöscht",
+        "SUBTASK_ASSIGNED": "{{actor}} hat die Personen von {{target}} geändert",
+        "ASSIGNED_ADDED": "{{actor}} hat {{people}} {{target}} zugewiesen",
+        "ASSIGNED_REMOVED": "{{actor}} hat {{people}} aus {{target}} entfernt",
+        "TASK_CREATED": "{{actor}} hat die Aufgabe {{target}} angelegt",
+        "TASK_UPDATED": "{{actor}} hat die Aufgabe {{target}} geändert",
+        "TASK_DELETED": "{{actor}} hat die Aufgabe {{target}} gelöscht",
+        "TASK_MOVED": "{{actor}} hat {{target}} nach {{stage}} verschoben",
+        "TASK_STATUS": "{{actor}} hat {{target}} auf {{status}} gesetzt",
+        "SUBTASK_CREATED": "{{actor}} hat die Unteraufgabe {{target}} angelegt",
+        "SUBTASK_UPDATED": "{{actor}} hat die Unteraufgabe {{target}} geändert",
+        "SUBTASK_DELETED": "{{actor}} hat die Unteraufgabe {{target}} gelöscht",
+        "STAGE_ADDED": "{{actor}} hat die Stufe {{stage}} hinzugefügt",
+        "PLAN_LOADED": "{{actor}} hat die Vorlage {{template}} geladen",
+        "PLAN_REPLACED": "{{actor}} hat die Aufgaben durch die Vorlage {{template}} ersetzt",
+        "PLAN_REMOVED": "{{actor}} hat die Aufgaben der Vorlage {{template}} entfernt",
+        "ASSIGNED_BOTH": "{{actor}} hat {{added}} {{target}} zugewiesen und {{removed}} entfernt",
+        "UNLOCK_REQUESTED": "{{actor}} hat gebeten, {{target}} zu entsperren",
+        "REQUEST_SOLVED": "{{actor}} hat die Anfrage zu {{target}} als erledigt markiert"
+      },
+      "detail": {
+        "yes": "Ja",
+        "no": "Nein",
+        "deleted": "Gelöscht",
+        "fileGone": "Nicht mehr an der Unteraufgabe",
+        "whatChanged": "Was sich geändert hat",
+        "files": "Dateien",
+        "filesGone": "Mit ihr entfernte Dateien",
+        "noNote": "Keine Notiz",
+        "revisionNote": "Was geändert werden soll",
+        "approvalNote": "Notiz zur Freigabe",
+        "checklist": "Abgehakte Punkte",
+        "checklistItem": "Neuer Punkt",
+        "added": "Zugewiesen",
+        "removed": "Entfernt",
+        "people": "Personen",
+        "field": "Angabe",
+        "before": "Vorher",
+        "after": "Nachher",
+        "subtasks": "Unteraufgaben",
+        "noSubtasks": "Keine Unteraufgaben.",
+        "template": "Vorlage",
+        "previousTemplate": "Ersetzt",
+        "taskCount": "Aufgaben"
+      },
+      "field": {
+        "name": "Name",
+        "code": "Kürzel",
+        "weight": "Gewicht",
+        "startDate": "Beginn",
+        "dueDate": "Termin",
+        "requiresDocument": "Dokument nötig",
+        "requiresApproval": "Freigabe nötig",
+        "checklist": "Freigabe-Checkliste",
+        "status": "Stand"
+      },
+      "count_one": "{{count}} Eintrag",
+      "count_other": "{{count}} Einträge",
+      "from": "Von",
+      "to": "Bis",
+      "anyDay": "Jeder Tag",
+      "clearFilters": "Filter zurücksetzen",
+      "pager": "Seiten",
+      "pageRange": "{{from}}–{{to}} von {{total}}",
+      "prevPage": "Vorige Seite",
+      "nextPage": "Nächste Seite",
+      "page": "Seite {{page}}"
+    },
+    "myTasks": {
+      "title": "Meine Produktionsaufgaben",
+      "open_one": "{{count}} offene Unteraufgabe",
+      "open_other": "{{count}} offene Unteraufgaben",
+      "projects": "Projekte",
+      "openDevice": "Gerät öffnen"
+    },
+    "requests": {
+      "title": "Anfragen",
+      "region": "Anfragen {{stage}}",
+      "open": "Anfragen von {{stage}} öffnen",
+      "openCount_one": "{{count}} offen",
+      "openCount_other": "{{count}} offen",
+      "noneOpen": "Freigabe- und Entsperr-Anfragen",
+      "statusLabel": "Stand",
+      "status": {
+        "open": "Offen",
+        "solved": "Erledigt",
+        "all": "Alle"
+      },
+      "kindLabel": "Art",
+      "kindFilter": {
+        "all": "Alle",
+        "APPROVAL": "Freigabe",
+        "UNLOCK": "Entsperren"
+      },
+      "kind": {
+        "APPROVAL": "Freigabe",
+        "UNLOCK": "Entsperren"
+      },
+      "underTask": "in {{task}}",
+      "sentBy": "Gesendet von {{name}} · {{time}}",
+      "requestedBy": "Angefragt von",
+      "requestedAt": "Angefragt am",
+      "markSolved": "Als erledigt markieren",
+      "solvedToast": "Anfrage zu {{subtask}} als erledigt markiert.",
+      "solvedBy": {
+        "MANUAL": "Erledigt von {{name}} · {{time}}",
+        "APPROVED": "Erledigt — freigegeben von {{name}} · {{time}}",
+        "REVISION": "Erledigt — Überarbeitung verlangt von {{name}} · {{time}}",
+        "UNLOCKED": "Erledigt — entsperrt von {{name}} · {{time}}"
+      },
+      "emptyOpen": "Keine offenen Anfragen in dieser Stufe.",
+      "empty": "Keine passenden Anfragen.",
+      "loadFailed": "Die Anfragen konnten nicht geladen werden.",
+      "unlockAsk": "Die Verwaltung um Entsperren bitten",
+      "unlockTitle": "Um Entsperren bitten",
+      "unlockText": "«{{subtask}}» ist freigegeben und gesperrt. Die Verwaltung um das Entsperren bitten.",
+      "unlockTextAwaiting": "«{{subtask}}» wartet auf die Freigabe und ist gesperrt. Die Verwaltung um das Entsperren bitten.",
+      "unlockReason": "Grund",
+      "unlockReasonPlaceholder": "Warum entsperren? (freiwillig)",
+      "unlockSend": "Anfrage senden",
+      "unlockSent": "Die Bitte um Entsperren ging an die Verwaltung.",
+      "goToSubtask": "Zur Unteraufgabe"
+    },
+    "inbox": {
+      "title": "Anfragen & Aktivitäten der Produktion",
+      "noOpen": "Keine offenen Anfragen",
+      "noOpenAnywhere": "Nirgends offene Anfragen. Haken entfernen, um alle Projekte zu sehen.",
+      "noOpenHere": "Keine Einheit dieses Projekts hat offene Anfragen. Haken entfernen, um alle zu sehen.",
+      "path": "Weg",
+      "allProjects": "Alle Projekte",
+      "searchProjects": "Projekte oder Einheiten suchen …",
+      "searchUnits": "Einheiten suchen …",
+      "onlyOpen": "Nur mit offenen Anfragen",
+      "units_one": "{{count}} Einheit",
+      "units_other": "{{count}} Einheiten",
+      "noMatch": "Nichts gefunden.",
+      "goToAssignments": "Zu den Zuweisungen"
+    },
+    "assignSection": {
+      "title": "Zuweisungen der Produktion",
+      "search": "Projekte oder Einheiten suchen …",
+      "tasks_one": "{{count}} Aufgabe",
+      "tasks_other": "{{count}} Aufgaben"
     }
   }
 }

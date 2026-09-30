@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { Check, ChevronDown, ChevronRight, ChevronUp, Clock3, FileText, Lock, Paperclip, Play, Plus, ShieldCheck, Square, Trash2, X } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
@@ -9,6 +9,7 @@ import type { ProductionTask, TaskArea, TaskSectionStage, TaskStage, TaskStatus,
 import { FlagGlyph } from '../device/deviceGlyphs';
 import { CompleteSubtaskDialog } from './CompleteSubtaskDialog';
 import { NameInput } from './InlineName';
+import { UnlockRequestDialog } from './UnlockRequestDialog';
 import { PeopleCell, type PersonNames } from './PeopleCell';
 import { SubtaskDetail } from './SubtaskFiles';
 import { latestFiles, type SubtaskActions } from './subtaskFileModel';
@@ -17,6 +18,7 @@ import {
     formatPercent,
     isSubtaskCompleted,
     overallOf,
+    parsePercent,
     pendingApprovals,
     roundPercent,
     stageLabel,
@@ -26,6 +28,7 @@ import {
     TASK_LIMITS,
     TASK_STATUSES,
     taskProgress,
+    taskSectionWeight,
 } from './taskModel';
 
 type Mode = 'template' | 'device';
@@ -190,6 +193,42 @@ const ProgressCell = ({ done, total, complete }: { done: number; total: number; 
  *             Verwaltung eine Aufgabe (mit Tagen) und legt neue an — nur für
  *             dieses Gerät (28.09.2026)
  */
+/**
+ * Das Gewicht der Stufe im Bereich als Feld (30.09.2026) — übernommen beim Verlassen oder mit
+ * Enter, Escape verwirft. Unlesbares (nicht 0…100) springt auf den alten Wert zurück.
+ */
+const StageWeightField = ({ value, label, onCommit }: { value: number; label: string; onCommit: (weight: number) => void }) => {
+    const shown = String(value).replace('.', ',');
+    const [text, setText] = useState<string | null>(null);
+    const current = text ?? shown;
+    const invalid = parsePercent(current) === null;
+    const commit = () => {
+        const parsed = parsePercent(current);
+        setText(null);
+        if (parsed !== null && parsed !== value) onCommit(parsed);
+    };
+    const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+        if (event.key === 'Escape') { setText(null); event.currentTarget.blur(); }
+    };
+    return (
+        <span className={`ofi-ptk-percent is-compact ofi-ptk-stageweight ${invalid ? 'is-invalid' : ''}`}>
+            <input
+                className="ofi-ptk-input is-num"
+                value={current}
+                inputMode="decimal"
+                aria-label={label}
+                title={label}
+                onChange={(event) => setText(event.target.value)}
+                onFocus={(event) => event.currentTarget.select()}
+                onBlur={commit}
+                onKeyDown={onKeyDown}
+            />
+            <span aria-hidden>%</span>
+        </span>
+    );
+};
+
 export const StageCard = ({
     area,
     stage,
@@ -214,6 +253,9 @@ export const StageCard = ({
     addDisabledReason,
     onClose,
     showStageWeight = false,
+    onStageWeight,
+    hidePending = false,
+    focusSubtaskId = null,
 }: {
     area: TaskArea;
     stage: TaskSectionStage;
@@ -260,8 +302,18 @@ export const StageCard = ({
      * (dort immer 100 %), in der Tafel der Zuweisungen schon. Die Vorlage zeigt es immer.
      */
     showStageWeight?: boolean;
+    /** Das Gewicht der Stufe im Bereich ändern (30.09.2026) — Vorlage und Tafel der Zuweisungen. */
+    onStageWeight?: (weight: number) => void;
+    /** Ohne das Zeichen «wartet auf Freigabe» (30.09.2026, «Görevlerim»: das gehört zu den Anfragen). */
+    hidePending?: boolean;
+    /** Diese Unteraufgabe gleich zeigen (30.09.2026, «Go to subtask»): Aufgabe auf, Unteraufgabe gewählt, in Sicht. */
+    focusSubtaskId?: string | null;
 }) => {
-    const weight = roundPercent(tasks.reduce((sum, task) => sum + task.weight, 0));
+    /* Seit dem 30.09.2026 trägt die Stufe ihr eigenes Gewicht im Bereich; ihre Aufgaben ergeben
+       zusammen 100 % der STUFE («the weights of the task only should fill the weight of its stage»). */
+    const weight = stage.weight ?? 0;
+    const taskSum = roundPercent(tasks.reduce((sum, task) => sum + task.weight, 0));
+    const tasksOff = tasks.length > 0 && Math.abs(taskSum - 100) > 0.01;
     // Tage und Stand gibt es nur am Gerät — eine Vorlage trägt keine (28.09.2026).
     const onDevice = mode === 'device';
     const stageName = stageLabel(stage);
@@ -269,10 +321,20 @@ export const StageCard = ({
     // Alle Aufgaben der Stufe erledigt: die Nummer wird ein grüner Kreis mit Haken.
     const stageDone = onDevice && tasks.length > 0 && tasks.every((task) => task.status === 'DONE');
     const collapsible = onDevice && Boolean(subtaskActions);
-    const pending = onDevice ? pendingApprovals(tasks) : 0;
+    const pending = onDevice && !hidePending ? pendingApprovals(tasks) : 0;
     // «At first hide the subtasks» — aufgeklappte Aufgaben, die gezeigte Unteraufgabe, das Abschlussfenster.
-    const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
-    const [shownSubtask, setShownSubtask] = useState<string | null>(null);
+    const focusTaskId = focusSubtaskId ? tasks.find((task) => task.subtasks.some((subtask) => subtask.id === focusSubtaskId))?.id ?? null : null;
+    const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(focusTaskId ? [focusTaskId] : []));
+    const [shownSubtask, setShownSubtask] = useState<string | null>(() => (focusTaskId ? focusSubtaskId : null));
+    // Die gesuchte Unteraufgabe in die Mitte holen — einmal, nach dem ersten Zeichnen.
+    useEffect(() => {
+        if (!focusTaskId || !focusSubtaskId) return undefined;
+        const timer = window.setTimeout(() => {
+            document.querySelector(`[data-subtask-row="${CSS.escape(focusSubtaskId)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }, 350);
+        return () => window.clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const [completing, setCompleting] = useState<{ taskId: string; subtaskId: string } | null>(null);
     const toggleTask = (taskId: string) => setExpanded((current) => {
         const next = new Set(current);
@@ -282,6 +344,8 @@ export const StageCard = ({
     });
     // Die Sperre aufheben (28.09.2026): ein Klick der Verwaltung auf das Schloss — mit Rückfrage.
     const [unlocking, setUnlocking] = useState<{ task: ProductionTask; subtask: TaskSubtask } | null>(null);
+    // Um das Entsperren bitten (30.09.2026): ein Klick der Leute der Unteraufgabe auf das Schloss.
+    const [requestingUnlock, setRequestingUnlock] = useState<{ task: ProductionTask; subtask: TaskSubtask; label: string; awaiting: boolean } | null>(null);
     const completingTask = completing ? tasks.find((task) => task.id === completing.taskId) : undefined;
     const completingIndex = completingTask ? completingTask.subtasks.findIndex((subtask) => subtask.id === completing?.subtaskId) : -1;
 
@@ -346,7 +410,7 @@ export const StageCard = ({
                 {/* Gewicht und Beitrag der Stufe ganz rechts am Rand der Karte. Auf den Arbeitsstufen
                     des Geräts nur der Beitrag (28.09.2026: das Gewicht steht dort immer auf 100 %) —
                     die Zuweisungen zeigen es (showStageWeight). */}
-                {tasks.length > 0 && (
+                {(tasks.length > 0 || onStageWeight) && (
                     <span
                         className="ofi-ptk-card__sum"
                         title={onDevice && !showStageWeight ? undefined : t('productionTasks.stage.sumHint', {
@@ -354,7 +418,19 @@ export const StageCard = ({
                             overall: formatPercent(overallOf(weight, share), true),
                         })}
                     >
-                        {(!onDevice || showStageWeight) && <b>{formatPercent(weight)}</b>}
+                        {/* Die Aufgaben ergeben nicht 100 % der Stufe — gleich hier sichtbar. */}
+                        {tasksOff && (!onDevice || showStageWeight) && (
+                            <em className="ofi-ptk-card__tasksum" title={t('productionTasks.stage.tasksOff', { sum: formatPercent(taskSum) })}>
+                                {t('productionTasks.stage.tasksSum', { sum: formatPercent(taskSum) })}
+                            </em>
+                        )}
+                        {onStageWeight ? (
+                            <StageWeightField
+                                value={weight}
+                                label={t('productionTasks.stage.weightAria', { stage: stageName })}
+                                onCommit={onStageWeight}
+                            />
+                        ) : (!onDevice || showStageWeight) && <b>{formatPercent(weight)}</b>}
                         <small>{t('productionTasks.overallShort', { value: formatPercent(overallOf(weight, share), true) })}</small>
                     </span>
                 )}
@@ -394,7 +470,9 @@ export const StageCard = ({
                         </div>
                         {tasks.map((task) => {
                             const mine = Boolean(meId && task.assigneeIds.includes(meId));
-                            const overall = formatPercent(overallOf(task.weight, share), true);
+                            // Beitrag: Gewicht in der Stufe × Gewicht der Stufe × Anteil des Bereichs (30.09.2026).
+                            const inSection = taskSectionWeight(weight, task.weight);
+                            const overall = formatPercent(overallOf(inSection, share), true);
                             const statusEditable = onDevice && (canSetStatus?.(task, null) ?? false);
                             const progress = taskProgress(task);
                             const foldable = collapsible && task.subtasks.length > 0;
@@ -500,6 +578,7 @@ export const StageCard = ({
                                         <div key={subtask.id} className="ofi-ptk-subgroup">
                                         <div
                                             className={`ofi-ptk-row is-sub ${subtaskActions ? 'is-clickable' : ''} ${shown ? 'is-shown' : ''}`}
+                                            data-subtask-row={subtask.id}
                                             role="row"
                                             onClick={subtaskActions ? (event) => { if (!fromControl(event)) setShownSubtask(shown ? null : subtask.id); } : undefined}
                                         >
@@ -542,6 +621,18 @@ export const StageCard = ({
                                                                 title={`${lockLabel} · ${t('productionTasks.subtask.unlock')}`}
                                                                 aria-label={t('productionTasks.subtask.unlock')}
                                                                 onClick={() => setUnlocking({ task, subtask })}
+                                                            >
+                                                                <Lock aria-hidden />
+                                                            </button>
+                                                        ) : subtaskActions?.requestUnlock && subtaskEditable ? (
+                                                            /* Wer an ihr steht, bittet um das Entsperren (30.09.2026: «send unlock
+                                                               requests to the admins by clicking on the lock icon»). */
+                                                            <button
+                                                                type="button"
+                                                                className={`ofi-ptk-lockbtn ofi-nosize ${awaiting ? 'is-awaiting' : ''}`}
+                                                                title={`${lockLabel} · ${t('productionTasks.requests.unlockAsk')}`}
+                                                                aria-label={t('productionTasks.requests.unlockAsk')}
+                                                                onClick={() => setRequestingUnlock({ task, subtask, label: `${subtaskCode(task.code, index)} · ${subtask.name}`, awaiting })}
                                                             >
                                                                 <Lock aria-hidden />
                                                             </button>
@@ -589,13 +680,13 @@ export const StageCard = ({
                                                 className="ofi-ptk-weight is-sub"
                                                 title={subtask.weight === null ? undefined : t('productionTasks.subtask.weightOfTask', {
                                                     weight: formatPercent(subtask.weight),
-                                                    section: formatPercent(subtaskSectionWeight(task.weight, subtask.weight)),
+                                                    section: formatPercent(subtaskSectionWeight(taskSectionWeight(weight, task.weight), subtask.weight)),
                                                 })}
                                             >
                                                 {subtask.weight === null ? '' : formatPercent(subtask.weight)}
                                             </span>
                                             <span role="cell" className="ofi-ptk-overall">
-                                                {subtask.weight === null ? '' : formatPercent(overallOf(subtaskSectionWeight(task.weight, subtask.weight), share), true)}
+                                                {subtask.weight === null ? '' : formatPercent(overallOf(subtaskSectionWeight(taskSectionWeight(weight, task.weight), subtask.weight), share), true)}
                                             </span>
                                             {onDevice && (
                                                 <span role="cell">
@@ -687,6 +778,14 @@ export const StageCard = ({
                     if (target && subtaskActions) void subtaskActions.unlock(target.task, target.subtask);
                 }}
             />
+            {requestingUnlock && subtaskActions?.requestUnlock && (
+                <UnlockRequestDialog
+                    subtaskLabel={requestingUnlock.label}
+                    awaiting={requestingUnlock.awaiting}
+                    onSend={(note) => subtaskActions.requestUnlock?.(requestingUnlock.task, requestingUnlock.subtask, note) ?? Promise.resolve(false)}
+                    onClose={() => setRequestingUnlock(null)}
+                />
+            )}
         </section>
     );
 };

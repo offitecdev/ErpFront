@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, CircleCheck, Copy, Info, Layers, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, CircleCheck, Copy, Layers, Trash2, TriangleAlert, Undo2 } from 'lucide-react';
 
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
@@ -22,6 +22,7 @@ import {
     renameSection,
     renameStage,
     setSectionShare,
+    setStageWeight,
     type TemplateDraft,
 } from './templateDraft';
 import {
@@ -36,6 +37,7 @@ import {
     sectionNameTaken,
     stageLabel,
     stageNameTaken,
+    stageTaskWeight,
     TASK_LIMITS,
     tasksByStage,
     withSubtaskAssignees,
@@ -107,10 +109,10 @@ export const TemplateEditor = ({
     const [removal, setRemoval] = useState<{ area: TaskArea; stage?: TaskStage; count: number } | null>(null);
 
     const check = useMemo(() => checkTemplate(draft.sections, draft.tasks), [draft.sections, draft.tasks]);
-    /* Ist das Gewicht des gewählten Bereichs verteilt (Aufgaben zusammen 100 %),
-       gibt es nichts mehr zu vergeben — «+ Yeni aşama» und «+ Görev ekle»
-       sind dann gesperrt, bis eine Aufgabe weniger wiegt. */
-    const sectionFull = (key: TaskArea) => (check.areas.find((entry) => entry.area === key)?.weightSum ?? 0) >= 100 - 0.01;
+    /* Seit dem 30.09.2026 füllen die Aufgaben nur IHRE Stufe: ergeben sie dort 100 %, gibt es in
+       dieser Stufe nichts mehr zu vergeben — «+ Görev ekle» ist gesperrt, bis eine weniger wiegt.
+       Andere Stufen bleiben offen; neue Stufen auch (sie nehmen, was an Stufengewicht frei ist). */
+    const stageFull = (key: TaskArea, stage: TaskStage) => stageTaskWeight(draft.tasks, key, stage) >= 100 - 0.01;
     const section = draft.sections.find((entry) => entry.key === area) ?? draft.sections[0] ?? null;
     const groups = useMemo(() => (section ? tasksByStage(draft.tasks, section) : null), [draft.tasks, section]);
     const warnings = Object.fromEntries(check.areas.map((entry) => [entry.area, !entry.ok])) as Record<TaskArea, boolean>;
@@ -412,7 +414,9 @@ export const TemplateEditor = ({
                                     staffLoading={staffLoading}
                                     onOpenTask={onOpenTask}
                                     onAddTask={onAddTask}
-                                    addDisabledReason={sectionFull(section.key) ? t('productionTasks.template.sectionFull') : undefined}
+                                    addDisabledReason={stageFull(section.key, stage.key) ? t('productionTasks.stage.full') : undefined}
+                                    // Das Gewicht der Stufe im Bereich (30.09.2026).
+                                    onStageWeight={canEdit ? (weight) => onChange(setStageWeight(draft, section.key, stage.key, weight)) : undefined}
                                     // Personen nur an den Unteraufgaben (29.09.2026); die Aufgabe zeigt ihre Summe.
                                     onAssignSubtask={canEdit ? (task, subtask, assigneeIds) => onChange({
                                         ...draft,
@@ -446,15 +450,7 @@ export const TemplateEditor = ({
                                 maxLength={TASK_LIMITS.stageName}
                                 isTaken={(name) => stageNameTaken(section, name)}
                                 onCreate={(name) => onChange(addStage(draft, section.key, name))}
-                                disabledReason={sectionFull(section.key) ? t('productionTasks.template.sectionFull') : undefined}
                             />
-                        )}
-                        {/* Warum gesperrt — gleich darunter, nicht nur im Tipp. */}
-                        {canEdit && sectionFull(section.key) && (
-                            <div className="ofi-ptk-note is-info ofi-ptk-fullnote" role="status">
-                                <Info aria-hidden />
-                                <span>{t('productionTasks.template.sectionFull')}</span>
-                            </div>
                         )}
                     </div>
                 </>

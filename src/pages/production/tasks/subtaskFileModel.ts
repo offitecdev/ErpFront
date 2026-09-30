@@ -27,6 +27,11 @@ export interface SubtaskActions {
     addChecklistItem: (task: ProductionTask, subtask: TaskSubtask, text: string) => Promise<boolean>;
     /** Die Sperre aufheben (Klick auf das Schloss) — wartet danach wieder auf die Freigabe. */
     unlock: (task: ProductionTask, subtask: TaskSubtask) => Promise<boolean>;
+    /**
+     * Um das Entsperren BITTEN (30.09.2026) — wer an einer gesperrten Unteraufgabe steht und nicht
+     * die Verwaltung ist: ein Klick auf das Schloss. Fehlt es, ist das Schloss nur ein Zeichen.
+     */
+    requestUnlock?: (task: ProductionTask, subtask: TaskSubtask, note: string) => Promise<boolean>;
 }
 
 const two = (value: number) => String(value).padStart(2, '0');
@@ -128,6 +133,17 @@ export const formatMoment = (iso: string | null): string => {
     if (same(date, today)) return t('productionTasks.files.today', { time });
     if (same(date, yesterday)) return t('productionTasks.files.yesterday', { time });
     return `${two(date.getDate())}.${two(date.getMonth() + 1)}.${date.getFullYear()} ${time}`;
+};
+
+/**
+ * Wer darf eine neue Fassung dieser Datei hochladen? (30.09.2026: «they can't delete or modify
+ * them») — wie der Server: die Verwaltung, sonst nur, wer die erste Fassung hochgeladen hat.
+ */
+export const canReviseFile = (actions: SubtaskActions, subtask: TaskSubtask, group: FileGroup): boolean => {
+    if (!canUploadTo(actions, subtask)) return false;
+    if (actions.isAdmin) return true;
+    const original = [group.latest, ...group.older].reduce((first, file) => ((file.version || 1) < (first.version || 1) ? file : first), group.latest);
+    return Boolean(actions.meId && original.uploadedById === actions.meId);
 };
 
 /** Wer darf diese Datei entfernen? — wie der Server: gesperrt niemand, sonst die Verwaltung oder wer sie hochgeladen hat. */

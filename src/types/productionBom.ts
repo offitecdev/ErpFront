@@ -486,3 +486,185 @@ export interface BomOrigin {
     /** Revidiert und noch nicht wieder bestätigt. */
     revisionPending?: boolean;
 }
+<<<<<<< Updated upstream
+=======
+
+/* ── Satın alma talebi & gelen mallar (27.09.2026 abends, Vorgabe Samet) ────
+   «Bom'da sadece sipariş ve fiyat talep istekleri oluşsun … tedarikçi ve
+    fiyatlar gözükmesin, başka bir sayfada talep olarak gelsin.» */
+
+/** PRICE = Preise anfragen (Entwurf) · ORDER = bestellen, was fehlt (freigegeben). */
+export type BomProcurementKind = 'PRICE' | 'ORDER';
+export type BomProcurementStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
+
+export interface BomProcurementProgress {
+    covered: number;
+    total: number;
+    requests: number;
+    orders: number;
+    confirmed: number;
+}
+
+/** Ein Talep, wie die BOM ihn sieht (ohne Lieferant, ohne Preis). */
+export interface BomProcurementSummary {
+    id: string;
+    requestNumber: string;
+    kind: BomProcurementKind;
+    status: BomProcurementStatus;
+    bomRevision: number;
+    createdAt: string;
+    createdByName: string | null;
+    note: string | null;
+    lines: Array<{ bomLineId: string; quantity: number }>;
+    progress: BomProcurementProgress;
+}
+
+/** Eingegangene Ware an einer BOM. */
+export interface BomGoodsIn {
+    id: string;
+    receiptId: string;
+    /** ORDER = Wareneingang einer Bestellung · STOCK = im Depo dazugekommen. */
+    source: 'ORDER' | 'STOCK';
+    referenceNumber: string | null;
+    lineId: string | null;
+    productId: string;
+    erpCode: string | null;
+    name: string;
+    quantity: number;
+    serials: string[];
+    receivedAt: string;
+    receivedByName: string | null;
+}
+
+export interface BomProcurementInput {
+    kind: BomProcurementKind;
+    lines: Array<{ lineId: string; quantity: number; note: string | null }>;
+    note: string | null;
+}
+
+/** Ein Beleg des Einkaufs (MIT Lieferant und Betrag — nur «Satın alma»). */
+export interface ProcurementDocument {
+    purchaseOrderId: string;
+    referenceNumber: string;
+    kind: 'ORDER' | 'REQUEST';
+    status: string;
+    supplierName: string;
+    currency: string;
+    totalNet: number;
+    confirmed: boolean;
+    received: number;
+    createdAt: string;
+    /** Letzte Änderung am Vorgang (28.09.2026). */
+    updatedAt?: string;
+}
+
+export interface ProcurementRequest {
+    id: string;
+    requestNumber: string;
+    kind: BomProcurementKind;
+    status: BomProcurementStatus;
+    note: string | null;
+    bomRevision: number;
+    createdAt: string;
+    createdByName: string | null;
+    closedAt: string | null;
+    closedByName: string | null;
+    /** Letzter Handgriff an Talep oder einem seiner Vorgänge — die Liste sortiert danach. */
+    lastActivityAt?: string;
+    bom: { id: string; bomNumber: string; kind: BomKind; status: BomStatus; area: BuiltInArea; revision: number; templateName: string; consumed: boolean } | null;
+    project: { id: string; projectNumber: string; projectName: string; customerName: string | null; deliveryDate: string | null } | null;
+    device: { id: string; name: string; positionNumber: string | null } | null;
+    lines: Array<{
+        bomLineId: string;
+        productId: string;
+        erpCode: string | null;
+        name: string;
+        brand: string | null;
+        modelNumber: string | null;
+        unit: BomUnit;
+        quantity: number;
+        note: string | null;
+        covered: boolean;
+        missingNow: number | null;
+    }>;
+    progress: BomProcurementProgress;
+    documents: ProcurementDocument[];
+}
+
+/** Wohin ein Wareneingang Ware gab (Antwort von «receive»). */
+export interface BomReceiptAllocation {
+    productId: string;
+    erpCode: string | null;
+    name: string;
+    quantity: number;
+    serials: string[];
+    /** null = kein wartender Bedarf: freier Bestand. */
+    bomId: string | null;
+    bomNumber: string | null;
+    projectNumber: string | null;
+    projectName: string | null;
+    deviceName: string | null;
+    deliveryDate: string | null;
+}
+
+/* ── Kalkülasyon (27.09.2026 abends) ─────────────────────────────────────── */
+
+export interface CostingPrice {
+    unit: number;
+    currency: string;
+}
+
+export interface CostingLine {
+    key: string;
+    productId: string;
+    erpCode: string | null;
+    name: string;
+    unit: BomUnit | string;
+    quantity: number;
+    /** Alışpreis: Depo-Karte (CARD) oder günstigste Preisanfrage (QUOTE). */
+    plan: (CostingPrice & { source: 'CARD' | 'QUOTE' }) | null;
+    /** Durchschnitt der bestätigten Bestellpositionen. */
+    actual: (CostingPrice & { orderedQuantity: number }) | null;
+    planTotal: number | null;
+    actualTotal: number | null;
+    forecastTotal: number | null;
+    diff: number | null;
+}
+
+export interface CostingTotal {
+    currency: string;
+    plan: number;
+    actual: number;
+    forecast: number;
+    comparablePlan: number;
+    diff: number;
+}
+
+export interface CostingDevice {
+    id: string;
+    name: string;
+    positionNumber: string | null;
+    bomNumbers: string[];
+    lines: CostingLine[];
+    totals: CostingTotal[];
+    missingPrice: number;
+    actualLines: number;
+}
+
+export interface CostingProjectSummary {
+    id: string;
+    projectNumber: string;
+    projectName: string;
+    customerName: string | null;
+    deliveryDate: string | null;
+    devices: number;
+    lines: number;
+    missingPrice: number;
+    actualLines: number;
+    totals: CostingTotal[];
+}
+
+export interface CostingProject extends CostingProjectSummary {
+    deviceList: CostingDevice[];
+}
+>>>>>>> Stashed changes

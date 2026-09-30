@@ -66,7 +66,8 @@ export const draftInput = (draft: TemplateDraft): TaskTemplateInput => ({
         key: section.key,
         name: section.name.replace(/\s+/g, ' ').trim(),
         share: section.share,
-        stages: section.stages.map((stage) => ({ key: stage.key, name: stage.name.replace(/\s+/g, ' ').trim() })),
+        // Mit dem Gewicht der Stufe (30.09.2026) — ohne hielte der Server die Anfrage für einen älteren Stand.
+        stages: section.stages.map((stage) => ({ key: stage.key, name: stage.name.replace(/\s+/g, ' ').trim(), weight: stage.weight ?? 0 })),
     })),
     tasks: orderTasks(draft.tasks, draft.sections).map((task) => ({
         area: task.area,
@@ -143,9 +144,19 @@ const withSection = (draft: TemplateDraft, key: TaskArea, change: (section: Task
     sections: draft.sections.map((section) => (section.key === key ? change(section) : section)),
 });
 
-/** Eine neue Stufe am Ende des Weges im Bereich. */
+/** Eine neue Stufe am Ende des Weges im Bereich — sie nimmt, was an Gewicht der Stufen noch frei ist (30.09.2026). */
 export const addStage = (draft: TemplateDraft, area: TaskArea, name: string): TemplateDraft =>
-    withSection(draft, area, (section) => ({ ...section, stages: [...section.stages, { key: newStageKey(), name: name.trim() }] }));
+    withSection(draft, area, (section) => {
+        const used = roundPercent(section.stages.reduce((sum, stage) => sum + (stage.weight ?? 0), 0));
+        return { ...section, stages: [...section.stages, { key: newStageKey(), name: name.trim(), weight: Math.max(0, roundPercent(100 - used)) }] };
+    });
+
+/** Das Gewicht einer Stufe im Bereich (30.09.2026). */
+export const setStageWeight = (draft: TemplateDraft, area: TaskArea, stage: TaskStage, weight: number): TemplateDraft =>
+    withSection(draft, area, (section) => ({
+        ...section,
+        stages: section.stages.map((entry) => (entry.key === stage ? { ...entry, weight } : entry)),
+    }));
 
 export const renameStage = (draft: TemplateDraft, area: TaskArea, stage: TaskStage, name: string): TemplateDraft =>
     withSection(draft, area, (section) => ({

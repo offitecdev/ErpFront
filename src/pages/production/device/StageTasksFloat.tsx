@@ -1,5 +1,7 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
-import { ChevronRight, FileStack, ListChecks } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
+import { Activity, ChevronRight, FileStack, Inbox, ListChecks } from 'lucide-react';
+
+import { productionTasksApi } from '@/lib/api/productionTasks';
 
 import { t } from '@/i18n/translate';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
@@ -8,7 +10,9 @@ import type { ProductionTask, TaskArea, TaskSectionStage, TaskStatus, TaskSubtas
 import type { PersonNames } from '../tasks/PeopleCell';
 import { StageCard } from '../tasks/StageCard';
 import type { SubtaskActions } from '../tasks/subtaskFileModel';
+import { StageActivityCard } from './StageActivityCard';
 import { StageFilesCard } from './StageFilesCard';
+import { StageRequestsCard } from './StageRequestsCard';
 import { stageFilesOf } from './stageFileModel';
 import { initialsOf, personTone, stageLabel } from '../tasks/taskModel';
 
@@ -74,9 +78,14 @@ const useGrow = (boxRef: RefObject<HTMLDivElement | null>, fromRef: RefObject<DO
  *
  * Darunter (28.09.2026, nur die Verwaltung) ein zweites Plättchen «Dateien»:
  * es zieht sich ebenso zur Liste aller Dateien der Stufe auf (StageFilesCard).
- * Offen ist immer nur eine der beiden Karten.
+ * Und darunter (30.09.2026, ebenso nur die Verwaltung) ein drittes,
+ * «Aktivitäten»: der Verlauf der Stufe — wer was wann tat (StageActivityCard).
+ * Offen ist immer nur eine der Karten; die übrigen bleiben als Plättchen an ihrem Platz.
  */
 export const StageTasksFloat = ({
+    focusSubtaskId = null,
+    deviceId,
+    revision,
     area,
     stage,
     number,
@@ -90,9 +99,17 @@ export const StageTasksFloat = ({
     busyTaskId,
     onStatus,
     onSubtaskStatus,
+    onAssignSubtask,
     canSetStatus,
     subtaskActions,
+    stageNameOf,
 }: {
+    /** Diese Unteraufgabe gleich zeigen (30.09.2026, «Go to subtask»): die Karte der Aufgaben öffnet sich. */
+    focusSubtaskId?: string | null;
+    /** Das Gerät — der Verlauf der Stufe wird je Gerät gelesen. */
+    deviceId: string;
+    /** Zählt die vom Server bestätigten Änderungen — der Verlauf lädt danach nach. */
+    revision: number;
     area: TaskArea;
     stage: TaskSectionStage;
     number: number | null;
@@ -106,32 +123,86 @@ export const StageTasksFloat = ({
     busyTaskId: string | null;
     onStatus?: (task: ProductionTask, status: TaskStatus) => void;
     onSubtaskStatus?: (task: ProductionTask, subtask: TaskSubtask, status: TaskStatus) => void;
+    /** Personen einer Unteraufgabe setzen — nur die Verwaltung (30.09.2026: auch auf den Stufen). */
+    onAssignSubtask?: (task: ProductionTask, subtask: TaskSubtask, assigneeIds: string[]) => void;
     canSetStatus?: (task: ProductionTask, subtask: TaskSubtask | null) => boolean;
     /** Dateien und Abschluss der Unteraufgaben; mit `isAdmin` auch das Plättchen «Dateien». */
     subtaskActions?: SubtaskActions;
+    /** Der Name einer Stufe des Geräts — der Verlauf nennt Stufen (verschoben, neu). */
+    stageNameOf: (area: string | null, stage: string | null) => string;
 }) => {
-    const [open, setOpen] = useState(readOpen);
+    // «Go to subtask»: offen, wenn die gesuchte Unteraufgabe in dieser Stufe liegt.
+    const [open, setOpen] = useState(() => (focusSubtaskId && tasks.some((task) => task.subtasks.some((subtask) => subtask.id === focusSubtaskId)) ? true : readOpen()));
     const [filesOpen, setFilesOpen] = useState(false);
+    const [activityOpen, setActivityOpen] = useState(false);
+    // Die Anfragen der Stufe (30.09.2026) — viertes Plättchen, unter «Aktivitäten».
+    const [requestsOpen, setRequestsOpen] = useState(false);
+    const [openRequests, setOpenRequests] = useState(0);
+    const [requestsTick, setRequestsTick] = useState(0);
     const boxRef = useRef<HTMLDivElement>(null);
     const fromRef = useRef<DOMRect | null>(null);
     const filesRef = useRef<HTMLDivElement>(null);
     const filesFromRef = useRef<DOMRect | null>(null);
+    const activityRef = useRef<HTMLDivElement>(null);
+    const activityFromRef = useRef<DOMRect | null>(null);
+    const requestsRef = useRef<HTMLDivElement>(null);
+    const requestsFromRef = useRef<DOMRect | null>(null);
     const showFiles = Boolean(subtaskActions?.isAdmin);
 
     const toggle = (next: boolean) => {
         fromRef.current = boxRef.current?.getBoundingClientRect() ?? null;
         writeOpen(next);
         setOpen(next);
-        if (next) setFilesOpen(false);
+        if (next) {
+            setFilesOpen(false);
+            setActivityOpen(false);
+            setRequestsOpen(false);
+        }
     };
     const toggleFiles = (next: boolean) => {
         filesFromRef.current = filesRef.current?.getBoundingClientRect() ?? null;
         setFilesOpen(next);
+        if (next) {
+            setActivityOpen(false);
+            setRequestsOpen(false);
+        }
+        if (next && open) toggle(false);
+    };
+    const toggleActivity = (next: boolean) => {
+        activityFromRef.current = activityRef.current?.getBoundingClientRect() ?? null;
+        setActivityOpen(next);
+        if (next) {
+            setFilesOpen(false);
+            setRequestsOpen(false);
+        }
+        if (next && open) toggle(false);
+    };
+    const toggleRequests = (next: boolean) => {
+        requestsFromRef.current = requestsRef.current?.getBoundingClientRect() ?? null;
+        setRequestsOpen(next);
+        if (next) {
+            setFilesOpen(false);
+            setActivityOpen(false);
+        }
         if (next && open) toggle(false);
     };
 
     useGrow(boxRef, fromRef, open);
     useGrow(filesRef, filesFromRef, filesOpen);
+    useGrow(activityRef, activityFromRef, activityOpen);
+    useGrow(requestsRef, requestsFromRef, requestsOpen);
+
+    /* Wie viele Anfragen der Stufe noch offen sind — die Zahl am Plättchen; jede bestätigte
+       Änderung und jedes «Mark as solved» fragt neu. Nur die Verwaltung. */
+    useEffect(() => {
+        if (!subtaskActions?.isAdmin) return undefined;
+        let cancelled = false;
+        void productionTasksApi.requests(deviceId, area, stage.key, 'open').then(
+            (list) => { if (!cancelled) setOpenRequests(list.openCount); },
+            () => { /* ohne Zahl: das Plättchen bleibt ohne Zähler */ },
+        );
+        return () => { cancelled = true; };
+    }, [deviceId, area, stage.key, revision, requestsTick, subtaskActions?.isAdmin]);
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         // Escape aus einem Bestätigungsfenster (Portal) schliesst nur dieses.
@@ -147,6 +218,20 @@ export const StageTasksFloat = ({
         if (event.key === 'Escape' && filesOpen) {
             event.stopPropagation();
             toggleFiles(false);
+        }
+    };
+    const onRequestsKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (!event.currentTarget.contains(event.target as Node)) return;
+        if (event.key === 'Escape' && requestsOpen) {
+            event.stopPropagation();
+            toggleRequests(false);
+        }
+    };
+    const onActivityKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (!event.currentTarget.contains(event.target as Node)) return;
+        if (event.key === 'Escape' && activityOpen) {
+            event.stopPropagation();
+            toggleActivity(false);
         }
     };
     const files = showFiles ? stageFilesOf(tasks) : [];
@@ -182,8 +267,10 @@ export const StageTasksFloat = ({
                             busyTaskId={busyTaskId}
                             onStatus={onStatus}
                             onSubtaskStatus={onSubtaskStatus}
+                            onAssignSubtask={onAssignSubtask}
                             canSetStatus={canSetStatus}
                             subtaskActions={subtaskActions}
+                            focusSubtaskId={focusSubtaskId}
                             onClose={() => toggle(false)}
                         />
                     </div>
@@ -223,8 +310,9 @@ export const StageTasksFloat = ({
                     </button>
                 )}
             </div>
-            {/* Dateien der Stufe — nur die Verwaltung, solange die Aufgaben zu sind. */}
-            {showFiles && subtaskActions && !open && (
+            {/* Dateien der Stufe — nur die Verwaltung. Die Plättchen bleiben immer in ihrer
+                Reihenfolge stehen (30.09.2026: «don't hide the other buttons»); offen ist nur eines. */}
+            {showFiles && subtaskActions && (
                 <div
                     ref={filesRef}
                     className={`ofi-ptk-float is-files ${filesOpen ? 'is-open' : ''}`}
@@ -251,6 +339,90 @@ export const StageTasksFloat = ({
                                     {files.length
                                         ? t('productionTasks.stageFiles.count', { count: files.length })
                                         : t('productionTasks.stageFiles.none')}
+                                </small>
+                            </span>
+                            <ChevronRight className="ofi-ptk-float__chevron" aria-hidden />
+                        </button>
+                    )}
+                </div>
+            )}
+            {/* Der Verlauf der Stufe (30.09.2026) — unter «Dateien», ebenso nur die Verwaltung. */}
+            {showFiles && subtaskActions && (
+                <div
+                    ref={activityRef}
+                    className={`ofi-ptk-float is-activity ${activityOpen ? 'is-open' : ''}`}
+                    role="region"
+                    aria-label={t('productionTasks.activity.region', { stage: stageName })}
+                    onKeyDown={onActivityKeyDown}
+                >
+                    {activityOpen ? (
+                        <div className="ofi-ptk-float__inner">
+                            <StageActivityCard
+                                deviceId={deviceId}
+                                revision={revision}
+                                area={area}
+                                stageKey={stage.key}
+                                stageName={stageName}
+                                tasks={tasks}
+                                actions={subtaskActions}
+                                stageNameOf={stageNameOf}
+                                onClose={() => toggleActivity(false)}
+                            />
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            className="ofi-ptk-float__summary ofi-nosize"
+                            aria-expanded="false"
+                            aria-label={t('productionTasks.activity.open', { stage: stageName })}
+                            onClick={() => toggleActivity(true)}
+                        >
+                            <span className="ofi-ptk-float__icon is-activity" aria-hidden><Activity /></span>
+                            <span className="ofi-ptk-float__text">
+                                <b>{t('productionTasks.activity.title')}</b>
+                                <small>{t('productionTasks.activity.summary')}</small>
+                            </span>
+                            <ChevronRight className="ofi-ptk-float__chevron" aria-hidden />
+                        </button>
+                    )}
+                </div>
+            )}
+            {/* Anfragen an die Verwaltung (30.09.2026) — unter «Aktivitäten», nur die Verwaltung. */}
+            {showFiles && subtaskActions && (
+                <div
+                    ref={requestsRef}
+                    className={`ofi-ptk-float is-requests ${requestsOpen ? 'is-open' : ''}`}
+                    role="region"
+                    aria-label={t('productionTasks.requests.region', { stage: stageName })}
+                    onKeyDown={onRequestsKeyDown}
+                >
+                    {requestsOpen ? (
+                        <div className="ofi-ptk-float__inner">
+                            <StageRequestsCard
+                                deviceId={deviceId}
+                                revision={revision}
+                                area={area}
+                                stageKey={stage.key}
+                                stageName={stageName}
+                                onChanged={() => setRequestsTick((value) => value + 1)}
+                                onClose={() => toggleRequests(false)}
+                            />
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            className="ofi-ptk-float__summary ofi-nosize"
+                            aria-expanded="false"
+                            aria-label={t('productionTasks.requests.open', { stage: stageName })}
+                            onClick={() => toggleRequests(true)}
+                        >
+                            <span className="ofi-ptk-float__icon is-requests" aria-hidden><Inbox /></span>
+                            <span className="ofi-ptk-float__text">
+                                <b>{t('productionTasks.requests.title')}</b>
+                                <small>
+                                    {openRequests > 0
+                                        ? <em>{t('productionTasks.requests.openCount', { count: openRequests })}</em>
+                                        : t('productionTasks.requests.noneOpen')}
                                 </small>
                             </span>
                             <ChevronRight className="ofi-ptk-float__chevron" aria-hidden />

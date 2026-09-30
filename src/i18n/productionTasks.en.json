@@ -19,6 +19,51 @@
       "title": "Production: check again",
       "message": "{{actor}} added new requirements — check and complete again: {{tasks}} — {{device}} ({{project}})",
       "messageNoActor": "New requirements were added — check and complete again: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskRemoved": {
+      "title": "Production: no longer assigned",
+      "message": "{{actor}} removed you from: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "You were removed from: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskDeleted": {
+      "title": "Production: task deleted",
+      "message": "{{actor}} deleted: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Deleted: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskUpdated": {
+      "title": "Production: task changed",
+      "message": "{{actor}} changed: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Changed: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskApproved": {
+      "title": "Production: approved",
+      "message": "{{actor}} approved: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Approved: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskRevision": {
+      "title": "Production: revision requested",
+      "message": "{{actor}} requested a revision: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Revision requested: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskRevisionNote": {
+      "title": "Production: revision requested",
+      "message": "{{actor}} requested a revision: {{tasks}} — {{device}} ({{project}}) — «{{note}}»",
+      "messageNoActor": "Revision requested: {{tasks}} — {{device}} ({{project}}) — «{{note}}»"
+    },
+    "productionTaskUnlocked": {
+      "title": "Production: unlocked",
+      "message": "{{actor}} unlocked — back in progress: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Unlocked — back in progress: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionUnlockRequested": {
+      "title": "Production: unlock requested",
+      "message": "{{actor}} asks to unlock: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Unlock requested: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionUnlockRequestedNote": {
+      "title": "Production: unlock requested",
+      "message": "{{actor}} asks to unlock: {{tasks}} — {{device}} ({{project}}) — «{{note}}»",
+      "messageNoActor": "Unlock requested: {{tasks}} — {{device}} ({{project}}) — «{{note}}»"
     }
   },
   "productionTasks": {
@@ -50,8 +95,10 @@
       "ready": "Ready",
       "readyHint": "Shares and weights add up to 100% — the template can be loaded onto devices.",
       "shares": "The section shares add up to {{sum}}; they must add up to 100%.",
-      "weights": "The weights of the {{area}} tasks add up to {{sum}}; they must add up to 100%.",
-      "noSections": "No sections added yet."
+      "weights": "The stage weights of {{area}} add up to {{sum}}; they must add up to 100%.",
+      "noSections": "No sections added yet.",
+      "stageTasks": "The tasks of {{stage}} ({{area}}) add up to {{sum}} of the stage; they must add up to 100%.",
+      "stageEmpty": "{{stage}} ({{area}}) weighs {{weight}} but has no tasks — give it tasks or set its weight to 0%."
     },
     "device": {
       "stageAdded": "Stage “{{name}}” added — now add its tasks.",
@@ -88,11 +135,23 @@
       "unloadTitle": "Remove the tasks?",
       "unloadText": "All tasks from the “{{name}}” template and their assignments are deleted from this device. The template itself stays.",
       "tasksSaved": "Saved for this device — the template stays unchanged.",
-      "customizeHint": "Changes here apply only to this device, not to the template."
+      "customizeHint": "Changes here apply only to this device, not to the template.",
+      "saveToTemplate": "Save to template",
+      "saveToHint": "Write this version back into the template «{{name}}»",
+      "saveToTitle": "Save to «{{name}}»?",
+      "saveToWarning": "This changes the main template «{{name}}» itself, not just this device.",
+      "saveToWhat": "The template gets this device’s sections, stages, weights, tasks, subtasks and assigned people. Statuses, files and dates stay on the device.",
+      "saveToOthers_one": "{{count}} other device uses this template. Its copy stays as it is — only devices that load the template from now on get this version.",
+      "saveToOthers_other": "{{count}} other devices use this template. Their copies stay as they are — only devices that load the template from now on get this version.",
+      "saveToNoOthers": "No other device uses this template. Devices that load it from now on get this version.",
+      "saveToIncomplete": "This version doesn’t add up to 100% yet — the template will be incomplete too and can’t be loaded until it’s fixed.",
+      "saveToConfirm": "Change the template",
+      "savedToTemplate": "The template «{{name}}» has been updated.",
+      "saveToGone": "The template «{{name}}» no longer exists — use «Save as template» instead."
     },
     "err": {
       "REVISION_NOTE_REQUIRED": "A revision needs a note saying what changed.",
-      "SECTION_FULL": "The tasks of “{{section}}” already add up to 100% — lower a task’s weight before adding a stage.",
+      "SECTION_FULL": "The stages of “{{section}}” already weigh 100% — lower a stage’s weight before adding one.",
       "SUBTASK_AWAITING": "This subtask is waiting for approval and locked — no file changes until an admin approves it or requests a revision.",
       "CHECKLIST_TOO_MANY": "The checklist can have at most {{max}} items.",
       "CHECKLIST_ITEM_REQUIRED": "Enter a text for the checklist item.",
@@ -144,7 +203,10 @@
       "FILE_TOO_LARGE": "The file is too large (max. {{max}} MB).",
       "FILES_TOO_MANY": "A subtask can hold at most {{max}} files.",
       "FILE_NOT_FOUND": "File not found.",
-      "FILE_FORBIDDEN": "Only admins and the people on this subtask can do this."
+      "FILE_FORBIDDEN": "Only admins and the people on this subtask can do this.",
+      "STAGE_WEIGHT_INVALID": "A stage weight must be between 0 and 100.",
+      "UNLOCK_ALREADY_REQUESTED": "An unlock has already been requested for this subtask.",
+      "REQUEST_NOT_FOUND": "The request was not found or is already solved."
     },
     "people": {
       "assign": "Assign person",
@@ -165,7 +227,11 @@
       "pending_one": "{{count}} awaiting approval",
       "pending_other": "{{count}} awaiting approval",
       "pendingHint_one": "{{count}} subtask is waiting for approval",
-      "pendingHint_other": "{{count}} subtasks are waiting for approval"
+      "pendingHint_other": "{{count}} subtasks are waiting for approval",
+      "full": "The tasks of this stage already add up to 100% — lower a task’s weight first.",
+      "tasksSum": "Tasks {{sum}}",
+      "tasksOff": "The tasks of this stage add up to {{sum}} — they must add up to 100% of the stage.",
+      "weightAria": "Weight of {{stage}} within the section"
     },
     "table": {
       "code": "Code",
@@ -202,9 +268,9 @@
       "people": "People",
       "peopleFromSubtasks": "People are assigned on the subtasks — this shows everyone on them.",
       "weight": "Weight",
-      "weightHint": "Weight within the section {{weight}} · contribution to overall completion {{overall}}",
+      "weightHint": "Weight within the stage {{weight}} · contribution to overall completion {{overall}}",
       "weightInvalid": "Enter a value between 0 and 100.",
-      "weightLeft": "Still free in this section: {{left}} — a higher value is lowered to it.",
+      "weightLeft": "Still free in this stage: {{left}} — a higher value is lowered to it.",
       "startDate": "Start date",
       "dueDate": "Due date",
       "dueBeforeStart": "The due date is before the start date.",
@@ -294,7 +360,7 @@
       "unsavedLeave": "This template has unsaved changes. Do you want to save them before leaving the page?",
       "usedBy_one": "Used on {{count}} device",
       "usedBy_other": "Used on {{count}} devices",
-      "weightSum": "Task total {{sum}}",
+      "weightSum": "Stages {{sum}}",
       "areaUnused": "Not used in this template",
       "addSection": "Add section",
       "sectionName": "Section name",
@@ -319,7 +385,7 @@
       "removeStageText_other": "The stage “{{name}}” and its {{count}} tasks will be removed from this template.",
       "nameInUse": "Name already in use",
       "nameRequired": "Name required",
-      "sectionFull": "No weight left in this section — its tasks already add up to 100%. Lower a task's weight first.",
+      "sectionFull": "The stages of this section already weigh 100% — lower a stage’s weight first.",
       "removeStageEmpty": "The stage “{{name}}” will be removed from this template.",
       "removeSectionEmpty": "The section “{{name}}” will be removed from this template."
     },
@@ -517,6 +583,186 @@
       "cellFree": "No task on this day",
       "legendUpcoming": "Task day still to come",
       "cellUpcoming": "{{name}} · {{day}} is still to come"
+    },
+    "activity": {
+      "title": "Activities",
+      "region": "{{stage}} activities",
+      "open": "Open the {{stage}} activities",
+      "summary": "Who did what, and when",
+      "filterLabel": "Show",
+      "filter": {
+        "all": "All",
+        "work": "Work",
+        "approval": "Approvals",
+        "files": "Files",
+        "changes": "Changes"
+      },
+      "person": "Person",
+      "allPeople": "Everyone",
+      "loading": "Loading…",
+      "loadFailed": "The activities could not be loaded.",
+      "retry": "Try again",
+      "empty": "Nothing has happened in this stage yet.",
+      "emptyFiltered": "No activities match these filters.",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "someone": "Someone",
+      "says": {
+        "SUBTASK_STARTED": "{{actor}} started {{target}}",
+        "SUBTASK_STOPPED": "{{actor}} stopped {{target}}",
+        "SUBTASK_SUBMITTED": "{{actor}} sent {{target}} for approval",
+        "SUBTASK_DONE": "{{actor}} completed {{target}}",
+        "SUBTASK_APPROVED": "{{actor}} approved {{target}}",
+        "REVISION_REQUESTED": "{{actor}} requested a revision on {{target}}",
+        "SUBTASK_UNLOCKED": "{{actor}} unlocked {{target}}",
+        "CHECKLIST_ITEM_ADDED": "{{actor}} added a checklist item to {{target}}",
+        "FILE_UPLOADED": "{{actor}} uploaded {{file}} to {{target}}",
+        "FILE_REVISED": "{{actor}} uploaded version {{version}} of {{file}} to {{target}}",
+        "FILES_UPLOADED_one": "{{actor}} uploaded {{count}} file to {{target}}",
+        "FILES_UPLOADED_other": "{{actor}} uploaded {{count}} files to {{target}}",
+        "FILE_DELETED": "{{actor}} deleted {{file}} from {{target}}",
+        "SUBTASK_ASSIGNED": "{{actor}} changed the people on {{target}}",
+        "ASSIGNED_ADDED": "{{actor}} assigned {{people}} to {{target}}",
+        "ASSIGNED_REMOVED": "{{actor}} removed {{people}} from {{target}}",
+        "TASK_CREATED": "{{actor}} created the task {{target}}",
+        "TASK_UPDATED": "{{actor}} updated the task {{target}}",
+        "TASK_DELETED": "{{actor}} deleted the task {{target}}",
+        "TASK_MOVED": "{{actor}} moved {{target}} to {{stage}}",
+        "TASK_STATUS": "{{actor}} set {{target}} to {{status}}",
+        "SUBTASK_CREATED": "{{actor}} created the subtask {{target}}",
+        "SUBTASK_UPDATED": "{{actor}} updated the subtask {{target}}",
+        "SUBTASK_DELETED": "{{actor}} deleted the subtask {{target}}",
+        "STAGE_ADDED": "{{actor}} added the stage {{stage}}",
+        "PLAN_LOADED": "{{actor}} loaded the template {{template}}",
+        "PLAN_REPLACED": "{{actor}} replaced the tasks with the template {{template}}",
+        "PLAN_REMOVED": "{{actor}} removed the tasks of {{template}}",
+        "ASSIGNED_BOTH": "{{actor}} assigned {{added}} and removed {{removed}} on {{target}}",
+        "UNLOCK_REQUESTED": "{{actor}} asked to unlock {{target}}",
+        "REQUEST_SOLVED": "{{actor}} marked the request for {{target}} as solved"
+      },
+      "detail": {
+        "yes": "Yes",
+        "no": "No",
+        "deleted": "Deleted",
+        "fileGone": "No longer on the subtask",
+        "whatChanged": "What changed",
+        "files": "Files",
+        "filesGone": "Files removed with it",
+        "noNote": "No note",
+        "revisionNote": "What should be changed",
+        "approvalNote": "Approval note",
+        "checklist": "Checked items",
+        "checklistItem": "New item",
+        "added": "Assigned",
+        "removed": "Removed",
+        "people": "People",
+        "field": "Field",
+        "before": "Before",
+        "after": "After",
+        "subtasks": "Subtasks",
+        "noSubtasks": "No subtasks.",
+        "template": "Template",
+        "previousTemplate": "Replaced",
+        "taskCount": "Tasks"
+      },
+      "field": {
+        "name": "Name",
+        "code": "Code",
+        "weight": "Weight",
+        "startDate": "Start",
+        "dueDate": "Due",
+        "requiresDocument": "Document required",
+        "requiresApproval": "Approval required",
+        "checklist": "Approval checklist",
+        "status": "Status"
+      },
+      "count_one": "{{count}} entry",
+      "count_other": "{{count}} entries",
+      "from": "From",
+      "to": "To",
+      "anyDay": "Any day",
+      "clearFilters": "Clear filters",
+      "pager": "Pages",
+      "pageRange": "{{from}}–{{to}} of {{total}}",
+      "prevPage": "Previous page",
+      "nextPage": "Next page",
+      "page": "Page {{page}}"
+    },
+    "myTasks": {
+      "title": "My Production Tasks",
+      "open_one": "{{count}} open subtask",
+      "open_other": "{{count}} open subtasks",
+      "projects": "Projects",
+      "openDevice": "Open device"
+    },
+    "requests": {
+      "title": "Requests",
+      "region": "{{stage}} requests",
+      "open": "Open the {{stage}} requests",
+      "openCount_one": "{{count}} open",
+      "openCount_other": "{{count}} open",
+      "noneOpen": "Approval and unlock requests",
+      "statusLabel": "Status",
+      "status": {
+        "open": "Open",
+        "solved": "Solved",
+        "all": "All"
+      },
+      "kindLabel": "Type",
+      "kindFilter": {
+        "all": "All",
+        "APPROVAL": "Approval",
+        "UNLOCK": "Unlock"
+      },
+      "kind": {
+        "APPROVAL": "Approval",
+        "UNLOCK": "Unlock"
+      },
+      "underTask": "in {{task}}",
+      "sentBy": "Sent by {{name}} · {{time}}",
+      "requestedBy": "Requested by",
+      "requestedAt": "Requested at",
+      "markSolved": "Mark as solved",
+      "solvedToast": "Request for {{subtask}} marked as solved.",
+      "solvedBy": {
+        "MANUAL": "Solved by {{name}} · {{time}}",
+        "APPROVED": "Solved — approved by {{name}} · {{time}}",
+        "REVISION": "Solved — revision requested by {{name}} · {{time}}",
+        "UNLOCKED": "Solved — unlocked by {{name}} · {{time}}"
+      },
+      "emptyOpen": "No open requests in this stage.",
+      "empty": "No requests match.",
+      "loadFailed": "The requests could not be loaded.",
+      "unlockAsk": "Ask an admin to unlock",
+      "unlockTitle": "Request unlock",
+      "unlockText": "«{{subtask}}» is approved and locked. Ask the admins to unlock it.",
+      "unlockTextAwaiting": "«{{subtask}}» is waiting for approval and locked. Ask the admins to unlock it.",
+      "unlockReason": "Reason",
+      "unlockReasonPlaceholder": "Why should it be unlocked? (optional)",
+      "unlockSend": "Send request",
+      "unlockSent": "Unlock request sent to the admins.",
+      "goToSubtask": "Go to subtask"
+    },
+    "inbox": {
+      "title": "Production requests & activities",
+      "noOpen": "No open requests",
+      "noOpenAnywhere": "No open requests anywhere. Untick the box to see all projects.",
+      "noOpenHere": "No unit of this project has open requests. Untick the box to see all units.",
+      "path": "Path",
+      "allProjects": "All projects",
+      "searchProjects": "Search projects or units…",
+      "searchUnits": "Search units…",
+      "onlyOpen": "Only with open requests",
+      "units_one": "{{count}} unit",
+      "units_other": "{{count}} units",
+      "noMatch": "Nothing matches.",
+      "goToAssignments": "Go to assignments"
+    },
+    "assignSection": {
+      "title": "Production assignments",
+      "search": "Search projects or units…",
+      "tasks_one": "{{count}} task",
+      "tasks_other": "{{count}} tasks"
     }
   }
 }

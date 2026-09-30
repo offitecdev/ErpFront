@@ -23,6 +23,9 @@ import { useModuleAccess } from '../lib/useEnabledModules';
 import AnalogClock from '../components/home/AnalogClock';
 import { QuickMenuCarousel, type QuickMenuTile } from '../components/home/QuickMenuCarousel';
 import { DashboardStats } from '../components/home/DashboardStats';
+import { MyTasksSection } from '../components/home/MyTasksSection';
+import { ProductionInboxSection } from '../components/home/ProductionInboxSection';
+import { ProductionAssignmentsSection } from '../components/home/ProductionAssignmentsSection';
 import { useHomeGlass } from '../components/home/homeAppearance';
 import { UpcomingSection } from '../components/home/UpcomingSection';
 
@@ -121,6 +124,12 @@ export const Home = () => {
           <div className="ofi-home__workspace">
             {/* Kennzahlen & Charts */}
             <div className="ofi-home__main">
+                {/* «Görevlerim» (30.09.2026): die eigenen Aufgaben der Produktion — nur, wenn es welche gibt. */}
+                <MyTasksSection />
+                {/* Anfragen und Verlauf der Produktion (30.09.2026) — nur die Verwaltung. */}
+                <ProductionInboxSection />
+                {/* Zuweisungen der Produktion (30.09.2026) — je Projekt seine Einheiten, «Zu den Zuweisungen». */}
+                <ProductionAssignmentsSection />
                 <DashboardStats />
             </div>
 

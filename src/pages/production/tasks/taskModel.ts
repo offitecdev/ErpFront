@@ -10,6 +10,7 @@ import type {
     TaskSection,
     TaskSectionStage,
     TaskStage,
+    TaskStageCheck,
     TaskSubtask,
     TaskTemplateCheck,
 } from '@/types/productionTasks';
@@ -59,7 +60,7 @@ export const builtInSections = (shares: Partial<Record<BuiltInArea, number>> = {
         key: area,
         name: '',
         share: shares[area] ?? 0,
-        stages: BUILT_IN_STAGES[area].map((key) => ({ key, name: '' })),
+        stages: BUILT_IN_STAGES[area].map((key) => ({ key, name: '', weight: 0 })),
     }));
 
 /**
@@ -194,8 +195,29 @@ export const formatPercent = (value: number, fixed = false): string =>
         maximumFractionDigits: 2,
     }).format((Number(value) || 0) / 100);
 
-/** Beitrag einer Aufgabe zur Gesamtfertigstellung: Gewicht × Anteil des Bereichs. */
+/** Beitrag zur Gesamtfertigstellung: Gewicht im Bereich × Anteil des Bereichs. */
 export const overallOf = (weight: number, share: number): number => roundPercent((weight * share) / 100);
+
+/**
+ * Was eine Aufgabe im BEREICH wiegt (30.09.2026): ihr Gewicht in der Stufe × das Gewicht der
+ * Stufe. Beitrag zur Gesamtfertigstellung dann mit `overallOf`.
+ */
+export const taskSectionWeight = (stageWeight: number, taskWeight: number): number =>
+    roundPercent((stageWeight * taskWeight) / 100);
+
+/** Das Gewicht einer Stufe im Bereich (0, wenn es sie nicht gibt). */
+export const stageWeightOf = (sections: readonly TaskSection[], area: TaskArea, stage: TaskStage): number =>
+    sections.find((section) => section.key === area)?.stages.find((entry) => entry.key === stage)?.weight ?? 0;
+
+/** Was die Aufgaben einer Stufe zusammen wiegen (in der Stufe) — ohne `exceptId`. */
+export const stageTaskWeight = (
+    tasks: ReadonlyArray<Pick<ProductionTask, 'id' | 'area' | 'stage' | 'weight'>>,
+    area: TaskArea,
+    stage: TaskStage,
+    exceptId?: string,
+): number => roundPercent(tasks
+    .filter((task) => task.area === area && task.stage === stage && task.id !== exceptId)
+    .reduce((sum, task) => sum + task.weight, 0));
 
 /** Eine Zahl aus einem Feld («12,5» wie «12.5»); leer/ungültig → null. */
 export const parsePercent = (value: string): number | null => {
@@ -208,31 +230,28 @@ export const parsePercent = (value: string): number | null => {
 
 type WeightedTask = Pick<ProductionTask, 'area' | 'stage' | 'weight'>;
 
-/** Aufgaben und Gewichtssumme je Bereich. */
-export const areaTotals = (
-    sections: readonly TaskSection[],
-    tasks: readonly WeightedTask[],
-): Record<TaskArea, { taskCount: number; weightSum: number }> => {
-    const totals: Record<TaskArea, { taskCount: number; weightSum: number }> = {};
-    for (const section of sections) totals[section.key] = { taskCount: 0, weightSum: 0 };
-    for (const task of tasks) {
-        const entry = totals[task.area];
-        if (!entry) continue;
-        entry.taskCount += 1;
-        entry.weightSum = roundPercent(entry.weightSum + task.weight);
-    }
-    return totals;
-};
-
-/** Geht die Vorlage auf? Wortgleich mit `templateCheck` des Servers. */
+/**
+ * Geht die Vorlage auf? Wortgleich mit `templateCheck` des Servers (30.09.2026: je Stufe).
+ * Die Anteile der Bereiche ergeben 100 %; ein Bereich mit Aufgaben, wenn seine Stufen zusammen
+ * 100 % wiegen und jede Stufe stimmt — mit Aufgaben ergeben diese 100 % der Stufe, ohne wiegt
+ * sie 0; ein Bereich ohne Aufgaben, wenn er keinen Anteil trägt.
+ */
 export const checkTemplate = (sections: readonly TaskSection[], tasks: readonly WeightedTask[]): TaskTemplateCheck => {
-    const totals = areaTotals(sections, tasks);
     const sharesSum = roundPercent(sections.reduce((sum, section) => sum + section.share, 0));
     const sharesOk = Math.abs(sharesSum - 100) <= SUM_TOLERANCE;
     const areas = sections.map((section): TaskAreaCheck => {
-        const { taskCount, weightSum } = totals[section.key];
-        const ok = taskCount > 0 ? Math.abs(weightSum - 100) <= SUM_TOLERANCE : section.share === 0;
-        return { area: section.key, share: section.share, taskCount, weightSum, ok };
+        const own = tasks.filter((task) => task.area === section.key);
+        const stages = section.stages.map((stage): TaskStageCheck => {
+            const inStage = own.filter((task) => task.stage === stage.key);
+            const taskWeightSum = roundPercent(inStage.reduce((sum, task) => sum + task.weight, 0));
+            const ok = inStage.length > 0 ? Math.abs(taskWeightSum - 100) <= SUM_TOLERANCE : stage.weight === 0;
+            return { stage: stage.key, weight: stage.weight, taskCount: inStage.length, taskWeightSum, ok };
+        });
+        const weightSum = roundPercent(section.stages.reduce((sum, stage) => sum + stage.weight, 0));
+        const ok = own.length > 0
+            ? Math.abs(weightSum - 100) <= SUM_TOLERANCE && stages.every((stage) => stage.ok)
+            : section.share === 0;
+        return { area: section.key, share: section.share, taskCount: own.length, weightSum, ok, stages };
     });
     const hasTasks = areas.some((entry) => entry.taskCount > 0);
     return { valid: sharesOk && hasTasks && areas.every((entry) => entry.ok), sharesSum, sharesOk, areas };
@@ -251,9 +270,22 @@ export const checkProblems = (sections: readonly TaskSection[], taskCount: numbe
         if (entry.ok) continue;
         const target = sections.find((row) => row.key === entry.area);
         const label = target ? sectionLabel(target) : entry.area;
-        problems.push(entry.taskCount
-            ? t('productionTasks.check.weights', { area: label, sum: formatPercent(entry.weightSum) })
-            : t('productionTasks.check.noAreaTasks', { area: label, share: formatPercent(entry.share) }));
+        if (!entry.taskCount) {
+            problems.push(t('productionTasks.check.noAreaTasks', { area: label, share: formatPercent(entry.share) }));
+            continue;
+        }
+        // Seit dem 30.09.2026 je Stufe: die Stufen zusammen, dann jede Stufe für sich.
+        if (Math.abs(entry.weightSum - 100) > SUM_TOLERANCE) {
+            problems.push(t('productionTasks.check.weights', { area: label, sum: formatPercent(entry.weightSum) }));
+        }
+        for (const stage of entry.stages) {
+            if (stage.ok) continue;
+            const stageEntry = target?.stages.find((row) => row.key === stage.stage);
+            const stageName = stageEntry ? stageLabel(stageEntry) : stage.stage;
+            problems.push(stage.taskCount
+                ? t('productionTasks.check.stageTasks', { area: label, stage: stageName, sum: formatPercent(stage.taskWeightSum) })
+                : t('productionTasks.check.stageEmpty', { area: label, stage: stageName, weight: formatPercent(stage.weight) }));
+        }
     }
     return problems;
 };
