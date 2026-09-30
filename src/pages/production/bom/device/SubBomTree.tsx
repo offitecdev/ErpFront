@@ -1,7 +1,7 @@
 import { ChevronRight, FolderTree, Plus } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
-import type { Bom } from '@/types/productionBom';
+import type { Bom, BomSummary } from '@/types/productionBom';
 
 import { CompletionChecks, StatusPill } from '../bomUi';
 
@@ -24,10 +24,10 @@ export const SubBomTree = ({
     onAdd,
 }: {
     main: Bom;
-    subs: Bom[];
+    subs: BomSummary[];
     max: number;
     canAdd: boolean;
-    onOpen: (bom: Bom) => void;
+    onOpen: (bom: BomSummary) => void;
     onAdd: () => void;
 }) => {
     const full = subs.length >= max;
@@ -46,7 +46,7 @@ export const SubBomTree = ({
             </div>
             <ul className="ofi-bom-tree__children">
                 {subs.map((sub) => {
-                    const orders = sub.purchases.filter((purchase) => purchase.kind === 'ORDER').length;
+                    const orders = sub.activity?.orderCount ?? ('purchases' in sub ? (sub as Bom).purchases.filter((purchase) => purchase.kind === 'ORDER').length : 0);
                     const active = sub.status !== 'DRAFT' && !sub.consumedAt;
                     return (
                         <li key={sub.id}>

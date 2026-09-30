@@ -1,9 +1,9 @@
-import { X } from 'lucide-react';
+import { Mail, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { t } from '@/i18n/translate';
 
-import { isBlankRow, withBlankRow, type SupplierRow } from '../supplierRows';
+import { isBlankRow, isEmail, withBlankRow, type SupplierRow } from '../supplierRows';
 import { sameText } from '../warehouseText';
 import { BarcodeInput } from './BarcodeInput';
 import { SupplierSelect, type SupplierValue } from './SupplierSelect';
@@ -16,9 +16,11 @@ import { SupplierSelect, type SupplierValue } from './SupplierSelect';
  * aslında bu ürün barkodu olması lazım … barkod okutma yeri de tedarikçi
  * yanında, orada buton olacak.»
  *
- * Eine kleine Tabelle in der Tafel: je Zeile ein Lieferant (aus der
- * Lieferantenliste der Firma oder frei geschrieben) und rechts daneben sein
- * Barcode — tippen, mit dem Handscanner lesen oder über die Kamera im Feld.
+ * 30.09.2026 dazu SEINE E-Mail («tedarikçi kısmında tedarikçi, tedarikçi
+ * maili, ürün barkodu olması gerekmektedir») — an sie geht die automatische
+ * Preisanfrage. Wer einen Lieferanten aus der Liste wählt, bekommt dessen
+ * E-Mail vorgeschlagen (die leere Zelle wird gefüllt, eine getippte bleibt).
+ *
  * Am Ende steht immer eine leere Zeile bereit («hep bir boş input olması
  * lazım»); sobald sie etwas trägt, kommt die nächste. Derselbe Lieferant
  * zweimal wird abgewiesen. Der erste Lieferant steht in der Liste der Karten.
@@ -45,20 +47,25 @@ export const SupplierListEditor = ({
             toast.error(t('warehouse.supplier.duplicate', { name: value.name }));
             return;
         }
-        setRow(key, { value });
+        const row = rows.find((entry) => entry.key === key);
+        const suggested = value?.email?.trim() ?? '';
+        setRow(key, { value, ...(row && !row.email.trim() && suggested ? { email: suggested } : {}) });
     };
 
     const remove = (key: string) => commit(rows.filter((row) => row.key !== key));
 
     return (
-        <div className="ofi-wh-suppliers">
+        <div className="ofi-wh-suppliers has-email">
             <div className="ofi-wh-suppliers__head" aria-hidden>
                 <span>{t('warehouse.supplier.columns.name')}</span>
+                <span>{t('warehouse.supplier.columns.email')}</span>
                 <span>{t('warehouse.supplier.columns.barcode')}</span>
             </div>
             {rows.map((row, index) => {
                 const ready = index === rows.length - 1 && isBlankRow(row);
                 const name = row.value?.name ?? null;
+                const emailBad = Boolean(row.email.trim()) && !isEmail(row.email);
+                const emailMissing = Boolean(row.value) && !row.email.trim();
                 return (
                     <div key={row.key} className={`ofi-wh-suppliers__row ${ready ? 'is-ready' : ''}`}>
                         <div className="ofi-wh-suppliers__pick">
@@ -70,6 +77,20 @@ export const SupplierListEditor = ({
                                 taken={rows.flatMap((other) => (other.key !== row.key && other.value ? [other.value] : []))}
                             />
                         </div>
+                        <label className={`ofi-wh-field ofi-wh-suppliers__email${emailBad || (row.key === invalidKey && row.email.trim()) ? ' is-invalid' : ''}${emailMissing ? ' is-missing' : ''}`}>
+                            <Mail className="ofi-wh-field__lead" aria-hidden />
+                            <input
+                                type="email"
+                                inputMode="email"
+                                autoComplete="off"
+                                spellCheck={false}
+                                value={row.email}
+                                disabled={disabled}
+                                placeholder={t('warehouse.supplier.emailPlaceholder')}
+                                aria-label={name ? t('warehouse.supplier.emailOf', { name }) : t('warehouse.supplier.emailLabel', { index: index + 1 })}
+                                onChange={(event) => setRow(row.key, { email: event.target.value })}
+                            />
+                        </label>
                         <BarcodeInput
                             value={row.barcode}
                             onChange={(next) => setRow(row.key, { barcode: next })}
@@ -78,7 +99,7 @@ export const SupplierListEditor = ({
                                 : t('warehouse.supplier.barcodeLabel', { index: index + 1 })}
                             placeholder={t('warehouse.supplier.barcodePlaceholder')}
                             scanTitle={name ? t('warehouse.supplier.scanTitleOf', { name }) : t('warehouse.supplier.scanTitle')}
-                            invalid={row.key === invalidKey}
+                            invalid={row.key === invalidKey && !row.email.trim()}
                             disabled={disabled}
                         />
                         {!disabled && (

@@ -1,372 +1,268 @@
-import { useMemo, useState } from 'react';
-import { Columns02, XClose } from '@/components/icons/antIconCompat';
-import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
-import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
+import { useMemo, useRef, useState } from 'react';
+import { ArrowLeftRight, ChevronLeft, ChevronRight, Search, TriangleAlert, X } from 'lucide-react';
 import { DateField } from '@/components/ui-shared/DateField';
 import { t } from '@/i18n/translate';
-import type { MovementKind, MovementOrigin } from '@/types/inventory';
-import { ColResizeHandle, FilterBar, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow, ToggleGroup } from './components/primitives';
-import { useColumnWidths } from '@/hooks/useColumnWidths';
+import type { MovementKind, MovementListItem } from '@/types/inventory';
+/* Das Kleid des Depo (Tabelle, Werkzeugzeile, Token-Felder) — Vorgabe Samet,
+   29.09.2026: «depoda kullandık ya, onun gibi». Nur die Formen kommen von
+   dort; die Daten bleiben die des Lagers. */
+import '@/styles/modules/warehouse.css';
+import '@/styles/modules/stockMovements.css';
 import { useLanguageTick } from './hooks/useLanguageTick';
-import { MOVEMENTS_PAGE_SIZE, useMovementsList, type QuickRange } from './hooks/useMovementsList';
+import { MOVEMENTS_PAGE_SIZE, useMovementsList } from './hooks/useMovementsList';
+import { MovementTypeFilter, PeriodFilter, type PeriodKey } from './movements/MovementFilters';
+import { ORIGIN_LABEL, type MovementFilterValue } from './movements/movementLabels';
 import { fmtDateTime, fmtQty } from './utils/format';
 
 /**
- * LAGERBEWEGUNGEN (10.09.2026) — stärker kategorisiert, mit Zeitraum, im
- * Apple-Lager-Kleid (Haarlinien, Segmente, 28px-Felder, keine Pillen).
+ * ══ STOK HAREKETLERİ — EINE RUHIGE TABELLE (29.09.2026) ═════════════════════
  *
- *   · Zeitraum «Von – Bis» mit Kalender-Popover (DateField) und der
- *     Schnellwahl Heute / Diese Woche / Dieser Monat / Dieses Jahr / Gesamt.
- *   · TYP als Segment: Alle, Zugang, Abgang, Umbuchung, Rücknahme, Korrektur.
- *   · HERKUNFT als Segment: Alle, Schnellerfassung, Wareneingang Bestellung,
- *     Rapport/Projekt, manuell.
- *   · Spalten: Datum/Zeit, Typ, Herkunft, ERP-Code, Bezeichnung, Modell,
- *     Seriennummer, Barcode, Menge, Lager, Mitarbeiter, Beschreibung —
- *     Barcode und Seriennummer sind in der Spaltenwahl abwählbar.
- *   · EIN Suchfeld über ERP-Code, Bezeichnung, Modell, Serie und Barcode.
+ * Vorgabe Samet: «Stok hareketleri de apple macOS temiz olsun … çok filtre
+ * var, filtreleri çok azalt, sadece gerekli olanları … tablo çok büyük, çok
+ * ağır … basit bir tablo olsun, girdi çıktı sadece, sütunları azalt.»
  *
- * Die Typmarken sind `span.rounded-full`: lagerApple.css macht daraus
- * umrandete Abzeichen ohne Tönung; die Segmente sind `ToggleGroup`s, die dort
- * als Mac-Segment gezeichnet werden. Die Definition (Zugang mit Menge 0)
- * bleibt als eigene Marke sichtbar, ist aber kein Filterreiter.
+ *   · Werkzeugzeile: EIN Suchfeld, «Hareket» (Giriş/Çıkış + Kaynak, mehrfach,
+ *     die gläserne Auswahl des Depo) und «Dönem» (eine Schnellwahl; erst
+ *     «Özel aralık» holt die zwei Kalenderfelder dazu).
+ *   · Sieben Spalten: Tarih · ERP kodu · Ürün · Giriş · Çıkış · Kaynak · Kişi.
+ *     Modell, Seriennummer, Barcode, Lager und die Spaltenwahl sind fort; die
+ *     Suche findet Serie und Barcode trotzdem.
+ *   · Die Definitionen (Zugang mit Menge 0, «Ürün tanımı») stehen NICHT mehr
+ *     darin — sie waren 6 400 von 6 800 Zeilen und keine Bewegung der Ware.
+ *     Sie bleiben in der Produktkarte sichtbar.
  */
 
-const KIND_META: Record<string, { labelKey: string; className: string }> = {
-    IN: { labelKey: 'inv.movement.in', className: 'text-emerald-700 dark:text-emerald-300' },
-    OUT: { labelKey: 'inv.movement.out', className: 'text-red-600 dark:text-red-300' },
-    DEFINITION: { labelKey: 'inv.movement.definition', className: 'text-slate-600 dark:text-white/70' },
-    TRANSFER: { labelKey: 'inv.movement.transfer', className: 'text-sky-700 dark:text-sky-300' },
-    RETURN: { labelKey: 'inv.movement.return', className: 'text-amber-700 dark:text-amber-300' },
-    ADJUSTMENT: { labelKey: 'inv.movement.adjustment', className: 'text-violet-700 dark:text-violet-300' },
+/** Alles, was Ware bewegt — also jede Bewegung ausser der Definition. */
+const REAL_KINDS: MovementKind[] = ['IN', 'OUT', 'TRANSFER', 'RETURN', 'ADJUSTMENT'];
+/** Zugang in der Tabelle: Eingang, Rückgabe, Korrektur (sie bucht auf ein Ziel). */
+const INBOUND_KINDS: MovementKind[] = ['IN', 'RETURN', 'ADJUSTMENT'];
+
+const kindsFor = (directions: MovementFilterValue['directions']): MovementKind[] => {
+    if (directions.length === 1) return directions[0] === 'IN' ? INBOUND_KINDS : ['OUT'];
+    return REAL_KINDS;
 };
 
-const ORIGIN_LABEL: Record<MovementOrigin, string> = {
-    QUICK_ADD: 'inv.origin.quickAdd',
-    QUICK_DELETE: 'inv.origin.quickDelete',
-    ORDER_RECEIPT: 'inv.origin.orderReceipt',
-    REPORT: 'inv.origin.report',
-    MANUAL: 'inv.origin.manual',
-};
+const Blank = () => <span className="ofi-wh-empty-cell">—</span>;
 
-type TypeFilter = MovementKind | '';
-const TYPE_OPTIONS: Array<{ key: TypeFilter; labelKey: string }> = [
-    { key: '', labelKey: 'inv.movements.allTypes' },
-    { key: 'IN', labelKey: 'inv.movement.in' },
-    { key: 'OUT', labelKey: 'inv.movement.out' },
-    { key: 'TRANSFER', labelKey: 'inv.movement.transfer' },
-    { key: 'RETURN', labelKey: 'inv.movement.return' },
-    { key: 'ADJUSTMENT', labelKey: 'inv.movement.adjustment' },
-];
-type OriginFilter = MovementOrigin | '';
-const ORIGIN_OPTIONS: Array<{ key: OriginFilter; labelKey: string }> = [
-    { key: '', labelKey: 'inv.movements.allTypes' },
-    { key: 'QUICK_ADD', labelKey: 'inv.origin.quickAdd' },
-    { key: 'ORDER_RECEIPT', labelKey: 'inv.origin.orderReceipt' },
-    { key: 'REPORT', labelKey: 'inv.origin.report' },
-    { key: 'MANUAL', labelKey: 'inv.origin.manual' },
-];
-const RANGE_OPTIONS: Array<{ key: QuickRange | 'custom'; labelKey: string }> = [
-    { key: 'today', labelKey: 'inv.movements.quickToday' },
-    { key: 'week', labelKey: 'inv.movements.quickWeek' },
-    { key: 'month', labelKey: 'inv.movements.quickMonth' },
-    { key: 'year', labelKey: 'inv.movements.quickYear' },
-    { key: 'all', labelKey: 'inv.movements.quickAll' },
-];
-
-// Sürüklenebilir sütun genişlikleri. Bezeichnung hat KEINE Breite: sie ist
-// die einzige Spalte ohne Mass und nimmt den Rest.
-const MOVEMENT_COLUMN_WIDTHS = {
-    date: 138,
-    kind: 104,
-    origin: 150,
-    code: 138,
-    model: 120,
-    serial: 130,
-    barcode: 130,
-    quantity: 84,
-    location: 110,
-    employee: 130,
-    description: 220,
-};
-type MovementColumn = keyof typeof MOVEMENT_COLUMN_WIDTHS;
-
-/** Abwählbare Spalten (Spaltenwahl) — der Rest steht immer. */
-type OptionalColumn = 'model' | 'serial' | 'barcode' | 'location' | 'employee';
-const OPTIONAL_COLUMNS: Array<{ key: OptionalColumn; labelKey: string }> = [
-    { key: 'model', labelKey: 'inv.columns.modelNumber' },
-    { key: 'serial', labelKey: 'inv.columns.serialNumber' },
-    { key: 'barcode', labelKey: 'inv.columns.barcode' },
-    { key: 'location', labelKey: 'inv.columns.location' },
-    { key: 'employee', labelKey: 'inv.columns.employee' },
-];
-const COLUMNS_STORAGE = 'offitec:inv-movements:columns:v1';
-const readHidden = (): Set<OptionalColumn> => {
-    try {
-        const parsed = JSON.parse(localStorage.getItem(COLUMNS_STORAGE) || '[]');
-        return new Set(Array.isArray(parsed) ? parsed.filter((key): key is OptionalColumn => OPTIONAL_COLUMNS.some((column) => column.key === key)) : []);
-    } catch {
-        return new Set();
+const QtyCell = ({ movement, side }: { movement: MovementListItem; side: 'in' | 'out' }) => {
+    // Eine Umbuchung ist weder Zu- noch Abgang: sie steht leise in «Giriş».
+    if (movement.movementType === 'TRANSFER') {
+        return side === 'in' ? <span className="ofi-smv-qty is-move">⇄ {fmtQty(movement.quantity)}</span> : null;
     }
+    const out = movement.movementType === 'OUT';
+    if ((side === 'out') !== out) return null;
+    return (
+        <span className={`ofi-smv-qty ${out ? 'is-out' : 'is-in'}`}>
+            {out ? '−' : '+'}{fmtQty(movement.quantity)}
+            {movement.article?.unit && <small>{movement.article.unit}</small>}
+        </span>
+    );
 };
 
 export const StockMovementsPage = () => {
     useLanguageTick();
-    const list = useMovementsList();
-    const grid = useColumnWidths<MovementColumn>({
-        storageKey: 'offitec:inv-movements:col-widths:v2',
-        defaults: MOVEMENT_COLUMN_WIDTHS,
-        minPx: 64,
-    });
+    const searchRef = useRef<HTMLInputElement>(null);
+    const [filter, setFilter] = useState<MovementFilterValue>({ directions: [], origins: [] });
+    const kinds = useMemo(() => kindsFor(filter.directions), [filter.directions]);
+    const list = useMovementsList({ kinds, origins: filter.origins });
 
-    const [hidden, setHidden] = useState<Set<OptionalColumn>>(readHidden);
-    const [columnsAnchor, setColumnsAnchor] = useState<HTMLButtonElement | null>(null);
-    const [columnsOpen, setColumnsOpen] = useState(false);
-    const toggleColumn = (key: OptionalColumn) => setHidden((current) => {
-        const next = new Set(current);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        try { localStorage.setItem(COLUMNS_STORAGE, JSON.stringify([...next])); } catch { /* privater Modus */ }
-        return next;
-    });
-    const show = (key: OptionalColumn) => !hidden.has(key);
+    /* «Özel aralık» ist eine eigene Wahl: sie bleibt stehen, auch wenn die
+       getippten Tage zufällig einer Schnellwahl gleichen. */
+    const [custom, setCustom] = useState(false);
+    const period: PeriodKey = custom ? 'custom' : (list.quickRange ?? 'custom');
+    const pickPeriod = (next: PeriodKey) => {
+        if (next === 'custom') { setCustom(true); return; }
+        setCustom(false);
+        list.setQuickRange(next);
+    };
 
-    const visibleKeys = useMemo(
-        () => (['origin', 'code'] as MovementColumn[])
-            .concat((['model', 'serial', 'barcode'] as OptionalColumn[]).filter(show) as MovementColumn[])
-            .concat(['quantity'] as MovementColumn[])
-            .concat((['location', 'employee'] as OptionalColumn[]).filter(show) as MovementColumn[])
-            .concat(['description'] as MovementColumn[]),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [hidden],
-    );
-    const columnCount = 3 + visibleKeys.length;
+    const filtered = Boolean(list.search.trim() || filter.directions.length || filter.origins.length || list.dateFrom || list.dateTo);
+    const clearAll = () => {
+        list.setSearch('');
+        setFilter({ directions: [], origins: [] });
+        setCustom(false);
+        list.setQuickRange('all');
+    };
 
-    const rangeValue: QuickRange | 'custom' = list.quickRange ?? 'custom';
-    const hasRange = Boolean(list.dateFrom || list.dateTo);
+    const firstLoad = list.loading && !list.items.length;
+    const from = list.total ? (list.page - 1) * MOVEMENTS_PAGE_SIZE + 1 : 0;
+    const to = Math.min(list.total, list.page * MOVEMENTS_PAGE_SIZE);
 
     return (
-        <div className="flex w-full flex-col gap-4">
-            <InventoryListHeader title={t('inv.movements.title')} />
+        <div className="ofi-wh ofi-smv">
+            <header className="ofi-wh-head">
+                <h1 className="ofi-wh-head__title">{t('inv.movements.title')}</h1>
+                {!firstLoad && <span className="ofi-wh-head__count">{t('inv.movements.count', { count: list.total })}</span>}
+            </header>
 
-            <FilterBar
-                end={(
-                    <button
-                        ref={setColumnsAnchor}
-                        type="button"
-                        aria-expanded={columnsOpen}
-                        onClick={() => setColumnsOpen((open) => !open)}
-                        className="ofi-mv-columns flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-[12px] font-semibold text-slate-600 dark:border-white/20 dark:text-white/70"
-                    >
-                        <Columns02 size={13} aria-hidden />
-                        {t('inv.movements.columnsButton')}
-                    </button>
-                )}
-            >
-                <SearchBox
-                    value={list.search}
-                    onChange={list.setSearch}
-                    placeholder={t('inv.movements.searchPlaceholder')}
-                />
-                {/* Zeitraum: zwei Kalenderfelder und die Schnellwahl daneben. */}
-                <div className="ofi-mv-range" role="group" aria-label={t('inv.movements.rangeLabel')}>
-                    <DateField
-                        value={list.dateFrom}
-                        onChange={list.setDateFrom}
-                        max={list.dateTo || undefined}
-                        ariaLabel={t('inv.movements.dateFrom')}
-                        placeholder={t('inv.movements.dateFrom')}
-                        buttonClassName="ofi-mv-date"
-                        className="ofi-mv-range__field"
+            <div className="ofi-wh-toolbar">
+                <div
+                    className="ofi-wh-search"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) { event.preventDefault(); searchRef.current?.focus(); }
+                    }}
+                >
+                    <Search className="ofi-wh-search__glass" />
+                    <input
+                        ref={searchRef}
+                        value={list.search}
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder={t('inv.movements.searchPlaceholder')}
+                        aria-label={t('inv.movements.searchPlaceholder')}
+                        onChange={(event) => list.setSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Escape' && list.search) { event.preventDefault(); list.setSearch(''); }
+                        }}
                     />
-                    <span className="ofi-mv-range__dash" aria-hidden>–</span>
-                    <DateField
-                        value={list.dateTo}
-                        onChange={list.setDateTo}
-                        min={list.dateFrom || undefined}
-                        ariaLabel={t('inv.movements.dateTo')}
-                        placeholder={t('inv.movements.dateTo')}
-                        buttonClassName="ofi-mv-date"
-                        className="ofi-mv-range__field"
-                    />
-                    {hasRange && (
+                    {list.search && (
                         <button
                             type="button"
-                            aria-label={t('inv.movements.clearRange')}
-                            title={t('inv.movements.clearRange')}
-                            onClick={() => { list.setDateFrom(''); list.setDateTo(''); }}
-                            className="ofi-mv-range__clear ofi-nosize"
+                            className="ofi-wh-search__clear ofi-nosize"
+                            aria-label={t('inv.movements.clearSearch')}
+                            onClick={() => { list.setSearch(''); searchRef.current?.focus(); }}
                         >
-                            <XClose size={14} />
+                            <X />
                         </button>
                     )}
                 </div>
-                <ToggleGroup<QuickRange | 'custom'>
-                    options={RANGE_OPTIONS.map((option) => ({ key: option.key, label: t(option.labelKey) }))}
-                    value={rangeValue}
-                    onChange={(next) => { if (next !== 'custom') list.setQuickRange(next); }}
-                />
-            </FilterBar>
 
-            {/* Zweite Zeile: Typ und Herkunft als Segmente. */}
-            <div className="ofi-mv-segments">
-                <div className="ofi-mv-segments__group">
-                    <span className="ofi-mv-segments__label">{t('inv.movements.typeLabel')}</span>
-                    <ToggleGroup<TypeFilter>
-                        options={TYPE_OPTIONS.map((option) => ({ key: option.key, label: t(option.labelKey) }))}
-                        value={list.type}
-                        onChange={list.setType}
-                    />
-                </div>
-                <div className="ofi-mv-segments__group">
-                    <span className="ofi-mv-segments__label">{t('inv.movements.originLabel')}</span>
-                    <ToggleGroup<OriginFilter>
-                        options={ORIGIN_OPTIONS.map((option) => ({ key: option.key, label: t(option.labelKey) }))}
-                        value={list.origin}
-                        onChange={list.setOrigin}
-                    />
-                </div>
+                <MovementTypeFilter value={filter} onChange={setFilter} />
+                <PeriodFilter value={period} onChange={pickPeriod} />
+
+                {period === 'custom' && (
+                    <div className="ofi-smv-range" role="group" aria-label={t('inv.movements.customRange')}>
+                        <DateField
+                            value={list.dateFrom}
+                            onChange={list.setDateFrom}
+                            max={list.dateTo || undefined}
+                            ariaLabel={t('inv.movements.dateFrom')}
+                            placeholder={t('inv.movements.dateFrom')}
+                            buttonClassName="ofi-smv-date ofi-nosize"
+                        />
+                        <span className="ofi-smv-range__dash" aria-hidden>–</span>
+                        <DateField
+                            value={list.dateTo}
+                            onChange={list.setDateTo}
+                            min={list.dateFrom || undefined}
+                            ariaLabel={t('inv.movements.dateTo')}
+                            placeholder={t('inv.movements.dateTo')}
+                            buttonClassName="ofi-smv-date ofi-nosize"
+                        />
+                    </div>
+                )}
             </div>
 
-            <SectionCard title={t('inv.movements.sectionTitle', { count: list.total })}>
-                <div className="overflow-x-auto">
-                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full min-w-[1080px]">
+            <div className={`ofi-wh-tablewrap ${list.loading && list.items.length ? 'is-loading' : ''}`}>
+                <div className="ofi-wh-tablescroll">
+                    <table className="ofi-wh-table" data-unstyled-table aria-label={t('inv.movements.title')}>
                         <colgroup>
-                            <ResizableCols keys={['date', 'kind'] as const} grid={grid} />
-                            {/* Bezeichnung: ohne Breite, nimmt den Rest. Sie steht
-                                nach dem ERP-Code — darum die Schlüssel davor und danach getrennt. */}
-                            <ResizableCols keys={['origin', 'code'] as const} grid={grid} />
+                            <col style={{ width: 142 }} />
+                            <col style={{ width: 150 }} />
                             <col />
-                            <ResizableCols keys={visibleKeys.slice(2)} grid={grid} />
+                            <col style={{ width: 112 }} />
+                            <col style={{ width: 112 }} />
+                            <col style={{ width: 250 }} />
+                            <col style={{ width: 150 }} />
                         </colgroup>
                         <thead>
                             <tr>
-                                <th className="relative text-left">
-                                    {t('inv.columns.dateTime')}
-                                    <ColResizeHandle {...grid.resizeProps('date')} />
-                                </th>
-                                <th className="relative text-left">
-                                    {t('inv.columns.movementType')}
-                                    <ColResizeHandle {...grid.resizeProps('kind')} />
-                                </th>
-                                <th className="relative text-left">
-                                    {t('inv.columns.origin')}
-                                    <ColResizeHandle {...grid.resizeProps('origin')} />
-                                </th>
-                                <th className="relative text-left">
-                                    {t('inv.columns.erpCode')}
-                                    <ColResizeHandle {...grid.resizeProps('code')} />
-                                </th>
-                                <th className="text-left">{t('inv.columns.productName')}</th>
-                                {show('model') && (
-                                    <th className="relative text-left">
-                                        {t('inv.columns.modelNumber')}
-                                        <ColResizeHandle {...grid.resizeProps('model')} />
-                                    </th>
-                                )}
-                                {show('serial') && (
-                                    <th className="relative text-left">
-                                        {t('inv.columns.serialNumber')}
-                                        <ColResizeHandle {...grid.resizeProps('serial')} />
-                                    </th>
-                                )}
-                                {show('barcode') && (
-                                    <th className="relative text-left">
-                                        {t('inv.columns.barcode')}
-                                        <ColResizeHandle {...grid.resizeProps('barcode')} />
-                                    </th>
-                                )}
-                                <th className="relative text-right">
-                                    {t('inv.columns.quantity')}
-                                    <ColResizeHandle {...grid.resizeProps('quantity')} />
-                                </th>
-                                {show('location') && (
-                                    <th className="relative text-left">
-                                        {t('inv.columns.location')}
-                                        <ColResizeHandle {...grid.resizeProps('location')} />
-                                    </th>
-                                )}
-                                {show('employee') && (
-                                    <th className="relative text-left">
-                                        {t('inv.columns.employee')}
-                                        <ColResizeHandle {...grid.resizeProps('employee')} />
-                                    </th>
-                                )}
-                                <th className="relative text-left">
-                                    {t('inv.columns.description')}
-                                    <ColResizeHandle {...grid.resizeProps('description')} />
-                                </th>
+                                <th><span className="ofi-smv-th">{t('inv.columns.dateTime')}</span></th>
+                                <th><span className="ofi-smv-th">{t('inv.columns.erpCode')}</span></th>
+                                <th><span className="ofi-smv-th">{t('inv.columns.productName')}</span></th>
+                                <th className="is-num"><span className="ofi-smv-th">{t('inv.movement.in')}</span></th>
+                                <th className="is-num"><span className="ofi-smv-th">{t('inv.movement.out')}</span></th>
+                                <th><span className="ofi-smv-th">{t('inv.movements.originLabel')}</span></th>
+                                <th><span className="ofi-smv-th">{t('inv.columns.employee')}</span></th>
                             </tr>
                         </thead>
                         <tbody>
-                            {(list.loading || list.items.length === 0) && (
-                                <TableStateRow colSpan={columnCount} loading={list.loading} emptyText={list.error || t('inv.movements.empty')} />
+                            {firstLoad && Array.from({ length: 8 }, (_, index) => (
+                                <tr key={`skel-${index}`} aria-hidden>
+                                    {[58, 70, 64, 40, 40, 72, 56].map((width, cell) => (
+                                        <td key={cell} className={cell === 3 || cell === 4 ? 'is-num' : ''}>
+                                            <span className="ofi-wh-skel" style={{ width: `${width}%`, marginLeft: cell === 3 || cell === 4 ? 'auto' : undefined }} />
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+
+                            {!list.loading && !list.items.length && (
+                                <tr>
+                                    <td colSpan={7} style={{ height: 'auto', padding: 0 }}>
+                                        {list.error ? (
+                                            <div className="ofi-wh-state is-error">
+                                                <TriangleAlert />
+                                                <b>{list.error}</b>
+                                                <button type="button" className="ofi-wh-btn ofi-nosize" onClick={list.reload}>
+                                                    {t('inv.movements.retry')}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="ofi-wh-state">
+                                                <ArrowLeftRight />
+                                                <b>{t('inv.movements.empty')}</b>
+                                                {filtered && (
+                                                    <button type="button" className="ofi-wh-btn ofi-nosize" onClick={clearAll}>
+                                                        {t('inv.movements.clearFilters')}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </td>
+                                </tr>
                             )}
-                            {!list.loading && list.items.map((movement) => {
-                                const meta = KIND_META[movement.movementKind] ?? KIND_META.IN;
-                                const isDefinition = movement.movementKind === 'DEFINITION';
-                                const isOut = movement.movementType === 'OUT';
+
+                            {!firstLoad && list.items.map((movement) => {
                                 const article = movement.article;
-                                // Beim Scan zählt die gelesene Kennung; sonst die des Artikels.
-                                const serial = movement.serialNumber || article?.serialNumber || null;
-                                const barcode = movement.scannedBarcode || article?.supplierBarcode || article?.systemBarcode || null;
                                 const employee = movement.employee ? `${movement.employee.firstName} ${movement.employee.lastName}`.trim() : '';
+                                const originText = t(ORIGIN_LABEL[movement.origin] ?? ORIGIN_LABEL.MANUAL);
+                                // Woher / wohin: der Lieferant, sonst die Notiz der Bewegung.
+                                const note = movement.supplier?.companyName || movement.description || '';
                                 return (
-                                    <tr key={movement.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
-                                        <td className="font-mono text-[12.5px] text-slate-500 dark:text-white/60">{fmtDateTime(movement.transactionDate)}</td>
-                                        <td>
-                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.className}`}>
-                                                {t(meta.labelKey)}
-                                            </span>
+                                    <tr key={movement.id}>
+                                        <td className="ofi-smv-date-cell">{fmtDateTime(movement.transactionDate)}</td>
+                                        <td>{article?.articleCode ? <span className="ofi-wh-code">{article.articleCode}</span> : <Blank />}</td>
+                                        <td className="is-name" title={article?.name || undefined}>{article?.name || <Blank />}</td>
+                                        <td className="is-num"><QtyCell movement={movement} side="in" /></td>
+                                        <td className="is-num"><QtyCell movement={movement} side="out" /></td>
+                                        <td title={[originText, note].filter(Boolean).join(' · ')}>
+                                            {originText}
+                                            {note && <span className="ofi-wh-cell-sub"> · {note}</span>}
                                         </td>
-                                        <td className="text-[12.5px] text-slate-600 dark:text-white/70">{t(ORIGIN_LABEL[movement.origin] ?? ORIGIN_LABEL.MANUAL)}</td>
-                                        <td className="font-mono text-[13px] text-slate-500 dark:text-white/60">{article?.articleCode || '—'}</td>
-                                        <td className="text-slate-800 dark:text-white">{article?.name || '—'}</td>
-                                        {show('model') && <td className="font-mono text-[12.5px] text-slate-600 dark:text-white/70">{article?.modelNumber || '—'}</td>}
-                                        {show('serial') && <td className="font-mono text-[12.5px] text-slate-600 dark:text-white/70">{serial || '—'}</td>}
-                                        {show('barcode') && <td className="font-mono text-[12.5px] text-slate-600 dark:text-white/70">{barcode || '—'}</td>}
-                                        <td className={`text-right font-mono text-[13px] ${isOut ? 'text-red-600 dark:text-red-300' : 'text-slate-700 dark:text-white/80'}`}>
-                                            {isDefinition ? '—' : `${isOut ? '−' : '+'}${fmtQty(movement.quantity)}`}
-                                        </td>
-                                        {show('location') && <td className="text-[12.5px] text-slate-600 dark:text-white/70">{movement.location || '—'}</td>}
-                                        {show('employee') && <td className="text-[12.5px] text-slate-600 dark:text-white/70">{employee || '—'}</td>}
-                                        <td className="max-w-0 truncate text-[12px] text-slate-500 dark:text-white/60" title={movement.description || undefined}>
-                                            {[movement.supplier?.companyName, movement.description].filter(Boolean).join(' · ') || '—'}
-                                        </td>
+                                        <td className="ofi-wh-cell-sub" title={employee || undefined}>{employee || <Blank />}</td>
                                     </tr>
                                 );
                             })}
                         </tbody>
                     </table>
                 </div>
-                <div className="border-t border-slate-200 dark:border-white/10">
-                    <Pager
-                        page={list.page}
-                        totalPages={list.totalPages}
-                        total={list.total}
-                        pageSize={MOVEMENTS_PAGE_SIZE}
-                        onPage={list.setPage}
-                    />
-                </div>
-            </SectionCard>
-
-            {/* Spaltenwahl — ein kleines Menü am Knopf; Barcode und Seriennummer
-                lassen sich abwählen (Vorgabe), die anderen Nebenspalten auch. */}
-            <AnchoredPicker anchorEl={columnsOpen ? columnsAnchor : null} onClose={() => setColumnsOpen(false)} width={240} maxHeight={320}>
-                <div className="p-1.5">
-                    <p className="px-2 pb-1 pt-1 text-[11.5px] font-semibold text-slate-500 dark:text-white/60">{t('inv.movements.columnsTitle')}</p>
-                    {OPTIONAL_COLUMNS.map((column) => (
-                        <label key={column.key} className="ofi-option-row flex cursor-pointer items-center gap-2.5 rounded-[5px] px-2 py-1.5 text-[12.5px] text-slate-800 dark:text-white">
-                            <input
-                                type="checkbox"
-                                checked={show(column.key)}
-                                onChange={() => toggleColumn(column.key)}
-                                className="size-3.5 accent-[#0a7aff]"
-                            />
-                            {t(column.labelKey)}
-                        </label>
-                    ))}
-                </div>
-            </AnchoredPicker>
+                <footer className="ofi-wh-tablefoot">
+                    <span>{list.total ? t('inv.movements.pageInfo', { from, to, total: list.total }) : ''}</span>
+                    <span className="ofi-wh-tablefoot__pager">
+                        <button
+                            type="button"
+                            className="ofi-wh-btn is-small is-icon is-quiet ofi-nosize"
+                            disabled={list.page <= 1 || list.loading}
+                            aria-label={t('inv.movements.prevPage')}
+                            title={t('inv.movements.prevPage')}
+                            onClick={() => list.setPage(list.page - 1)}
+                        >
+                            <ChevronLeft />
+                        </button>
+                        <button
+                            type="button"
+                            className="ofi-wh-btn is-small is-icon is-quiet ofi-nosize"
+                            disabled={list.page >= list.totalPages || list.loading}
+                            aria-label={t('inv.movements.nextPage')}
+                            title={t('inv.movements.nextPage')}
+                            onClick={() => list.setPage(list.page + 1)}
+                        >
+                            <ChevronRight />
+                        </button>
+                    </span>
+                </footer>
+            </div>
         </div>
     );
 };

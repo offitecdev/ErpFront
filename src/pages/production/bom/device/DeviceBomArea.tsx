@@ -4,7 +4,7 @@ import { Boxes, TriangleAlert } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorOf, productionBomErrorText } from '@/lib/api/productionBom';
-import type { Bom, BomAreaView } from '@/types/productionBom';
+import type { Bom, BomAreaView, BomSummary } from '@/types/productionBom';
 import type { TaskArea } from '@/types/productionTasks';
 import { useNavGuardStore } from '@/store/navGuardStore';
 import '@/styles/modules/warehouse.css';
@@ -33,7 +33,8 @@ export interface BomViewContext {
     canEdit: boolean;
     /** Die vorige Ansicht beim Namen (für den blauen Zurück-Pfeil). */
     backTitle: string;
-    bomOf: (id: string) => Bom | null;
+    bomOf: (id: string) => BomSummary | null;
+    detailOf: (id: string) => Bom | null;
     applyBom: (bom: Bom) => void;
     reload: () => void;
     open: (view: BomView) => void;
@@ -90,7 +91,8 @@ export const DeviceBomArea = ({
 
     useEffect(() => {
         let alive = true;
-        productionBomApi.deviceView(deviceId, area)
+        const controller = new AbortController();
+        productionBomApi.deviceView(deviceId, area, controller.signal)
             .then((value) => {
                 if (!alive) return;
                 setData(value);
@@ -102,7 +104,7 @@ export const DeviceBomArea = ({
                 const code = productionBomErrorOf(failure).code;
                 setError({ text: productionBomErrorText(failure, 'productionBom.err.loadFailed'), unavailable: code === 'NOT_AVAILABLE' });
             });
-        return () => { alive = false; };
+        return () => { alive = false; controller.abort(); };
     }, [deviceId, area, tick]);
 
     // Die oberste Ansicht in die Adresse — ersetzt, damit «zurück» die Seite
@@ -117,8 +119,8 @@ export const DeviceBomArea = ({
     useNavKeys(nav);
 
     const boms = useMemo(() => {
-        const map = new Map<string, Bom>();
-        for (const bom of data?.boms ?? []) map.set(bom.id, bom);
+        const map = new Map<string, BomSummary>();
+        for (const bom of [...(data?.main ? [data.main] : []), ...(data?.subs ?? [])]) map.set(bom.id, bom);
         for (const [id, bom] of overrides) map.set(id, bom);
         return map;
     }, [data, overrides]);
@@ -157,6 +159,7 @@ export const DeviceBomArea = ({
         canEdit: data.canEdit,
         backTitle: nav.previous ? viewTitle(nav.previous.view, data, boms) : '',
         bomOf,
+        detailOf: (id) => overrides.get(id) ?? null,
         applyBom,
         reload,
         open,
@@ -171,15 +174,39 @@ export const DeviceBomArea = ({
     return shell(
         <div className="ofi-bom-nav">
             <NavView entryKey={nav.current.key} direction={nav.direction}>
-                {view.kind === 'list' && (main ? <BomDetailView context={context} bom={main} /> : <MainMissing context={context} />)}
+                {view.kind === 'list' && (main ? <BomDetailLoader key={main.id} context={context} bom={main} /> : <MainMissing context={context} />)}
                 {view.kind === 'tasks' && <BomTasksView context={context} />}
                 {missingBom && <BomMissing context={context} />}
-                {bom && view.kind === 'bom' && <BomDetailView context={context} bom={bom} />}
+                {bom && view.kind === 'bom' && <BomDetailLoader key={bom.id} context={context} bom={bom} />}
                 {bom && view.kind === 'revisions' && <BomRevisionsView context={context} bom={bom} />}
                 {bom && view.kind === 'revision' && <BomRevisionView context={context} bom={bom} revision={view.revision} />}
             </NavView>
         </div>,
     );
+};
+
+/** Only the selected BOM loads its materials and editable revision. */
+const BomDetailLoader = ({ context, bom }: { context: BomViewContext; bom: BomSummary }) => {
+    const detail = context.detailOf(bom.id);
+    const apply = context.applyBom;
+    const [error, setError] = useState<string | null>(null);
+    const [retry, setRetry] = useState(0);
+    useEffect(() => {
+        if (detail) return;
+        const controller = new AbortController();
+        setError(null);
+        productionBomApi.bomLines(bom.id, controller.signal)
+            .then((result) => { if (!controller.signal.aborted) apply(result.bom); })
+            .catch((failure) => { if (!controller.signal.aborted) setError(productionBomErrorText(failure)); });
+        return () => controller.abort();
+    }, [bom.id, detail, apply, retry]);
+    if (detail) return <BomDetailView context={context} bom={detail} />;
+    return <>
+        <NavBar nav={context.nav} backTitle={context.backTitle} title={bom.bomNumber} />
+        {error ? <div className="ofi-bom-state is-error"><b>{error}</b>
+            <button type="button" className="ofi-bom-btn ofi-nosize" onClick={() => setRetry((value) => value + 1)}>{t('productionBom.common.retry')}</button>
+        </div> : <LoadingState />}
+    </>;
 };
 
 /** Lesende, solange es die Haupt-BOM noch nicht gibt (angelegt wird sie beim ersten Öffnen durch Bearbeitende). */

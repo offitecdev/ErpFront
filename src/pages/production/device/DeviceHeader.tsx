@@ -2,13 +2,13 @@ import type { MouseEvent, ReactNode } from 'react';
 
 import { t } from '@/i18n/translate';
 import { hrefFor, isModifiedClick } from '@/lib/navLink';
-import type { ProductionDeviceRow, ProductionProjectDevices } from '@/types/production';
+import type { ProductionDeviceHeader } from '@/types/production';
 
 import { quantity } from '../components/productionUi';
 
 type Props = {
-    device: ProductionDeviceRow;
-    project: ProductionProjectDevices['project'];
+    device: ProductionDeviceHeader['device'];
+    project: ProductionDeviceHeader['project'];
     projectPath: string;
     onOpenProject: () => void;
     /**

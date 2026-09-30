@@ -142,6 +142,10 @@ apiClient.interceptors.request.use(async (config) => {
         config.headers['X-CSRF-Token'] = csrfToken;
     }
 
+    // Die Sprache der Oberfläche (30.09.2026): Mails und PDF an Lieferanten folgen ihr.
+    const uiLang = (localStorage.getItem('offitec:lang') || document.documentElement.lang || '').slice(0, 2).toLowerCase();
+    if (uiLang === 'tr' || uiLang === 'de' || uiLang === 'en') config.headers['Accept-Language'] = uiLang;
+
     const selectedTenantId = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId');
     const url = config.url || '';
     const isIdentityRequest = url.startsWith('/auth') || (config.method?.toLowerCase() === 'get' && url.startsWith('/tenants'));

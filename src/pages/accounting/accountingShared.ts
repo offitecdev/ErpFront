@@ -84,7 +84,7 @@ export const displayNumber = (invoice: Pick<InvoiceDto, 'invoiceNumber' | 'statu
 export const kindLabel = (kind?: InvoiceKind | null): string => t(`billing.kind_${kind || 'RECHNUNG'}`);
 
 /** Woher die Rechnung kommt: Auftrag (und Projekt) oder frei erfasst. */
-export const invoiceSource = (invoice: InvoiceDto): { primary: string; secondary: string | null } => {
+export const invoiceSource = (invoice: Pick<InvoiceDto, 'reversesInvoice' | 'salesOrder' | 'project'>): { primary: string; secondary: string | null } => {
     if (invoice.reversesInvoice) {
         return {
             primary: t('accounting.reversesShort', { number: invoice.reversesInvoice.invoiceNumber }),

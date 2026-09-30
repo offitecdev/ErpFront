@@ -553,50 +553,5 @@
     #root .ofi-list-apple.ofi-lager :is(button, input, td) { transition: none !important; }
 }
 
-/* ── 6. Lagerbewegungen (10.09.2026): Zeitraum, Segmente, Spaltenwahl ─────
-   Die beiden Kalenderfelder tragen die Höhe der Filter (controls.css:
-   40px / 10px), die Schnellwahl und die Typ-/Herkunft-Segmente sind
-   `ToggleGroup`s — sie werden oben (Abschnitt 2) als Mac-Segment gemalt.
-   Die zweite Zeile mit Typ und Herkunft ist bewusst KEIN Filterkasten:
-   zwei beschriftete Segmente, sonst nichts. */
-#root .ofi-list-apple.ofi-lager .ofi-mv-range {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-#root .ofi-list-apple.ofi-lager .ofi-mv-range__field { width: 132px; }
-#root .ofi-list-apple.ofi-lager .ofi-mv-range__dash { color: var(--la-muted); font-size: 12px; }
-#root .ofi-list-apple.ofi-lager .ofi-mv-date {
-    display: flex;
-    height: var(--ofi-ctl-h, 40px);
-    padding: 0 10px 0 12px;
-    border: 1px solid var(--la-field-border);
-    border-radius: var(--ofi-ctl-radius, 10px) !important;
-    background: var(--la-surface);
-    font-size: 13px;
-    color: var(--la-text);
-    box-shadow: var(--la-btn-shadow);
-    transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-#root .ofi-list-apple.ofi-lager .ofi-mv-date:hover { border-color: var(--la-field-border-hover); }
-#root .ofi-list-apple.ofi-lager .ofi-mv-date:focus-visible { outline: none; border-color: var(--la-accent); box-shadow: 0 0 0 3px var(--la-focus); }
-#root .ofi-list-apple.ofi-lager .ofi-mv-range__clear {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--la-secondary);
-}
-#root .ofi-list-apple.ofi-lager .ofi-mv-range__clear:hover { background: var(--la-hover); color: var(--la-text); }
-#root .ofi-list-apple.ofi-lager .ofi-mv-segments {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px 24px;
-}
-#root .ofi-list-apple.ofi-lager .ofi-mv-segments__group { display: inline-flex; align-items: center; gap: 8px; }
-#root .ofi-list-apple.ofi-lager .ofi-mv-segments__label { font-size: 12px; color: var(--la-secondary); }
+/* ── 6. Lagerbewegungen: seit dem 29.09.2026 im Kleid des Depo — ihre
+   Regeln stehen in styles/modules/stockMovements.css (+ warehouse.css). */

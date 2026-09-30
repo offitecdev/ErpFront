@@ -7,6 +7,7 @@ import {
     BellRinging,
     ChevronRight,
     Edit01,
+    File05,
     FileCheck02,
     ListChecks,
     Users01,
@@ -57,6 +58,8 @@ const glyphFor = (type: string): { tone: Tone; icon: React.ReactNode } => {
     if (kind === 'WAREHOUSE_IMPORT_REJECTED') return { tone: 'red', icon: <AlertCircle size={18} /> };
     // Üretim · Görevlendirme (26.09.2026): eine Aufgabe eines Geräts zugewiesen.
     if (kind === 'PRODUCTION_TASK_ASSIGNED') return { tone: 'blue', icon: <ListChecks size={18} /> };
+    // Stok (29.09.2026): eine Preisanfrage kam beim Einkauf an — «Fiyat talebi oluşturuldu».
+    if (kind === 'PURCHASE_REQUEST_FORWARDED') return { tone: 'indigo', icon: <File05 size={18} /> };
     if (kind.includes('SIGNATURE')) return { tone: 'indigo', icon: <Edit01 size={18} /> };
     if (kind.includes('REPORT')) return { tone: 'green', icon: <FileCheck02 size={18} /> };
     if (kind.includes('MAINTENANCE') || kind.includes('INSTALLATION')) return { tone: 'orange', icon: <Wrench size={18} /> };

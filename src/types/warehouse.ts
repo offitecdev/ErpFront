@@ -18,7 +18,16 @@ export interface WarehouseProduct {
     materialGroup: WarehouseGroupRef | null;
     name: string;
     brand: string | null;
+    /** «Üretici kodu» (30.09.2026, früher «Model numarası») — nie gedruckt. */
     modelNumber: string | null;
+    /** «Ürün kodu» (30.09.2026) — steht im PDF der Preisanfrage und der Bestellung. */
+    productCode?: string | null;
+    /** Einheit der Karte: PCS · M · KG · SET · PACK (ältere Karten: keine). */
+    unit?: WarehouseUnit | null;
+    /** Taslak — es fehlt, was `missing` nennt. */
+    isDraft?: boolean;
+    /** Was einer fertigen Karte fehlt: name · unit · supplier · supplierEmail (leer = fertig). */
+    missing?: WarehouseMissingField[];
     /** Der erste Lieferant (Liste, Sortierung) — oder keiner. */
     supplier: { id: string | null; name: string } | null;
     /** Alle Lieferanten, jeder mit seinem Barcode des Produkts; `id` fehlt bei einem frei geschriebenen Namen. */
@@ -43,7 +52,16 @@ export interface WarehouseSupplierEntry {
     id: string | null;
     name: string;
     barcode: string | null;
+    /** Seine E-Mail für diese Karte — an sie geht die automatische Preisanfrage (30.09.2026). */
+    email?: string | null;
 }
+
+/** Die Einheiten einer Karte — dieselben wie die BOM-Zeile. */
+export const WAREHOUSE_UNITS = ['PCS', 'M', 'KG', 'SET', 'PACK'] as const;
+export type WarehouseUnit = typeof WAREHOUSE_UNITS[number];
+
+/** Was eine fertige (nicht-Taslak) Karte braucht. */
+export type WarehouseMissingField = 'name' | 'unit' | 'supplier' | 'supplierEmail';
 
 export interface WarehouseSerial {
     id: string;
@@ -147,6 +165,8 @@ export interface WarehouseSettings {
 export interface WarehouseSupplierOption {
     id: string | null;
     name: string;
+    /** Die E-Mail aus der Lieferantenliste — die Karte übernimmt sie in die leere Zeile. */
+    email?: string | null;
 }
 
 export type WarehouseMatchKind = 'serial' | 'barcode' | 'manufacturerBarcode' | 'supplierBarcode' | 'erpCode';
@@ -170,8 +190,12 @@ export interface WarehouseProductInput {
     name?: string;
     brand?: string | null;
     modelNumber?: string | null;
-    /** Alle Lieferanten der Karte, in ihrer Reihenfolge, jeder mit seinem Barcode. */
-    suppliers?: Array<{ supplierId: string | null; name: string; barcode: string | null }>;
+    productCode?: string | null;
+    unit?: WarehouseUnit | null;
+    /** false = «Kaydet» (Pflichtangaben nötig), true = «Taslak olarak kaydet»; fehlt = der Server entscheidet. */
+    isDraft?: boolean;
+    /** Alle Lieferanten der Karte, in ihrer Reihenfolge, jeder mit seinem Barcode und seiner E-Mail. */
+    suppliers?: Array<{ supplierId: string | null; name: string; barcode: string | null; email?: string | null }>;
     description?: string | null;
     quantity?: number;
     purchasePrice?: number | null;
@@ -238,7 +262,10 @@ export interface WarehouseImportRowInput {
     name?: string | null;
     brand?: string | null;
     modelNumber?: string | null;
+    productCode?: string | null;
+    unit?: string | null;
     supplierName?: string | null;
+    supplierEmail?: string | null;
     description?: string | null;
     quantity?: string | number | null;
     purchasePrice?: string | number | null;

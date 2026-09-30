@@ -40,6 +40,54 @@
     --ows-surface: transparent;
 }
 
+/* ── «GERİ» · «AYRI EKRANDA AÇ» (29.09.2026, Vorgabe Samet) ──────────────────
+   Über dem Kopf: links zurück (im Einkauf zum Talep, sonst in die Liste),
+   rechts — nur wenn die Seite im Einkauf eingebettet ist — dieselbe Seite
+   unter ihrer Stok-Adresse in einem neuen Tab. Zwei stille blaue Wörter. */
+.ofi-ows-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: -6px;
+}
+
+.ofi-ows-nav .ofi-ows-navlink {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 8px 0 4px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ows-accent);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.ofi-ows-nav a.ofi-ows-navlink {
+    padding: 0 6px 0 8px;
+    font-size: 12.5px;
+}
+
+.ofi-ows-nav .ofi-ows-navlink:hover {
+    background: rgba(10, 122, 255, 0.08);
+}
+
+.ofi-ows-nav .ofi-ows-navlink:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+:root.dark .ofi-ows-nav .ofi-ows-navlink,
+.dark .ofi-ows-nav .ofi-ows-navlink {
+    color: #4ea1ff;
+}
+
 /* ── DIE REITERLEISTE ────────────────────────────────────────────────────── */
 .ofi-ows-tabrow {
     display: flex;
@@ -628,3 +676,234 @@
     color: var(--ows-text);
 }
 .ofi-ows-projectchip:hover { border-color: var(--ows-accent); color: var(--ows-accent); }
+
+/* ── «FİYAT TALEBİ … TARAFINDAN İLETİLDİ» (29.09.2026, Vorgabe Samet) ────────
+   Eine stille Zeile über den Reitern: wer die Anfrage an den Einkauf gegeben
+   hat. Blau wie die übrigen Hinweise der Seite, keine Karte, kein Schatten. */
+.ofi-ows-forwarded {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 8px 12px;
+    border-radius: 9px;
+    background: rgba(10, 122, 255, 0.07);
+    color: #0a5fcc;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.ofi-ows-forwarded svg {
+    flex: none;
+}
+
+:root.dark .ofi-ows-forwarded,
+.dark .ofi-ows-forwarded {
+    background: rgba(59, 141, 255, 0.16);
+    color: #8ab8ff;
+}
+
+/* ══ MAL KABUL — SİPARİŞİN AYNISI, ALTTA TEK BAR (29.09.2026, Samet) ═══════
+   «Mal kabul ekranı siparişin aynısı ama stoğa aktarmalıyız, altta sabit bir
+   bar, macOS SwiftUI Apple UI, temiz.»
+   Eine Haarlinien-Tabelle wie die Positionen, darunter ein Glasbalken, der
+   am unteren Rand der Seitenfläche KLEBT (sticky — im Dock-Modus liegt unten
+   das Dock, `fixed` würde es verdecken). Links was ins Lager geht, rechts
+   EIN blauer Knopf. Eingelagert → der Balken wird grün und still. */
+.ofi-rcv {
+    --rcv-pill-open: #f2f2f4;
+    --rcv-pill-open-text: #6e6e73;
+    --rcv-pill-partial: #fff1e0;
+    --rcv-pill-partial-text: #b25c00;
+    --rcv-pill-done: #e5f6ea;
+    --rcv-pill-done-text: #1a7f37;
+    --rcv-bar-bg: rgba(255, 255, 255, 0.78);
+    --rcv-bar-line: rgba(0, 0, 0, 0.1);
+    --rcv-head: #86868b;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+:root.dark .ofi-rcv,
+.dark .ofi-rcv {
+    --rcv-pill-open: rgba(255, 255, 255, 0.08);
+    --rcv-pill-open-text: rgba(255, 255, 255, 0.6);
+    --rcv-pill-partial: rgba(255, 159, 10, 0.18);
+    --rcv-pill-partial-text: #ffb340;
+    --rcv-pill-done: rgba(48, 209, 88, 0.16);
+    --rcv-pill-done-text: #4cd964;
+    --rcv-bar-bg: rgba(40, 40, 44, 0.78);
+    --rcv-bar-line: rgba(255, 255, 255, 0.12);
+    --rcv-head: rgba(255, 255, 255, 0.5);
+}
+
+.ofi-rcv-hint {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--ows-mute);
+}
+
+.ofi-rcv-card {
+    border: 1px solid var(--ows-line);
+    border-radius: 12px;
+    background: var(--ows-surface);
+    overflow: hidden;
+}
+
+.ofi-rcv-scroll { overflow-x: auto; }
+
+.ofi-rcv-table {
+    width: 100%;
+    min-width: 820px;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 13px;
+    color: var(--ows-text);
+}
+
+.ofi-rcv-table th {
+    height: 34px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--ows-line);
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: left;
+    color: var(--rcv-head);
+    white-space: nowrap;
+}
+
+.ofi-rcv-table td {
+    height: 46px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--ows-line);
+    vertical-align: middle;
+}
+
+.ofi-rcv-table tbody tr:last-child td { border-bottom: 0; }
+.ofi-rcv-table .is-num { text-align: right; }
+.ofi-rcv-table .is-mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ofi-rcv-table .is-mute { color: var(--ows-mute); }
+.ofi-rcv-table .is-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-rcv-table tr.is-done td { color: var(--ows-mute); }
+.ofi-rcv-table td.is-num .ofi-qe-stepper { height: 30px; margin-left: auto; }
+
+/* Das hausweite `#root :where(input…)` (weiss, 40px) darf das Stepperfeld
+   nicht aufblähen — die Mengenzelle ist eine ruhige Zahl mit Pfeilen. */
+#root .ofi-rcv .ofi-qe-stepper input {
+    width: 66px;
+    height: 28px;
+    min-height: 0;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ows-text);
+}
+
+#root .ofi-rcv .ofi-qe-stepper__arrows button {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+}
+
+.ofi-rcv-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.ofi-rcv-pill.is-open { background: var(--rcv-pill-open); color: var(--rcv-pill-open-text); }
+.ofi-rcv-pill.is-partial { background: var(--rcv-pill-partial); color: var(--rcv-pill-partial-text); }
+.ofi-rcv-pill.is-done { background: var(--rcv-pill-done); color: var(--rcv-pill-done-text); }
+
+/* ── Der Glasbalken ─────────────────────────────────────────────────────── */
+.ofi-rcv-bar {
+    position: sticky;
+    bottom: 12px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 56px;
+    margin-top: 4px;
+    padding: 10px 10px 10px 18px;
+    border: 1px solid var(--rcv-bar-line);
+    border-radius: 14px;
+    background: var(--rcv-bar-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.ofi-rcv-bar__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.ofi-rcv-bar__info b { font-size: 13.5px; font-weight: 600; color: var(--ows-text); }
+.ofi-rcv-bar__info span { font-size: 12px; color: var(--ows-mute); }
+
+.ofi-rcv-bar__actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+}
+
+#root .ofi-rcv .ofi-rcv-link {
+    height: 34px;
+    padding: 0 10px;
+    border: 0;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ows-accent);
+}
+#root .ofi-rcv .ofi-rcv-link:hover:not(:disabled) { text-decoration: underline; }
+
+#root .ofi-rcv .ofi-rcv-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--ows-accent);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #fff;
+    transition: background-color 120ms ease, opacity 120ms ease;
+}
+#root .ofi-rcv .ofi-rcv-primary:hover:not(:disabled) { background: #0066e0; }
+#root .ofi-rcv .ofi-rcv-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ofi-rcv-bar.is-done { justify-content: flex-start; }
+.ofi-rcv-bar__done {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    color: var(--rcv-pill-done-text);
+}
+.ofi-rcv-bar__done b { font-weight: 600; }
+.ofi-rcv-bar__done span { color: var(--ows-mute); font-size: 12.5px; }
+
+@media (max-width: 640px) {
+    .ofi-rcv-bar { flex-direction: column; align-items: stretch; padding: 12px; }
+    .ofi-rcv-bar__actions { justify-content: flex-end; flex-wrap: wrap; }
+}

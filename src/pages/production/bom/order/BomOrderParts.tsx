@@ -43,18 +43,24 @@ export const BomOrderBanner = ({
 }) => {
     const fileRef = useRef<HTMLInputElement>(null);
     const [busy, setBusy] = useState(false);
+    /* Das Angebot gilt SOFORT als da (29.09.2026: «pdf yüklemesi 5 saniye sürüyor,
+       en fazla 200 ms») — das Hochladen läuft dahinter, die Bestellung liest den
+       Stand danach im Hintergrund. Scheitert es, ist der Haken wieder weg. */
+    const [uploaded, setUploaded] = useState(false);
     const isOrder = origin.kind === 'ORDER';
     const hasNumber = Boolean(savedQuoteNumber?.trim());
-    const hasFile = Boolean(origin.quoteFile);
+    const hasFile = Boolean(origin.quoteFile) || uploaded;
 
     const upload = async (file: File | null | undefined) => {
         if (!file) return;
+        setUploaded(true);
         setBusy(true);
         try {
-            await productionBomApi.uploadQuote(purchaseOrderId, file);
+            await productionBomApi.uploadQuote(purchaseOrderId, file, { lean: true });
             toast.success(t('productionBom.purchase.uploaded'));
             onChanged();
         } catch (error) {
+            setUploaded(false);
             toast.error(productionBomErrorText(error));
         } finally {
             setBusy(false);
@@ -112,8 +118,8 @@ export const BomOrderBanner = ({
                         {t('productionBom.purchases.checkQuoteFile')}
                     </span>
                     {hasFile ? (
-                        <button type="button" className="ofi-bom-btn is-small is-quiet ofi-nosize" onClick={() => void openQuoteFile(purchaseOrderId)}>
-                            <Eye />
+                        <button type="button" className="ofi-bom-btn is-small is-quiet ofi-nosize" disabled={busy} onClick={() => void openQuoteFile(purchaseOrderId)}>
+                            {busy ? <span className="ofi-bom-spinner is-small" /> : <Eye />}
                             {t('productionBom.purchase.view')}
                         </button>
                     ) : (

@@ -299,15 +299,18 @@ export const RequestsAppsMenu = () => {
                                 style={{ '--i': index } as React.CSSProperties}
                                 onClick={() => go(tile.to)}
                             >
-                                <span className="ofi-apps__tileicon" aria-hidden>{tile.icon}</span>
+                                <span className="ofi-apps__tileicon">
+                                    <span aria-hidden className="contents">{tile.icon}</span>
+                                    {/* Die Zahl sitzt auf der Ecke des Zeichens, wie
+                                        das Kennzeichen einer App (29.09.2026). Über
+                                        99 wird sie zur Aussage «viele» — eine
+                                        vierstellige Blase liest ohnehin niemand. */}
+                                    {tile.count > 0 && (
+                                        <span className="ofi-apps__tilecount is-live">{tile.count > 99 ? '99+' : tile.count}</span>
+                                    )}
+                                </span>
                                 <span className="ofi-apps__tilelabel">{tile.label}</span>
                                 <span className="ofi-apps__tilehint">{tile.hint}</span>
-                                {/* Über 99 wird die Zahl zur Aussage «viele» —
-                                    eine vierstellige Blase ist breiter als die
-                                    Kachel und niemand liest sie ohnehin. */}
-                                {tile.count > 0 && (
-                                    <span className="ofi-apps__tilecount is-live">{tile.count > 99 ? '99+' : tile.count}</span>
-                                )}
                             </button>
                         ))}
                     </div>

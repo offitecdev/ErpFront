@@ -118,7 +118,7 @@ export const MacSpinner = ({
 export const MacSpinnerScreen = () => (
     <div
         className="flex items-center justify-center"
-        style={{ minHeight: 'calc(100dvh - 2 * var(--page-pad-y, 1.5rem))' }}
+        style={{ minHeight: 'calc(100dvh / var(--ofi-zoom, 1) - 2 * var(--page-pad-y, 1.5rem))' }}
     >
         <MacSpinner size={30} />
     </div>

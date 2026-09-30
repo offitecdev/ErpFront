@@ -1,5 +1,10 @@
 # Wareneingang — vorläufig STILLGELEGT (Vorgabe Samet, 22.09.2026)
 
+> **29.09.2026: ABGELÖST.** Der Wareneingang ist zurück, aber NEU gebaut:
+> `src/pages/inventory/workspace/ReceivePanel.tsx` (Reiter «Mal kabul», Tabelle
+> wie die Bestellung + klebender Glasbalken unten, EIN Knopf «Onayla ve stoğa
+> gönder»). Die beiden Dateien hier sind nur noch Geschichte.
+
 «Mal kabul bölümünü şimdilik kaldır sistemden, yani dosyaları gizle.»
 
 Die beiden Reitertafeln des Wareneingangs liegen hier, **ausserhalb von `src/`** —

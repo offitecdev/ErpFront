@@ -25,9 +25,12 @@ import { groupTemplateLabel } from '../warehouseCodes';
 export type ImportField =
     | 'group'
     | 'name'
+    | 'productCode'
     | 'brand'
     | 'modelNumber'
+    | 'unit'
     | 'supplierName'
+    | 'supplierEmail'
     | 'manufacturerBarcode'
     | 'description'
     | 'quantity'
@@ -41,7 +44,7 @@ export type ImportField =
  * göre ürün barkodu»); ohne Lieferant gehört er der Karte.
  */
 export const TEMPLATE_FIELDS: ImportField[] = [
-    'group', 'name', 'brand', 'modelNumber', 'supplierName', 'manufacturerBarcode',
+    'group', 'name', 'productCode', 'brand', 'modelNumber', 'unit', 'supplierName', 'supplierEmail', 'manufacturerBarcode',
     'description', 'quantity', 'purchasePrice', 'currency', 'serialRequired',
 ];
 
@@ -49,9 +52,16 @@ export const TEMPLATE_FIELDS: ImportField[] = [
 const HEADER_ALIASES: Record<ImportField, string[]> = {
     group: ['malzeme grubu', 'material group', 'materialgruppe', 'grup', 'group', 'gruppe'],
     name: ['ürün adı', 'urun adi', 'product name', 'produktname', 'name', 'ad', 'ürün'],
+    // «Ürün kodu» (30.09.2026) — steht im PDF des Lieferanten.
+    productCode: ['ürün kodu', 'urun kodu', 'product code', 'produktcode', 'artikelnummer', 'article number'],
     brand: ['marka', 'ürün markası', 'brand', 'marke'],
-    modelNumber: ['model numarası', 'model no', 'model', 'model number', 'modellnummer'],
+    // «Üretici kodu» = früher «Model numarası» (derselbe Wert).
+    modelNumber: ['üretici kodu', 'uretici kodu', 'manufacturer code', 'herstellercode', 'herstellernummer',
+        'model numarası', 'model no', 'model', 'model number', 'modellnummer'],
+    unit: ['birim', 'birim türü', 'unit', 'einheit'],
     supplierName: ['tedarikçi adı', 'tedarikçi', 'tedarikci', 'supplier name', 'supplier', 'lieferant', 'lieferantenname'],
+    supplierEmail: ['tedarikçi e-postası', 'tedarikçi e-posta', 'tedarikçi maili', 'tedarikçi mail', 'e-posta', 'supplier e-mail', 'supplier email',
+        'e-mail des lieferanten', 'e-mail', 'email', 'mail'],
     // Die frühere Spalte «Tedarikçi ürün kodu» (Vorlage vor dem vierten Durchgang) war nach
     // Samet schon der Barcode des Lieferanten — sie zählt, wenn die Datei keine Barcodespalte hat.
     manufacturerBarcode: ['üretici barkodu', 'uretici barkodu', 'ürün barkodu', 'urun barkodu', 'tedarikçi barkodu', 'manufacturer barcode',
@@ -94,10 +104,12 @@ const download = (data: ArrayBuffer | Uint8Array, fileName: string) => {
 export interface ListExcelTexts {
     sheet: string;
     headers: {
-        erpCode: string; barcode: string; name: string; category: string; group: string; brand: string; modelNumber: string;
-        supplier: string; makerBarcodes: string; description: string; quantity: string; purchasePrice: string; currency: string;
+        erpCode: string; barcode: string; name: string; productCode: string; category: string; group: string; brand: string; modelNumber: string;
+        unit: string; supplier: string; makerBarcodes: string; description: string; quantity: string; purchasePrice: string; currency: string;
         serialRequired: string;
     };
+    /** Die Einheiten in der Sprache der Oberfläche (PCS → «Adet» …). */
+    units: Record<string, string>;
     yes: string;
     no: string;
     fileName: string;
@@ -114,16 +126,18 @@ const makerBarcodesText = (product: WarehouseProduct): string => [
 
 export const downloadListExcel = (products: WarehouseProduct[], texts: ListExcelTexts) => {
     const h = texts.headers;
-    const header = [h.erpCode, h.barcode, h.name, h.category, h.group, h.brand, h.modelNumber, h.supplier, h.makerBarcodes,
+    const header = [h.erpCode, h.barcode, h.name, h.productCode, h.category, h.group, h.brand, h.modelNumber, h.unit, h.supplier, h.makerBarcodes,
         h.description, h.quantity, h.purchasePrice, h.currency, h.serialRequired];
     const rows = products.map((product) => [
         product.erpCode ?? '',
         product.barcode ?? '',
         product.name,
+        product.productCode ?? '',
         product.materialGroup?.category?.name ?? '',
         product.materialGroup?.name ?? '',
         product.brand ?? '',
         product.modelNumber ?? '',
+        product.unit ? texts.units[product.unit] ?? product.unit : '',
         // Mehrere Lieferanten: die Namen mit «; » getrennt, ihre Barcodes daneben.
         product.suppliers.map((entry) => entry.name).join('; '),
         makerBarcodesText(product),
@@ -136,12 +150,12 @@ export const downloadListExcel = (products: WarehouseProduct[], texts: ListExcel
     const sheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
     // Codes bleiben Text — sonst verliert der Barcode seine führende 0.
     for (let index = 0; index < rows.length; index += 1) {
-        for (const col of [0, 1, 8]) {
+        for (const col of [0, 1, 3, 10]) {
             const cell = sheet[XLSX.utils.encode_cell({ r: index + 1, c: col })];
             if (cell) { cell.t = 's'; cell.z = '@'; }
         }
     }
-    sheet['!cols'] = [18, 16, 40, 18, 22, 16, 18, 24, 34, 48, 10, 12, 8, 12].map((wch) => ({ wch }));
+    sheet['!cols'] = [18, 16, 40, 16, 18, 22, 16, 18, 10, 24, 34, 48, 10, 12, 8, 12].map((wch) => ({ wch }));
     sheet['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(rows.length, 1), c: header.length - 1 } }) };
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, texts.sheet.slice(0, 31));
@@ -157,6 +171,8 @@ export interface TemplateTexts {
     productsSheet: string;
     helpSheet: string;
     headers: Record<ImportField, string>;
+    /** Die Einheiten in der Sprache der Oberfläche — die Auswahl der Spalte «Birim». */
+    units: Record<string, string>;
     yes: string;
     no: string;
     /** Die Anleitung, Zeile für Zeile (auf einem eigenen Blatt — ein Beispiel im
@@ -219,18 +235,20 @@ export const downloadTemplate = (catalog: WarehouseCatalog, texts: TemplateTexts
     // Blatt 1: die Produkte — nur die Kopfzeile, ausgefüllt wird von Hand.
     const header = TEMPLATE_FIELDS.map((field) => texts.headers[field]);
     const products = XLSX.utils.aoa_to_sheet([header]);
-    products['!cols'] = [34, 34, 16, 18, 24, 18, 40, 10, 12, 12, 16].map((wch) => ({ wch }));
+    products['!cols'] = [34, 34, 16, 16, 18, 12, 24, 28, 18, 40, 10, 12, 12, 16].map((wch) => ({ wch }));
 
     // Blatt 2: Anleitung.
     const help = XLSX.utils.aoa_to_sheet(texts.help.map((line) => [line]));
     help['!cols'] = [{ wch: 110 }];
 
     // Blatt 3 (ausgeblendet): die Listen für die Auswahl.
-    const listRows = Math.max(groupLabels.length, CURRENCIES.length, 2);
+    const unitLabels = Object.values(texts.units);
+    const listRows = Math.max(groupLabels.length, CURRENCIES.length, unitLabels.length, 2);
     const lists = XLSX.utils.aoa_to_sheet(Array.from({ length: listRows }, (_, index) => [
         groupLabels[index] ?? null,
         CURRENCIES[index] ?? null,
         index === 0 ? texts.yes : index === 1 ? texts.no : null,
+        unitLabels[index] ?? null,
     ]));
 
     const book = XLSX.utils.book_new();
@@ -240,6 +258,7 @@ export const downloadTemplate = (catalog: WarehouseCatalog, texts: TemplateTexts
     const names: Array<{ Name: string; Ref: string }> = [
         { Name: 'DepoParaBirimi', Ref: `Listeler!$B$1:$B$${CURRENCIES.length}` },
         { Name: 'DepoEvetHayir', Ref: 'Listeler!$C$1:$C$2' },
+        { Name: 'DepoBirimler', Ref: `Listeler!$D$1:$D$${Math.max(1, unitLabels.length)}` },
     ];
     if (groupLabels.length) names.push({ Name: 'DepoMalzemeGruplari', Ref: `Listeler!$A$1:$A$${groupLabels.length}` });
     book.Workbook = { Sheets: [{ Hidden: 0 }, { Hidden: 0 }, { Hidden: 1 }], Names: names };
@@ -256,6 +275,7 @@ export const downloadTemplate = (catalog: WarehouseCatalog, texts: TemplateTexts
             ...(groupLabels.length ? [list('group', 'DepoMalzemeGruplari')] : []),
             list('currency', 'DepoParaBirimi'),
             list('serialRequired', 'DepoEvetHayir'),
+            list('unit', 'DepoBirimler'),
             `<dataValidation type="decimal" operator="greaterThanOrEqual" allowBlank="1" showErrorMessage="1" sqref="${range('quantity')} ${range('purchasePrice')}"><formula1>0</formula1></dataValidation>`,
         ];
         let xml = readText(sheet.content);

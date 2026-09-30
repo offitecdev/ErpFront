@@ -98,7 +98,7 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, area, handle, names,
             )}
             {/* BOM (27.09.2026): die BOM-Liste des Geräts im Bereich — ein
                 Navigationsstapel unter der Glaskarte der Aufgaben. */}
-            {stage.id === 'bom' && <DeviceBomArea deviceId={deviceId} area={area} tasks={bomTasks} />}
+            {stage.id === 'bom' && <DeviceBomArea key={`${deviceId}:${area}`} deviceId={deviceId} area={area} tasks={bomTasks} />}
             {workStage && plan && tasks.length > 0 && stage.id !== 'bom' && (
                 <StageTasksFloat
                     area={area}

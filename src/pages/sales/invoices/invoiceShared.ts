@@ -98,7 +98,7 @@ export const invoiceCategory = (invoice: InvoiceDto): InvoiceCategory => {
 };
 
 /** Empfängername: Bestandskunde, sonst der frei erfasste Empfänger. */
-export const invoiceRecipient = (invoice: InvoiceDto): string =>
+export const invoiceRecipient = (invoice: Pick<InvoiceDto, 'customer' | 'recipientName'>): string =>
     invoice.customer?.companyName || invoice.recipientName || '';
 
 export const statusLabel = (status: InvoiceStatus): string => t(`invoices.status_${status}`);

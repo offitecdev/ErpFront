@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail01, Plus, QrCode01 } from '@/components/icons/antIconCompat';
+import { LuStar } from 'react-icons/lu';
+import { Plus, QrCode01 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { PersonAvatar } from '@/components/ui-shared/PersonAvatar';
 import { t } from '@/i18n/translate';
@@ -81,7 +82,7 @@ export const PersonnelListPage = () => {
                         <col style={{ width: 150 }} />
                         <col style={{ width: 150 }} />
                         <col style={{ width: 140 }} />
-                        <col style={{ width: canManageMail ? 104 : 92 }} />
+                        <col style={{ width: 92 }} />
                     </colgroup>
                     <thead>
                         <tr>
@@ -131,7 +132,32 @@ export const PersonnelListPage = () => {
                                     </div>
                                 </td>
                                 <td className="text-[13px] text-slate-500 dark:text-white/60">
-                                    <span className="block truncate">{person.email}</span>
+                                    {/* DER STERN NEBEN DER ADRESSE (Vorgabe 29.09.2026): hier
+                                        richtet die Verwaltung das Postfach der Person ein.
+                                        Gefüllt gelb = eingerichtet, rot = Abruf hakt,
+                                        grauer Umriss = noch keins. */}
+                                    <div className="flex min-w-0 items-center gap-1">
+                                        {canManageMail && (
+                                            <button
+                                                type="button"
+                                                aria-label={t('personnel.mailbox.open', { name: fullName(person) })}
+                                                title={mailboxes.get(person.id)?.error
+                                                    ? t('personnel.mailbox.statusError')
+                                                    : mailboxes.has(person.id) ? t('personnel.mailbox.configured') : t('personnel.mailbox.open', { name: fullName(person) })}
+                                                onClick={(event) => {
+                                                    // Sonst öffnete der Klick zusätzlich die Personenseite.
+                                                    event.stopPropagation();
+                                                    setMailPerson(person);
+                                                }}
+                                                className={`-ml-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-slate-100 dark:hover:bg-white/10 ${mailboxes.get(person.id)?.error
+                                                    ? 'text-[#ff3b30]'
+                                                    : mailboxes.has(person.id) ? 'text-[#ffb800]' : 'text-slate-300 hover:text-[#ffb800] dark:text-white/30'}`}
+                                            >
+                                                <LuStar size={15} fill={mailboxes.has(person.id) ? 'currentColor' : 'none'} aria-hidden />
+                                            </button>
+                                        )}
+                                        <span className="block min-w-0 truncate">{person.email}</span>
+                                    </div>
                                 </td>
                                 {/* Die Rolle aus den Einstellungen — die alte
                                     Personalrolle (STAFF/ADMIN/ACCOUNTANT) ist
@@ -156,22 +182,6 @@ export const PersonnelListPage = () => {
                                     {formatDate(person.createdAt)}
                                 </td>
                                 <td className="whitespace-nowrap text-right">
-                                    {canManageMail && (
-                                        <button
-                                            type="button"
-                                            aria-label={t('personnel.mailbox.open', { name: fullName(person) })}
-                                            title={mailboxes.has(person.id) ? t('personnel.mailbox.configured') : t('personnel.mailbox.title')}
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                setMailPerson(person);
-                                            }}
-                                            className={`mr-1 inline-flex size-7 items-center justify-center rounded-md transition-colors hover:bg-slate-100 dark:hover:bg-white/10 ${mailboxes.get(person.id)?.error
-                                                ? 'text-red-500'
-                                                : mailboxes.has(person.id) ? 'text-[#0a7aff]' : 'text-slate-400 hover:text-[#0066e0] dark:hover:text-white'}`}
-                                        >
-                                            <Mail01 size={14} />
-                                        </button>
-                                    )}
                                     <button
                                         type="button"
                                         aria-label={t('personnel.qr.open', { name: fullName(person) })}

@@ -8,8 +8,9 @@
  *  • links die Belegkarte (weiss, eine Haarlinie, KEIN Farbstreifen, keine
  *    Tönung), rechts Absenderzeile, Kunde und darunter GENAU EINE
  *    Zusatzanschrift — die auf der Offerte gewählte Projekt- ODER Lieferadresse;
- *  • Titel ohne roten Strich, darunter die Tabelle: Pos · Art.-Nr. ·
- *    Bezeichnung · Bestellt · Geliefert · Offen · Einheit — keine Preise;
+ *  • Titel ohne roten Strich, darunter die Tabelle: Pos · Bezeichnung ·
+ *    Bestellt · Geliefert · Offen · Einheit — keine Preise, keine Art.-Nr.
+ *    (29.09.2026, Samet: Artikelnummer raus);
  *  • Rot nur dort, wo wirklich noch etwas offen ist;
  *  • keine Unterschriftsfelder, kein Kleingedrucktes — höchstens eine
  *    Bemerkung unter der Tabelle.
@@ -64,7 +65,6 @@ type Strings = {
     project: string;
     reference: string;
     colPos: string;
-    colCode: string;
     colDescription: string;
     colOrdered: string;
     colDelivered: string;
@@ -81,7 +81,6 @@ const STRINGS: Record<PdfLang, Strings> = {
         project: 'Projekt',
         reference: 'Ihre Referenz',
         colPos: 'Pos.',
-        colCode: 'Art.-Nr.',
         colDescription: 'Bezeichnung',
         colOrdered: 'Bestellt',
         colDelivered: 'Geliefert',
@@ -96,7 +95,6 @@ const STRINGS: Record<PdfLang, Strings> = {
         project: 'Project',
         reference: 'Your reference',
         colPos: 'Pos.',
-        colCode: 'Item no.',
         colDescription: 'Description',
         colOrdered: 'Ordered',
         colDelivered: 'Delivered',
@@ -111,7 +109,6 @@ const STRINGS: Record<PdfLang, Strings> = {
         project: 'Proje',
         reference: 'Referansınız',
         colPos: 'Poz.',
-        colCode: 'Ürün no.',
         colDescription: 'Açıklama',
         colOrdered: 'Sipariş',
         colDelivered: 'Teslim',
@@ -144,10 +141,8 @@ const COL_OPEN_W = 16;
 const COL_DELIV_W = 20;
 const COL_ORDER_W = 19;
 const COL_POS_W = 11;
-const COL_CODE_W = 32;
 const X_POS = ML + CELL_PAD;
-const X_CODE = ML + COL_POS_W + CELL_PAD;
-const X_DESC = ML + COL_POS_W + COL_CODE_W + CELL_PAD;
+const X_DESC = ML + COL_POS_W + CELL_PAD;
 const R_UNIT_CENTER = MR - COL_UNIT_W / 2;
 const R_OPEN = MR - COL_UNIT_W - CELL_PAD;
 const R_DELIV = MR - COL_UNIT_W - COL_OPEN_W - CELL_PAD;
@@ -248,7 +243,20 @@ const drawAddresses = (doc: jsPDF, data: DeliveryNotePdfData, settings: PdfCompa
     drawFittedSingleLine(doc, sender, ADDR_X, TOP_FIRST + 2.4, ADDR_W, 6.8, 5.6);
     hairline(doc, ADDR_X, TOP_FIRST + 3.6, MR, 0.2);
 
+    // ── GENAU EINE Anschrift (29.09.2026, Samet: «sadece o adres yazması
+    // gerekmektedir»). Wurde der Auftrag für eine Projekt- ODER Lieferadresse
+    // erstellt, steht NUR diese auf dem Lieferschein — die Kundenanschrift
+    // nicht noch zusätzlich. Ohne gewählte Zusatzanschrift gilt die des Kunden.
+    const site = data.siteAddress && String(data.siteAddress.address || '').trim() ? data.siteAddress : null;
     let y = TOP_FIRST + 11.4;
+    if (site) {
+        const L = pdfStringsFor(lang);
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(7.3);
+        doc.setTextColor(...C.LABEL);
+        doc.text((site.kind === 'DELIVERY' ? L.siteAddressDelivery : L.siteAddressInstallation).toUpperCase(), ADDR_X, y - 1.6, { charSpace: 0.15 });
+        y += 3.4;
+    }
     doc.setTextColor(...C.TEXT);
     if (data.customerName) {
         doc.setFont(FONT, 'bold');
@@ -257,13 +265,13 @@ const drawAddresses = (doc: jsPDF, data: DeliveryNotePdfData, settings: PdfCompa
         doc.text(nameLines, ADDR_X, y);
         y += nameLines.length * 4.8;
     }
-    if (data.customerAddress) {
+    const address = site ? site.address : data.customerAddress;
+    if (address) {
         doc.setFont(FONT, 'normal');
         doc.setFontSize(10);
-        y = drawAddressBlockLines(doc, data.customerAddress, ADDR_X, y, ADDR_W, 10, 4.8);
+        y = drawAddressBlockLines(doc, address, ADDR_X, y, ADDR_W, 10, 4.8);
     }
-    // Genau EINE Zusatzanschrift — dieselbe Zeichnung wie auf der Offerte.
-    return brandKit.drawSiteAddress(doc, data.siteAddress ?? null, pdfStringsFor(lang), ADDR_X, y, ADDR_W);
+    return y;
 };
 
 // ── Tabelle ──────────────────────────────────────────────────────────────────
@@ -279,7 +287,6 @@ const drawTableHead = (doc: jsPDF, y: number, S: Strings): number => {
     const head = (text: string, x: number, align: 'left' | 'right' | 'center' = 'left') =>
         doc.text(text.toUpperCase(), x, base, { align, charSpace: 0.1 });
     head(S.colPos, X_POS);
-    head(S.colCode, X_CODE);
     head(S.colDescription, X_DESC);
     head(S.colOrdered, R_ORDER, 'right');
     head(S.colDelivered, R_DELIV, 'right');
@@ -302,11 +309,6 @@ const drawLine = (doc: jsPDF, line: DeliveryNotePdfLine, y: number, text: string
     doc.setFontSize(FS_BODY);
     doc.setTextColor(...C.TEXT);
     if (line.positionNumber) doc.text(line.positionNumber, X_POS, base);
-    doc.setTextColor(...C.LABEL);
-    if (line.articleCode) drawFittedSingleLine(doc, line.articleCode, X_CODE, base, COL_CODE_W - CELL_PAD * 2, FS_BODY, 6.5);
-    doc.setFont(FONT, 'normal');
-    doc.setFontSize(FS_BODY);
-    doc.setTextColor(...C.TEXT);
     doc.text(text, X_DESC, base, { lineHeightFactor: LINE_H / (FS_BODY * 0.3528) });
 
     const hasOrder = line.orderedQty > 0;

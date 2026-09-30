@@ -53,6 +53,8 @@ import type {
     UpdatePurchaseOrderInput,
     SendPurchaseOrderMailInput,
     SendPurchaseOrderMailResult,
+    PurchaseForwardInfo,
+    PurchaseForwardResult,
     ReceivePurchaseOrderInput,
     ReceivePurchaseOrderResult,
     AiImportStatus,
@@ -277,6 +279,8 @@ export const inventoryApi = {
         if (params.description) query.set('description', params.description);
         if (params.type) query.set('type', params.type);
         if (params.origin) query.set('origin', params.origin);
+        if (params.kinds?.length) query.set('kinds', params.kinds.join(','));
+        if (params.origins?.length) query.set('origins', params.origins.join(','));
         if (params.dateFrom) query.set('dateFrom', params.dateFrom);
         if (params.dateTo) query.set('dateTo', params.dateTo);
         // Filtre ve sayfa URL'nin parçasıdır; yalnızca tamamen aynı sorgular
@@ -529,8 +533,14 @@ export const purchaseOrdersApi = {
 
     // Elle durum değişikliği — COMPLETED dışındaki durumlar arasında serbest
     // (COMPLETED yalnızca receive/mark-stocked ile yazılır).
-    setStatus: async (id: string, status: Exclude<PurchaseOrderStatus, 'COMPLETED'>): Promise<PurchaseOrderRow> => {
-        const res = await apiClient.patch(`/inventory/purchase-orders/${id}/status`, { status });
+    // Onay (TO_BE_STOCKED) satırların ürünlerini stokta 0 ile açar; kodsuz satır
+    // kodunu `codeSchemeId` aralığından alır (yoksa geçici kod) — 29.09.2026.
+    setStatus: async (
+        id: string,
+        status: Exclude<PurchaseOrderStatus, 'COMPLETED'>,
+        options?: { codeSchemeId?: string },
+    ): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.patch(`/inventory/purchase-orders/${id}/status`, { status, ...(options ?? {}) });
         return res.data;
     },
 
@@ -610,6 +620,25 @@ export const purchaseOrdersApi = {
 
     sendMail: async (id: string, input: SendPurchaseOrderMailInput): Promise<SendPurchaseOrderMailResult> => {
         const res = await apiClient.post(`/inventory/purchase-orders/${id}/send-mail`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
+        return res.data;
+    },
+
+    /* ── FİYAT TALEBİ → SATIN ALMA (29.09.2026) ─────────────────────────────
+       Satın alma rolü olmayan biri talebi tedarikçiye değil Purser + yöneticilere
+       gönderir: sunucu alıcıları kendisi seçer, mail + zil bildirimi gider. */
+    /** Talebi alacak kişiler (ad + tür) ve bu talebin son gönderimleri. */
+    forwardInfo: async (id: string): Promise<PurchaseForwardInfo> => {
+        const res = await apiClient.get(`/inventory/purchase-orders/${encodeURIComponent(id)}/forward`);
+        return res.data;
+    },
+
+    forward: async (id: string, input: {
+        subject: string;
+        message: string;
+        lang: string;
+        attachments: Array<{ filename: string; contentType: string; contentBase64: string }>;
+    }): Promise<PurchaseForwardResult> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${encodeURIComponent(id)}/forward`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
 

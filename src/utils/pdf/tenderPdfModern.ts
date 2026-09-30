@@ -691,6 +691,34 @@ async function loadLogo(doc: jsPDF): Promise<{ dataUrl: string; w: number; h: nu
 // paylaşamaz.
 let wavePngCache: { key: string; dataUrl: string } | null = null;
 
+/** Das SVG der Welle als PNG (data:-URL) — im Browser über ein <canvas>. */
+async function rasterizeSvgInBrowser(svg: string, pxW: number, pxH: number): Promise<string | null> {
+    const img = new Image();
+    img.decoding = 'sync';
+    await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('wave svg decode failed'));
+        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = pxW;
+    canvas.height = pxH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, pxW, pxH);
+    return canvas.toDataURL('image/png');
+}
+
+/**
+ * Wie ein SVG zum Bild wird. Der Server baut die Lieferanten-PDFs mit DIESEM
+ * Code (Node-Bündel, 30.09.2026: «fiyat talepleri artık otomatik gönderiliyor»)
+ * — dort gibt es kein <canvas>, er setzt seinen eigenen Rasterer (sharp).
+ */
+export const pdfRaster: { svgToPng: (svg: string, pxW: number, pxH: number) => Promise<string | null> } = {
+    svgToPng: rasterizeSvgInBrowser,
+};
+
 async function loadHeaderWave(wMm: number, hMm: number): Promise<string | null> {
     const key = `${wMm.toFixed(2)}x${hMm.toFixed(2)}`;
     if (wavePngCache?.key === key) return wavePngCache.dataUrl;
@@ -716,22 +744,8 @@ async function loadHeaderWave(wMm: number, hMm: number): Promise<string | null> 
                 .replace(/\s*>$/, ' preserveAspectRatio="none">')
         );
 
-        const img = new Image();
-        img.decoding = 'sync';
-        await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject(new Error('wave svg decode failed'));
-            img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sized)}`;
-        });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = pxW;
-        canvas.height = pxH;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return null;
-        ctx.drawImage(img, 0, 0, pxW, pxH);
-
-        const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = await pdfRaster.svgToPng(sized, pxW, pxH);
+        if (!dataUrl) return null;
         wavePngCache = { key, dataUrl };
         return dataUrl;
     } catch (e) {
@@ -2588,6 +2602,9 @@ export const brandKit = {
     registerFonts,
     loadLogo,
     loadHeaderWave,
+    /** Der Briefkopf der Offerte (Logo, Welle, Kontaktzeile) — die Lieferantenbelege
+        zeichnen seit dem 29.09.2026 denselben («direkt teklifteki gibi»). */
+    drawPageHeader,
     drawPageFooter,
     drawSiteAddress,
 };

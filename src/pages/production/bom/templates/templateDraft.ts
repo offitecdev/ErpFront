@@ -73,9 +73,14 @@ export const lineFromProduct = (product: BomProduct, quantity = 1): DraftLine =>
     brand: product.brand,
     modelNumber: product.modelNumber,
     quantityText: quantityToText(quantity),
-    unit: 'PCS',
+    // «Her ürünün birim türü … bom listede oraya otomatik gelmesi gerekmektedir» (30.09.2026).
+    unit: unitOfCard(product.unit),
     note: null,
 });
+
+/** Die Einheit der Karte als Einheit der Zeile — ohne Angabe «Adet». */
+const unitOfCard = (unit: string | null | undefined): DraftLine['unit'] =>
+    (unit === 'PCS' || unit === 'M' || unit === 'KG' || unit === 'SET' || unit === 'PACK' ? unit : 'PCS');
 
 /** Eine Karte, die schon in der Liste steht, erhöht ihre Menge statt einer zweiten Zeile. */
 export const addProduct = (lines: DraftLine[], product: BomProduct): { lines: DraftLine[]; merged: boolean } => {

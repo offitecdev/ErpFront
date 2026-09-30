@@ -27,6 +27,13 @@ const NAMES: Record<PurchaseDocLang, Record<string, string>> = {
         stdUnitPrice: 'Birim Fiyat',
         stdNetPrice: 'Net Fiyat',
         stdAmount: 'Tutar',
+        // Üretim şablonu (30.09.2026)
+        stdGroup: 'Malzeme grubu',
+        stdProductCode: 'Ürün kodu',
+        stdName: 'Ürün adı',
+        stdUnit: 'Birim',
+        stdDiscount: 'İndirim',
+        stdLineTotal: 'Satır tutarı',
     },
     de: {
         stdErp: 'ERP-Code',
@@ -36,6 +43,12 @@ const NAMES: Record<PurchaseDocLang, Record<string, string>> = {
         stdUnitPrice: 'Einzelpreis',
         stdNetPrice: 'Nettopreis',
         stdAmount: 'Betrag',
+        stdGroup: 'Materialgruppe',
+        stdProductCode: 'Produktcode',
+        stdName: 'Produktname',
+        stdUnit: 'Einheit',
+        stdDiscount: 'Rabatt',
+        stdLineTotal: 'Betrag',
     },
     en: {
         stdErp: 'ERP code',
@@ -45,6 +58,12 @@ const NAMES: Record<PurchaseDocLang, Record<string, string>> = {
         stdUnitPrice: 'Unit Price',
         stdNetPrice: 'Net Price',
         stdAmount: 'Amount',
+        stdGroup: 'Material group',
+        stdProductCode: 'Product code',
+        stdName: 'Product name',
+        stdUnit: 'Unit',
+        stdDiscount: 'Discount',
+        stdLineTotal: 'Line total',
     },
 };
 
@@ -76,6 +95,54 @@ export const displayColumnName = (key: unknown, storedName: unknown, lang: Purch
     if (!localized) return stored;
     return !stored || variantsOf(String(key)).has(fold(stored)) ? localized : stored;
 };
+
+/**
+ * ── ÜRETİM ŞABLONU (Vorgabe Samet, 30.09.2026) ─────────────────────────────
+ * «Fiyat talebi: malzeme grubu, ürün kodu (boş olabilir), ürün adı, birim,
+ *  miktar. Siparişte: … birim fiyat, indirim, satır tutarı, en altta varsa
+ *  KDV.» Nur die Belege der BOM tragen diese Spalten (Stok bleibt, wie er ist);
+ * erkannt an `stdGroup` / `stdName`. Die Einheit steht als Wort in der Zeile
+ * (`stdUnit`, «Adet» …) und wird im PDF und auf dem Schirm in die Sprache
+ * übersetzt.
+ */
+export const PRODUCTION_COLUMN_KEYS = ['stdGroup', 'stdProductCode', 'stdName', 'stdUnit', 'stdDiscount', 'stdLineTotal'] as const;
+
+export const isProductionColumns = (columns: unknown): boolean =>
+    Array.isArray(columns) && columns.some((column) => {
+        const key = String((column as { key?: unknown })?.key ?? '');
+        return key === 'stdGroup' || key === 'stdName';
+    });
+
+/** Die Einheiten der Karte (PCS · M · KG · SET · PACK) in den drei Sprachen. */
+const UNIT_WORDS: Record<string, Record<PurchaseDocLang, string>> = {
+    PCS: { tr: 'Adet', de: 'Stk', en: 'pcs' },
+    M: { tr: 'm', de: 'm', en: 'm' },
+    KG: { tr: 'kg', de: 'kg', en: 'kg' },
+    SET: { tr: 'Set', de: 'Set', en: 'set' },
+    PACK: { tr: 'Paket', de: 'Pack.', en: 'pack' },
+};
+const UNIT_OF_WORD: Record<string, string> = {
+    pcs: 'PCS', pc: 'PCS', adet: 'PCS', stk: 'PCS', 'stk.': 'PCS', stück: 'PCS', stueck: 'PCS', piece: 'PCS', pieces: 'PCS',
+    m: 'M', meter: 'M', metre: 'M',
+    kg: 'KG',
+    set: 'SET', satz: 'SET', takım: 'SET',
+    pack: 'PACK', 'pack.': 'PACK', paket: 'PACK', packung: 'PACK',
+};
+
+/** «Adet» → «Stk» (de) · «pcs» (en); unbekannt bleibt, wie es ist. */
+export const localizeUnitWord = (value: unknown, lang: PurchaseDocLang): string => {
+    const text = String(value ?? '').trim();
+    const code = UNIT_WORDS[text.toUpperCase()] ? text.toUpperCase() : UNIT_OF_WORD[fold(text)];
+    return code ? UNIT_WORDS[code]![lang] : text;
+};
+
+/** Die Positionen mit der Einheit in der Sprache des Belegs (nur Zeilen mit `stdUnit`). */
+export const localizeProductionCells = <T extends { extras?: Array<{ key: string; value?: unknown }> | null }>(
+    items: T[],
+    lang: PurchaseDocLang,
+): T[] => items.map((item) => (item.extras?.some((entry) => entry?.key === 'stdUnit')
+    ? { ...item, extras: item.extras.map((entry) => (entry?.key === 'stdUnit' ? { ...entry, value: localizeUnitWord(entry.value, lang) } : entry)) }
+    : item));
 
 /** Bir sütun listesi standart şablonun mu? (`stdProduct` anahtarından tanınır) */
 export const isStandardColumns = (columns: unknown): boolean =>

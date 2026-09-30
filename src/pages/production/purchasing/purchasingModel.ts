@@ -22,6 +22,7 @@ const STAGE_TONE: Record<ProcurementStageKey, Tone> = {
     PRICE_NEEDED: 'warn',
     COMPARE: 'warn',
     QUOTE_NEEDED: 'wait',
+    CONFIRMATION_EXPECTED: 'wait',
     GOODS_EXPECTED: 'wait',
     REPLIES_EXPECTED: 'wait',
     DONE: 'ok',
@@ -38,14 +39,24 @@ export const stageDetail = (stage: ProcurementStage): string =>
 
 export const actionLabel = (action: ProcurementNextAction): string => t(`${P}.next.${action}`);
 
-/** Der nächste Schritt EINER Bestellung (dieselbe Regel wie der Stand des Talep, procurementFlow.ts). */
-export const orderAction = (doc: ProcurementDocView): ProcurementNextAction | null => {
-    if (doc.kind !== 'ORDER') return null;
-    if (doc.state === 'REVISED') return 'RESEND';
-    if (doc.state === 'DRAFT' || doc.state === 'SENT') return doc.quoteNumber && doc.hasQuoteFile ? 'CONFIRM' : 'QUOTE';
-    if (doc.state === 'CONFIRMED') return 'RECEIVE';
-    return null;
-};
+/**
+ * Wohin der Knopf einer Zeile führt (29.09.2026): «Teklif ekle» gibt es nicht
+ * mehr — eine Bestellung, die auf ihr Angebot oder ihre Bestätigung wartet,
+ * öffnet sich selbst («Siparişe git»); der Wareneingang bleibt eine Fläche;
+ * alles andere (bestellen, anfragen, Angebote hochladen, vergleichen)
+ * geschieht auf der Seite des Talep.
+ */
+export const actionTarget = (action: ProcurementNextAction): 'document' | 'receive' | 'request' =>
+    (action === 'QUOTE' || action === 'CONFIRM' || action === 'RESEND' || action === 'SEND' || action === 'AWAIT'
+        ? 'document'
+        : action === 'RECEIVE' ? 'receive' : 'request');
+
+/** Ein Angebot zählt für den Vergleich nur als PDF («PDF olmazsa yapılamaz», 29.09.2026). */
+export const hasPdfOffer = (doc: ProcurementDocView): boolean =>
+    Boolean(doc.quoteFile) && (doc.quoteFile?.type ?? '').toLowerCase() === 'application/pdf';
+
+/** Eine Bestellung, deren Ware erwartet wird, bekommt neben «Siparişe git» den Wareneingang. */
+export const canReceive = (doc: ProcurementDocView): boolean => doc.kind === 'ORDER' && doc.state === 'CONFIRMED';
 
 /** Punkt und Wort eines Belegs; eine Anfrage heisst anders als eine Bestellung. */
 export const docStateLabel = (kind: 'ORDER' | 'REQUEST', state: ProcurementDocState): string => t(`${P}.docState.${kind}.${state}`);
@@ -68,6 +79,7 @@ export const eventText = (event: ProcurementEvent): string => {
         supplier: String(data.supplier ?? ''),
         suppliers: suppliers.join(', '),
         count: Number(data.count) || codes.length || 0,
+        revision: Number(data.revision) || 0,
     });
 };
 

@@ -1322,6 +1322,18 @@ body > :not(#root) :is(.ofi-ord, .ofi-ord-plate, .ofi-poi) :is(input, textarea):
 }
 .ofi-mail-file svg { flex: none; color: #ff3b30; }
 .ofi-mail-file span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* Die Revision steht IM PDF (29.09.2026) — am Anhang nur als kleine Kapsel. */
+.ofi-mail-file .ofi-mail-file-rev {
+    flex: none;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(255, 59, 48, 0.1);
+    color: #d70015;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 600;
+}
+.dark .ofi-mail-file .ofi-mail-file-rev { background: rgba(255, 105, 97, 0.16); color: #ff6961; }
 
 .ofi-mail-foot {
     display: flex;
@@ -1386,3 +1398,87 @@ body > :not(#root) :is(.ofi-ord, .ofi-ord-plate, .ofi-poi) :is(input, textarea):
     box-shadow: none;
 }
 #root .ofi-mail :is(input, textarea)::placeholder { font-style: normal; opacity: 1; }
+
+/* Vorschlag neben «An» (29.09.2026): die Adresse des Lieferanten, ein Klick setzt sie ein. */
+.ofi-mail-suggest {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    max-width: 55%;
+    height: 24px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-tint);
+    color: var(--ofi-cal-accent);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+.ofi-mail-suggest em {
+    font-style: normal;
+    font-weight: 600;
+    opacity: 0.75;
+}
+
+/* ── DIE ANFRAGE AN DEN EINKAUF (29.09.2026) ─────────────────────────────────
+   Dasselbe Mailfenster (`ForwardPanel.tsx`): die Empfänger bestimmt der Server,
+   darum feste Kapseln ohne Schliesskreuz; links statt der Entwürfe eine kurze
+   Erklärung und die bisherigen Sendungen. */
+.ofi-mail-chip.is-fixed { padding: 0 9px; }
+/* Ohne Adresse bekommt die Person nur die Glocke — die Kapsel bleibt grau. */
+.ofi-mail-chip.is-muted { background: var(--ofi-cal-hover); color: var(--ofi-cal-muted); }
+.ofi-fwd-role {
+    flex: none;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ofi-cal-faint);
+}
+.ofi-fwd-intro {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    column-gap: 9px;
+    row-gap: 3px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 11px;
+    background: var(--ofi-cal-surface);
+}
+.ofi-fwd-intro__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+.ofi-fwd-intro b { font-size: 12.5px; font-weight: 650; color: var(--ofi-cal-text); }
+.ofi-fwd-intro p {
+    grid-column: 1 / -1;
+    margin: 4px 0 0;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ofi-cal-muted);
+}
+.ofi-fwd-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 8px 8px 8px 10px;
+    border-radius: 9px;
+}
+.ofi-fwd-entry:hover { background: var(--ofi-cal-hover); }
+.ofi-fwd-entry b { font-size: 12.5px; font-weight: 600; color: var(--ofi-cal-text); font-variant-numeric: tabular-nums; }
+.ofi-fwd-entry small { font-size: 10.5px; color: var(--ofi-cal-muted); }
+.ofi-fwd-entry span { font-size: 11.5px; line-height: 1.4; color: var(--ofi-cal-muted); }
+.ofi-fwd-attach { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Der Link zur Anfrage reist in der Mail mit — als zweite Kachel, blau. */
+.ofi-mail-file.is-link svg { color: var(--ofi-cal-accent); }

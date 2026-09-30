@@ -1,19 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { RefreshCcw01 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
-import { FilterBar, FilterSelect, SearchBox, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
+import { FilterBar, FilterSelect, Pager, SearchBox, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
 import { t } from '@/i18n/translate';
-import { productionApi, productionErrorOf, readProductionOverview, refreshProductionOverview } from '@/lib/api/production';
+import { productionApi, productionErrorOf } from '@/lib/api/production';
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { fmtDateTime } from '@/pages/inventory/utils/format';
 import { useAuthStore } from '@/store/authStore';
-import type { ProductionOrderNode, ProductionOverview, ProductionOverviewProject } from '@/types/production';
+import type { ProductionOrderListPage } from '@/types/production';
 import '@/styles/modules/production.css';
 
-import { Money, differenceTone } from './components/productionUi';
 
 /**
  * ── PRODUKTIONSAUFTRÄGE (19.09.2026, zweite Fassung — Vorgabe Samet) ────────
@@ -26,28 +25,18 @@ import { Money, differenceTone } from './components/productionUi';
  * (20.09.2026): keine Marge und kein Total mehr — stattdessen die ZAHL, wie
  * viele Geräte und Leistungen des Projekts schon bestellt sind.
  * Geräte, Positionen und der Vergleich je Gerät stehen auf der Projektseite,
- * jeweils in einem eigenen Reiter. Die Daten kommen aus dem Speicher (sofort
- * beim zweiten Öffnen) und gleichen still mit dem Verkauf ab, wenn der letzte
- * Abgleich älter als fünf Minuten ist.
+ * jeweils in einem eigenen Reiter. Die Liste liest 20 Projektübersichten je
+ * Seite; Suche und Zähler rechnet der Server. Der stille Abgleich bleibt.
  */
 
 type KindFilter = '' | 'PROJECT' | 'DELIVERY';
 
-const includesText = (value: string | null | undefined, needle: string) =>
-    Boolean(value && value.toLowerCase().includes(needle));
-
-const addonCount = (nodes: ProductionOrderNode[]): number =>
-    nodes.reduce((sum, node) => sum + node.addons.length + addonCount(node.addons), 0);
-
-const orderNumbers = (nodes: ProductionOrderNode[]): string[] =>
-    nodes.flatMap((node) => [node.order.orderNumber, ...orderNumbers(node.addons)]);
-
 /** «AB-2026-10106 · +1 NT» — die Aufträge eines Projekts in einer Zeile. */
-const ordersLabel = (row: ProductionOverviewProject): string => {
-    const addons = addonCount(row.orders);
+const ordersLabel = (row: ProductionOrderListPage['projects'][number]): string => {
+    const addons = row.addonCount;
     const extra = addons ? t('production.orders.addonCount', { count: addons }) : '';
     if (row.project.sourceKind === 'DELIVERY') return extra || '—';
-    const mains = row.orders.map((node) => node.order.orderNumber);
+    const mains = row.mainOrderNumbers;
     return [mains.join(', '), extra].filter(Boolean).join(' · ') || '—';
 };
 
@@ -56,35 +45,43 @@ const ordersLabel = (row: ProductionOverviewProject): string => {
  * Zahl statt der Marge (Vorgabe Samet, 20.09.2026: «sayılara göre … şu kadar
  * sayısına sipariş edilmiş»).
  */
-const orderedCount = (nodes: ProductionOrderNode[]): { ordered: number; total: number } =>
-    nodes.reduce((acc, node) => {
-        for (const entry of node.items) {
-            if (!entry.item.isActive) continue;
-            acc.total += 1;
-            if (entry.figures.orderedTotal > 0) acc.ordered += 1;
-        }
-        const deeper = orderedCount(node.addons);
-        acc.ordered += deeper.ordered;
-        acc.total += deeper.total;
-        return acc;
-    }, { ordered: 0, total: 0 });
-
 export const ProductionOrdersPage = () => {
     useLanguageTick();
     const navigate = useNavigate();
     const permissions = useAuthStore((state) => state.permissions);
     const canForce = permissions.includes('production.manage') || permissions.includes('inventory.transfer');
 
-    const [overview, setOverview] = useState<ProductionOverview | null>(null);
+    const [overview, setOverview] = useState<ProductionOrderListPage | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [syncing, setSyncing] = useState(false);
     const [search, setSearch] = useState('');
     const [kind, setKind] = useState<KindFilter>('');
+    const [query, setQuery] = useState('');
+    const [page, setPage] = useState(1);
+    const pageSize = 20;
+    const [tick, setTick] = useState(0);
+    const [loading, setLoading] = useState(true);
 
-    useEffect(() => readProductionOverview(
-        (value) => { setOverview(value); setError(null); },
-        (failure) => setError(productionErrorOf(failure).message || t('production.loadFailed')),
-    ), []);
+    useEffect(() => {
+        const timer = window.setTimeout(() => { setQuery(search.trim()); setPage(1); }, 300);
+        return () => window.clearTimeout(timer);
+    }, [search]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        setLoading(true);
+        setError(null);
+        productionApi.orderList({ page, pageSize, search: query, kind }, controller.signal)
+            .then((value) => {
+                if (controller.signal.aborted) return;
+                setOverview(value);
+                const lastPage = Math.max(1, Math.ceil(value.total / pageSize));
+                if (page > lastPage) setPage(lastPage);
+            })
+            .catch((failure) => { if (!controller.signal.aborted) setError(productionErrorOf(failure).message || t('production.loadFailed')); })
+            .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+        return () => controller.abort();
+    }, [page, pageSize, query, kind, tick]);
 
     /* Beim Öffnen still abgleichen — der Server tut es nur, wenn der letzte
        Abgleich älter als fünf Minuten ist. */
@@ -92,7 +89,7 @@ export const ProductionOrdersPage = () => {
         setSyncing(true);
         try {
             const result = await productionApi.sync(force);
-            if (result.synced || force) setOverview(await refreshProductionOverview());
+            if (result.synced || force) setTick((value) => value + 1);
             if (force) toast.success(t('production.syncDone'));
         } catch (failure) {
             if (force) toast.error(productionErrorOf(failure).message || t('production.syncFailed'));
@@ -103,16 +100,7 @@ export const ProductionOrdersPage = () => {
 
     useEffect(() => { void sync(false); }, [sync]);
 
-    const needle = search.trim().toLowerCase();
-    const rows = useMemo(() => (overview?.projects ?? []).filter((row) => {
-        if (kind && row.project.sourceKind !== kind) return false;
-        if (!needle) return true;
-        return includesText(row.project.projectNumber, needle)
-            || includesText(row.project.projectName, needle)
-            || includesText(row.project.customerName, needle)
-            || orderNumbers(row.orders).some((number) => includesText(number, needle));
-    }), [overview, kind, needle]);
-    const loading = !overview && !error;
+    const rows = overview?.projects ?? [];
 
     return (
         <div className="ofi-prod-page">
@@ -143,7 +131,7 @@ export const ProductionOrdersPage = () => {
 
             <FilterBar>
                 <SearchBox value={search} onChange={setSearch} placeholder={t('production.orders.search')} />
-                <FilterSelect value={kind} onChange={(next) => setKind(next as KindFilter)} label={t('production.columns.kind')}>
+                <FilterSelect value={kind} onChange={(next) => { setKind(next as KindFilter); setPage(1); }} label={t('production.columns.kind')}>
                     <option value="">{t('production.orders.filterAll')}</option>
                     <option value="PROJECT">{t('production.orders.projectSection')}</option>
                     <option value="DELIVERY">{t('production.orders.deliverySection')}</option>
@@ -156,23 +144,18 @@ export const ProductionOrdersPage = () => {
                 title={(
                     <span>
                         {t('production.orders.sectionTitle')}
-                        <span className="font-normal text-slate-400"> · {rows.length}</span>
+                        <span className="font-normal text-slate-400"> · {overview?.total ?? 0}</span>
                     </span>
                 )}
             >
                 <div className="overflow-x-auto">
-                    <table data-inv-table data-grid-lines data-unstyled-table className="ofi-prod-tree ofi-prod-flat w-full min-w-[1080px]">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="ofi-prod-tree ofi-prod-flat w-full min-w-[720px]">
                         <colgroup>
                             <col style={{ width: 136 }} />
                             <col />
                             <col style={{ width: 96 }} />
                             <col style={{ width: 168 }} />
-                            <col style={{ width: 128 }} />
-                            <col style={{ width: 120 }} />
-                            <col style={{ width: 100 }} />
-                            <col style={{ width: 118 }} />
-                            <col style={{ width: 108 }} />
-                            <col style={{ width: 120 }} />
+                            <col style={{ width: 150 }} />
                         </colgroup>
                         <thead>
                             <tr>
@@ -181,26 +164,21 @@ export const ProductionOrdersPage = () => {
                                 <th className="text-left">{t('production.columns.kind')}</th>
                                 <th className="text-left">{t('production.columns.orders')}</th>
                                 <th className="text-right">{t('production.columns.orderedItems')}</th>
-                                <th className="text-right">{t('production.figures.sales')}</th>
-                                <th className="text-right">{t('production.figures.open')}</th>
-                                <th className="text-right">{t('production.figures.expenditure')}</th>
-                                <th className="text-right">{t('production.figures.received')}</th>
-                                <th className="text-right">{t('production.figures.difference')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {(loading || rows.length === 0) && (
                                 <TableStateRow
-                                    colSpan={10}
+                                    colSpan={5}
                                     loading={loading}
-                                    emptyText={needle || kind ? t('production.noMatch') : t('production.orders.empty')}
+                                    emptyText={query || kind ? t('production.noMatch') : t('production.orders.empty')}
                                     skeletonRows={6}
                                 />
                             )}
                             {!loading && rows.map((row) => {
-                                const { project, figures } = row;
+                                const { project } = row;
                                 const delivery = project.sourceKind === 'DELIVERY';
-                                const counts = orderedCount(row.orders);
+                                const counts = row.counts;
                                 const open = () => navigate(`/production/orders/${project.id}`);
                                 return (
                                     <tr
@@ -225,7 +203,7 @@ export const ProductionOrdersPage = () => {
                                             </span>
                                         </td>
                                         <td className="max-w-0">
-                                            <span className="ofi-prod-cell__sub block truncate" title={orderNumbers(row.orders).join(', ')}>
+                                            <span className="ofi-prod-cell__sub block truncate" title={row.orderNumbers.join(', ')}>
                                                 {ordersLabel(row)}
                                             </span>
                                         </td>
@@ -235,11 +213,6 @@ export const ProductionOrdersPage = () => {
                                                 <span>/ {counts.total}</span>
                                             </span>
                                         </td>
-                                        <td><Money value={figures.salesTotal} /></td>
-                                        <td><Money value={figures.openTotal} dimZero /></td>
-                                        <td><Money value={figures.orderedTotal} dimZero /></td>
-                                        <td><Money value={figures.receivedTotal} dimZero /></td>
-                                        <td><Money value={figures.difference} tone={differenceTone(figures)} /></td>
                                     </tr>
                                 );
                             })}
@@ -247,6 +220,10 @@ export const ProductionOrdersPage = () => {
                     </table>
                 </div>
             </SectionCard>
+            {overview && overview.total > 0 && (
+                <Pager page={page} pageSize={pageSize} total={overview.total}
+                    totalPages={Math.max(1, Math.ceil(overview.total / pageSize))} onPage={setPage} />
+            )}
         </div>
     );
 };

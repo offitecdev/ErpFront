@@ -1,18 +1,20 @@
-import { ChevronRight, ShoppingCart, Tag } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
 import type { ProcurementFeedRow, ProcurementNextAction } from '@/types/purchasing';
 
 import { shortDate, shownPurchaseCode } from '../../bom/bomFormat';
 import { daysLeft, daysText, docStateLabel, eventText, isUrgent, whenText } from '../purchasingModel';
-import { DocToken, NextButton, StageText } from '../purchasingUi';
+import { DocToken, KindPill, NextButton, StageText } from '../purchasingUi';
 import { readPurchasingWorkspace } from '@/lib/api/purchasing';
 import { purchaseOrdersApi } from '@/lib/api/inventory';
 
 /**
- * Eine Zeile: Talep · Projekt · Gerät · Belege · Stand · Liefertermin · letzter
- * Handgriff — und rechts der EINE nächste Schritt («Sipariş oluştur», «Teklif
- * ekle», «Mal kabul» …). Ein Klick auf die Zeile öffnet den Talep.
+ * Eine Zeile: Talep · Projekt · Kommission · Gerät · Belege · Stand · Liefertermin · letzter
+ * Handgriff — und rechts der EINE nächste Schritt («Sipariş oluştur», «Siparişe
+ * git», «Talep et», «Karşılaştır» …). Ein Klick auf die Zeile öffnet den Talep.
+ * Unter der Nummer sagt ein farbiges Schild, ob es ein Fiyat talebi oder ein
+ * Satın alma talebi ist (29.09.2026).
  */
 export const FeedRow = ({ row, canProcure, onOpen, onAction }: {
     row: ProcurementFeedRow;
@@ -37,15 +39,11 @@ export const FeedRow = ({ row, canProcure, onOpen, onAction }: {
         >
             <td>
                 <span className="ofi-buy-l1 is-code">{row.requestNumber}</span>
-                <span className="ofi-buy-l2 is-kind">
-                    {row.kind === 'PRICE' ? <Tag aria-hidden /> : <ShoppingCart aria-hidden />}
-                    {t(`productionBom.procurement.kind.${row.kind}`)}
-                </span>
+                <KindPill kind={row.kind} ordered={row.ordered} />
             </td>
-            <td>
-                <span className="ofi-buy-l1">{row.project?.name || '—'}</span>
-                <span className="ofi-buy-l2 is-code">{row.project?.number ?? ''}</span>
-            </td>
+            {/* Projektnummer und Kommission (= Projektname) getrennt — 29.09.2026. */}
+            <td><span className="ofi-buy-l1 is-code">{row.project?.number || '—'}</span></td>
+            <td><span className="ofi-buy-l1">{row.project?.name || '—'}</span></td>
             <td>
                 <span className="ofi-buy-l1">{row.device?.name ?? '—'}</span>
                 <span className="ofi-buy-l2">

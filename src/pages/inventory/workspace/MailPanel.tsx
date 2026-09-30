@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { File05, Plus, Save01, Send01, Trash01, X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
-import { purchaseOrdersApi } from '@/lib/api/inventory';
+import i18n from '@/i18n';
+import { inventoryApi, purchaseOrdersApi } from '@/lib/api/inventory';
 import { isRequestTimeout } from '@/lib/axios';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
 import type { PurchaseOrderMailDraft, PurchaseOrderRow } from '@/types/inventory';
@@ -69,24 +70,53 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
 
     const pdfLang = 'de' as const;
     const fileName = supplierPdfFileName(localizePurchaseCode(order.referenceNumber, pdfLang), active, multi);
-    /* Eine revidierte BOM-Bestellung geht MIT ihrem Änderungsblatt hinaus (27.09.2026 abends:
-       «siparişlerde revizyonlar varsa o pdf ayrı olsun … bunlar değişti diyerek»). */
+    /* EINE REVIDIERTE BESTELLUNG IST EIN PDF (29.09.2026, Samet: «bilgilendirme yazısına
+       gerek yok … revize PDF'de belirtilecek, altta şu şu oldu tablosu, üstte açıklama;
+       e-postası otomatik güncel revize şeklinde yazacak»): kein eigenes Änderungsblatt
+       mehr — das Bestell-PDF trägt Hinweis und Änderungstabelle (orderPdf.ts), die
+       Mail heisst «Geänderte Bestellung … · Revision n» und erklärt es in drei Sprachen. */
     const revisionNumber = !priceRequest && order.bomOrigin?.revision && order.bomOrigin.revision.number > 0 ? order.bomOrigin.revision.number : 0;
-    const revisionFileName = revisionNumber ? `${localizePurchaseCode(order.referenceNumber, pdfLang)}_Rev${revisionNumber}.pdf` : null;
     const mailState = active ? (active.emailSentAt ? 'SENT' : 'NOT_SENT') : stageMailState(order);
     const sentAt = active ? active.emailSentAt : order.emailSentAt;
     const isResend = Boolean(sentAt);
     const canSend = EMAIL_RE.test(to.trim() || target.supplierEmail || '');
+
+    /* DIE ADRESSE DES LIEFERANTEN WIRD VORGESCHLAGEN (29.09.2026, Samet: «tedarikçi
+       e-postası otomatik önerilebilir ya da kendisi de girebilir»). Quelle: was der
+       Vorgang kennt, sonst die heutige Adresse im Lieferantenstamm. Steht «An» leer,
+       wird sie eingesetzt; sonst bleibt sie als Vorschlag neben dem Feld. */
+    const [stammEmail, setStammEmail] = useState<{ supplierId: string; email: string } | null>(null);
+    useEffect(() => {
+        const supplierId = target.supplierId;
+        if (!supplierId || target.supplierEmail) return;
+        let cancelled = false;
+        inventoryApi.getSupplier(supplierId)
+            .then((row) => {
+                const email = String(row?.email ?? '').trim();
+                if (cancelled || !EMAIL_RE.test(email)) return;
+                setStammEmail({ supplierId, email });
+                setTo((current) => current.trim() || email);
+            })
+            .catch(() => { /* ohne Stammadresse bleibt das Feld frei */ });
+        return () => { cancelled = true; };
+    }, [target.supplierId, target.supplierEmail]);
+    const suggestedEmail = (target.supplierEmail ?? '').trim()
+        || (stammEmail && stammEmail.supplierId === target.supplierId ? stammEmail.email : '');
 
     /* Die Felder werden EINMAL je Vorgang und Belegart gefüllt, damit ein selbst
        geschriebener Text nicht bei jeder Antwort des Servers verschwindet. */
     const seededFor = useRef<string>('');
     const seed = () => {
         const number = localizePurchaseCode(order.referenceNumber, pdfLang);
+        setRecipient();
+        if (revisionNumber) {
+            setSubject(t('inv.orders.mail.subjectRevised', { number, revision: revisionNumber }));
+            setMessage(t('inv.orders.mail.defaultMessageRevised', { number, revision: revisionNumber }));
+            return;
+        }
         const base = priceRequest
             ? t('inv.orders.mail.subjectPriceRequest', { number })
             : t('inv.orders.mail.subject', { number });
-        setRecipient();
         setSubject(order.revision > 0 && order.emailSentAt ? `${base} (${t('inv.orders.updatedTag')})` : base);
         setMessage(t(priceRequest ? 'inv.orders.mail.defaultMessagePriceRequest' : 'inv.orders.mail.defaultMessage'));
     };
@@ -213,24 +243,22 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
             const bytes = priceRequest
                 ? await (await import('@/utils/pdf/priceRequestPdf')).buildPriceRequestPdfBytes(target, settings, pdfLang)
                 : await (await import('@/utils/pdf/orderPdf')).buildOrderPdfBytes(target, settings, pdfLang);
-            const revisionBytes = revisionFileName
-                ? await (await import('@/utils/pdf/orderPdf')).buildOrderRevisionPdfBytes(target, settings, pdfLang)
-                : null;
             const result = await purchaseOrdersApi.sendMail(order.id, {
                 to: to.trim() || undefined,
                 ccEmails: cc.map((person) => person.email).filter((email): email is string => Boolean(email)),
                 subject: subject.trim(),
                 message,
                 ...(active ? { supplierIndex: activeIndex } : {}),
+                // Die Mailkarte (Server): Wörter in der Sprache des Textes, Code wie im PDF.
+                lang: (i18n.resolvedLanguage || i18n.language || 'de').split('-')[0],
+                documentLang: pdfLang,
+                ...(revisionNumber ? { revision: revisionNumber } : {}),
                 attachments: [
                     {
                         filename: fileName,
                         contentType: 'application/pdf',
                         contentBase64: bytesToBase64(bytes),
                     },
-                    ...(revisionBytes && revisionFileName
-                        ? [{ filename: revisionFileName, contentType: 'application/pdf', contentBase64: bytesToBase64(revisionBytes) }]
-                        : []),
                 ],
             });
             onOrderChanged(result.order);
@@ -373,14 +401,34 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
                             </span>
                         </div>
                     )}
-                    <label className="ofi-mail-field">
+                    <div className="ofi-mail-field">
                         <span>{t('inv.orders.mail.to')}</span>
                         <input
                             value={to}
                             onChange={(event) => setTo(event.target.value)}
+                            list={suggestedEmail ? `ofi-mail-to-${order.id}` : undefined}
+                            type="email"
+                            autoComplete="email"
+                            aria-label={t('inv.orders.mail.to')}
                             placeholder={canSend ? undefined : t('inv.orders.flow.mailNoAddress')}
                         />
-                    </label>
+                        {suggestedEmail && (
+                            <datalist id={`ofi-mail-to-${order.id}`}>
+                                <option value={suggestedEmail}>{target.supplierName}</option>
+                            </datalist>
+                        )}
+                        {suggestedEmail && to.trim().toLowerCase() !== suggestedEmail.toLowerCase() && (
+                            <button
+                                type="button"
+                                className="ofi-mail-suggest"
+                                onClick={() => setTo(suggestedEmail)}
+                                title={target.supplierName}
+                            >
+                                <em>{t('inv.orders.mail.suggested')}</em>
+                                {suggestedEmail}
+                            </button>
+                        )}
+                    </div>
                     <div className="ofi-mail-field">
                         <span>{t('inv.orders.mail.cc')}</span>
                         <span className="ofi-mail-chips">
@@ -423,16 +471,11 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
                 />
 
                 <div className="ofi-mail-attach">
-                    <span className="ofi-mail-file">
+                    <span className="ofi-mail-file" title={revisionNumber ? t('inv.orders.mail.revisionInPdf', { revision: revisionNumber }) : undefined}>
                         <File05 size={16} />
                         <span>{fileName}</span>
+                        {revisionNumber > 0 && <em className="ofi-mail-file-rev">Rev. {revisionNumber}</em>}
                     </span>
-                    {revisionFileName && (
-                        <span className="ofi-mail-file" title={t('productionBom.orderDoc.revision', { n: revisionNumber })}>
-                            <File05 size={16} />
-                            <span>{revisionFileName}</span>
-                        </span>
-                    )}
                 </div>
 
                 <footer className="ofi-mail-foot">

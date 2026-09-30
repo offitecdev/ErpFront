@@ -1,0 +1,106 @@
+/* =========================================================
+   Offitec — STOK HAREKETLERİ (29.09.2026, Vorgabe Samet)
+
+   «Apple macOS temiz olsun, SwiftUI … filtreleri çok azalt … depoda
+    kullandığımız glass çoklu seçim gibi … basit bir tablo, girdi çıktı.»
+
+   Die Seite trägt das Kleid des Depo (`styles/modules/warehouse.css`:
+   `.ofi-wh`, Werkzeugzeile, Token-Felder, Tabelle mit grauem Kopf und
+   Zebra). Hier steht nur, was die Lagerbewegungen darüber hinaus brauchen:
+   die Mengen in Grün/Rot, die Kopfzellen ohne Sortierknopf, das Kalender-
+   paar von «Özel aralık» und der Punkt in der Richtungswahl.
+   ========================================================= */
+
+.ofi-smv {
+    --smv-in: #1f8a3b;
+    --smv-out: #d70015;
+}
+.dark .ofi-smv {
+    --smv-in: #30d158;
+    --smv-out: #ff453a;
+}
+
+/* Sieben Spalten brauchen keine 1360px — erst unter ~1080px wird gescrollt. */
+.ofi-smv .ofi-wh-table { --wh-table-min: 1080px; }
+
+/* Kopfzellen: dieselbe Zeile wie im Depo, aber ohne Sortierknopf. */
+.ofi-smv-th {
+    display: flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ofi-smv th.is-num .ofi-smv-th { justify-content: flex-end; }
+
+#root .ofi-smv table.ofi-wh-table > tbody > tr > td.ofi-smv-date-cell {
+    color: var(--wh-secondary);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Giriş grün mit «+», Çıkış rot mit «−»; die Einheit klein dahinter. */
+.ofi-smv-qty {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 4px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-smv-qty > small {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--wh-secondary);
+}
+.ofi-smv-qty.is-in { color: var(--smv-in); }
+.ofi-smv-qty.is-out { color: var(--smv-out); }
+.ofi-smv-qty.is-move { color: var(--wh-secondary); font-weight: 500; }
+
+/* ── «Özel aralık»: zwei Kalenderfelder im Mass der Werkzeugzeile ── */
+.ofi-smv-range {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.ofi-smv-range__dash { color: var(--wh-muted); }
+#root .ofi-smv .ofi-smv-date {
+    width: 148px;
+    height: 40px;
+    min-height: 0;
+    padding: 0 12px;
+    border: 1px solid var(--wh-ctl-border);
+    border-radius: 10px !important;
+    background: var(--wh-field);
+    box-shadow: none;
+    color: var(--wh-text);
+    font-size: 13.5px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+#root .ofi-smv .ofi-smv-date:hover { border-color: var(--wh-field-border-hover); }
+#root .ofi-smv .ofi-smv-date[aria-expanded='true'] {
+    border-color: var(--wh-accent);
+    box-shadow: 0 0 0 3px var(--wh-ring);
+}
+
+/* Der Punkt vor Giriş / Çıkış in der gläsernen Auswahl (Portal). */
+.ofi-smv-pickdir {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.ofi-smv-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.ofi-smv-dot.is-in { background: #34c759; }
+.ofi-smv-dot.is-out { background: #ff3b30; }
+
+@media (max-width: 720px) {
+    #root .ofi-wh.ofi-smv .ofi-wh-search { flex-basis: 100%; }
+    .ofi-smv-range { flex-wrap: wrap; }
+}

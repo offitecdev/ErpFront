@@ -8,6 +8,8 @@ import type {
     ProductionItemDetail,
     ProductionLinesPage,
     ProductionOrderNode,
+    ProductionOrderListPage,
+    ProductionDeviceHeader,
     ProductionOverview,
     ProductionPickerProject,
     ProductionProject,
@@ -41,9 +43,12 @@ export const productionApi = {
         (await apiClient.post('/production/sync', { force })).data,
 
     overview: () => get<ProductionOverview>('/production/overview'),
+    orderList: async (params: { page: number; pageSize: number; search: string; kind: string }, signal?: AbortSignal): Promise<ProductionOrderListPage> =>
+        (await apiClient.get('/production/overview', { params: { ...params, view: 'list' }, signal })).data,
     project: (id: string) => get<ProductionProjectDetail>(`/production/projects/${id}`),
     /** Prozess-Stufe «Geräte» eines Produktionsprojekts (24.09.2026). */
     devices: (id: string) => get<ProductionProjectDevices>(`/production/projects/${id}/devices`),
+    deviceHeader: (projectId: string, deviceId: string) => get<ProductionDeviceHeader>(`/production/projects/${encodeURIComponent(projectId)}/devices/${encodeURIComponent(deviceId)}`),
     lines: (params: { projectId?: string; search?: string } = {}) => get<ProductionLinesPage>('/production/lines', params),
     item: (id: string) => get<ProductionItemDetail>(`/production/items/${id}`),
 
@@ -94,6 +99,12 @@ export const readProductionDevices = (
     onValue: (value: ProductionProjectDevices, fresh: boolean) => void,
     onError?: (error: unknown) => void,
 ) => readQuery(`production:devices:${id}`, () => productionApi.devices(id), PAGE_CACHE, onValue, onError);
+
+export const readProductionDeviceHeader = (
+    projectId: string, deviceId: string,
+    onValue: (value: ProductionDeviceHeader, fresh: boolean) => void,
+    onError?: (error: unknown) => void,
+) => readQuery(`production:device-header:${projectId}:${deviceId}`, () => productionApi.deviceHeader(projectId, deviceId), PAGE_CACHE, onValue, onError);
 
 export const readProductionLines = (
     params: { projectId?: string; search?: string },

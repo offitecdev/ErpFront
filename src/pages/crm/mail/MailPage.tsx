@@ -13,6 +13,7 @@ import {
     type InboxStatusDto, type MailCategoryDto, type MailMessageDetail, type MailMessageRow, type MailStatsDto,
 } from '@/lib/api/mail';
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
+import { useAuthStore } from '@/store/authStore';
 import { MailCategories } from './MailCategories';
 import { EMPTY_MAIL_FILTERS, MailFilters, type MailFilterValue } from './MailFilters';
 import { MailList } from './MailList';
@@ -57,6 +58,7 @@ type MailView = { kind: 'folder'; folder: MailFolderKey } | { kind: 'category'; 
 
 export const MailPage = () => {
     useLanguageTick();
+    const user = useAuthStore((state) => state.user);
     const [status, setStatus] = useState<InboxStatusDto | null>(null);
     const [stats, setStats] = useState<MailStatsDto | null>(null);
     const [view, setView] = useState<MailView>({ kind: 'folder', folder: 'inbox' });
@@ -441,8 +443,23 @@ export const MailPage = () => {
                 </div>
             </header>
 
-            <div className="ofi-mail-body">
+            {/* EIN FENSTER, DREI SPALTEN (Vorgabe 29.09.2026, «wie Outlook/Mail
+                auf dem MacBook, links und rechts, nicht untereinander»):
+                Postfächer · Liste · Lesebereich nebeneinander in einer Karte.
+                Die Klasse hiess bis dahin `ofi-mail-body` — denselben Namen
+                trägt das Textfeld des Lager-Mailfensters (orderDetails.css,
+                display:block), und sobald jenes Blatt geladen war, fiel das
+                Raster hier auseinander und alles stand untereinander. */}
+            <div className={`ofi-mail-layout ${selectedId ? 'has-selection' : ''}`}>
                 <aside className="ofi-mail-rail">
+                    {/* Wessen Post das ist — der eigene Name, darunter die Adresse. */}
+                    <div className="ofi-mail-owner">
+                        <span className="ofi-mail-owner__kind">{status?.personal === false ? t('mail.page.companyMailbox') : t('mail.page.myMailbox')}</span>
+                        <span className="ofi-mail-owner__name">{status?.personal === false ? (status.mailbox || '') : [user?.firstName, user?.lastName].filter(Boolean).join(' ')}</span>
+                        {(status?.fromEmail || status?.mailbox) && status?.personal !== false && (
+                            <span className="ofi-mail-owner__address">{status.fromEmail || status.mailbox}</span>
+                        )}
+                    </div>
                     <nav className="ofi-mail-folders">
                         {folders.map((item) => (
                             <button
@@ -450,6 +467,7 @@ export const MailPage = () => {
                                 type="button"
                                 className={`ofi-mail-folder ${view.kind === 'folder' && view.folder === item.key ? 'is-active' : ''} ${item.emphasize && item.count > 0 ? 'has-unread' : ''}`}
                                 onClick={() => selectFolder(item.key)}
+                                title={item.label}
                             >
                                 <span className="ofi-mail-folder__icon">{item.icon}</span>
                                 <span className="ofi-mail-folder__label">{item.label}</span>

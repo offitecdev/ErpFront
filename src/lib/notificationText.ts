@@ -1,4 +1,6 @@
+import i18n from '@/i18n';
 import { t } from '@/i18n/translate';
+import { localizePurchaseCode, purchaseLangOf } from '@/utils/purchaseCode';
 
 /**
  * Sprachneutrale Bausteine → Satz in der Sprache der Person.
@@ -44,13 +46,21 @@ interface I18nSpec {
 const isI18nSpec = (value: unknown): value is I18nSpec =>
     Boolean(value) && typeof value === 'object' && typeof (value as I18nSpec).key === 'string';
 
-/** Werte, die selbst übersetzt werden müssen, kommen als { $t: 'schlüssel' }. */
+/**
+ * Werte, die selbst übersetzt werden müssen, kommen als { $t: 'schlüssel' };
+ * ein Einkaufsbeleg-Code als { $purchaseCode: 'PA-2026-012' } — gezeigt mit
+ * dem Präfix der Sprache der Person (FT-/PA-/PR-), wie in ihrer Liste (29.09.2026).
+ */
 const resolveParams = (params: Record<string, unknown> | undefined): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
     for (const [name, value] of Object.entries(params ?? {})) {
-        out[name] = value && typeof value === 'object' && typeof (value as { $t?: unknown }).$t === 'string'
-            ? t((value as { $t: string }).$t)
-            : value;
+        if (value && typeof value === 'object' && typeof (value as { $t?: unknown }).$t === 'string') {
+            out[name] = t((value as { $t: string }).$t);
+        } else if (value && typeof value === 'object' && typeof (value as { $purchaseCode?: unknown }).$purchaseCode === 'string') {
+            out[name] = localizePurchaseCode((value as { $purchaseCode: string }).$purchaseCode, purchaseLangOf(i18n.resolvedLanguage || i18n.language));
+        } else {
+            out[name] = value;
+        }
     }
     return out;
 };

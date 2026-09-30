@@ -130,6 +130,7 @@ export const OutgoingInvoicesPage = () => {
     // Die Seite selbst: Zeilen, Gesamtzahl und die Zähler der Reiter.
     useEffect(() => {
         let alive = true;
+        const controller = new AbortController();
         setBusy(true);
         billingApi.listInvoicesPage({
             page,
@@ -139,11 +140,11 @@ export const OutgoingInvoicesPage = () => {
             category,
             sort,
             today: dayjs().format('YYYY-MM-DD'),
-        })
+        }, controller.signal)
             .then((data) => { if (alive) setResult(data); })
             .catch((error) => { if (alive) toast.error(apiError(error, t('accounting.loadError'))); })
             .finally(() => { if (alive) { setLoading(false); setBusy(false); } });
-        return () => { alive = false; };
+        return () => { alive = false; controller.abort(); };
     }, [page, pageSize, query, tab, category, sort]);
 
     const figures = serverFigures

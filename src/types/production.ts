@@ -31,6 +31,11 @@ export interface ProductionProject {
     isActive: boolean;
 }
 
+export interface ProductionDeviceHeader {
+    project: Pick<ProductionProject, 'id' | 'projectNumber' | 'projectName'>;
+    device: Pick<ProductionDeviceRow, 'id' | 'name' | 'positionNumber' | 'articleCode' | 'quantity' | 'unit' | 'salesOrderNumber' | 'orderKind'>;
+}
+
 export interface ProductionOrder {
     id: string;
     sourceSalesOrderId: string;
@@ -84,6 +89,21 @@ export interface ProductionOverview {
     lastSyncedAt: string | null;
     totals: ProductionCostFigures;
     projects: ProductionOverviewProject[];
+}
+
+export interface ProductionOrderListPage {
+    projects: Array<{
+        project: Pick<ProductionProject, 'id' | 'sourceKind' | 'projectNumber' | 'projectName' | 'customerName'>;
+        sourceTenantName: string | null;
+        orderNumbers: string[];
+        mainOrderNumbers: string[];
+        addonCount: number;
+        counts: { ordered: number; total: number };
+    }>;
+    lastSyncedAt: string | null;
+    total: number;
+    page: number;
+    pageSize: number;
 }
 
 export interface ProductionPriceRow {

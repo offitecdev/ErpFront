@@ -1,0 +1,336 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ÜRETİM › SATIN ALMA — DAS FENSTER DER SENDUNG (30.09.2026, Vorgabe Samet)
+   «Progressi de görelim … pdf hazırladığım şeyleri de görelim, daha
+    animasyonlu olması lazım ama barlı değil — gelme animasyonu, Apple macOS.»
+   Karten schweben herein (Feder-Kurve), das Blatt schreibt seine Zeilen,
+   der Papierflieger fliegt, das Häkchen zeichnet sich. Keine Balken.
+   Farben aus den Popup-Tokens (`--ofi-cal-*`) — dunkel = Tauschen der Werte.
+   Das Fenster ist ein Portal (PopupDialog): Klassen ohne #root-Vorsatz.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+.ofi-dsp {
+    --dsp-text: var(--ofi-cal-text, #1d1d1f);
+    --dsp-muted: var(--ofi-cal-muted, #6e6e73);
+    --dsp-line: var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.08));
+    --dsp-surface: var(--ofi-cal-surface, #fff);
+    --dsp-fill: var(--ofi-cal-hover, rgba(0, 0, 0, 0.04));
+    --dsp-accent: var(--ofi-cal-accent, #0a7aff);
+    --dsp-green: #28a745;
+    --dsp-green-soft: rgba(52, 199, 89, 0.14);
+    --dsp-amber: #b25000;
+    --dsp-amber-soft: rgba(255, 149, 0, 0.14);
+    --dsp-red: #d30f15;
+    --dsp-paper: #ffffff;
+    --dsp-paper-line: #d8dbe2;
+    --dsp-spring: cubic-bezier(0.2, 0.9, 0.25, 1.15);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+    color: var(--dsp-text);
+    font: 400 13px/1.4 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+/* Dunkel: die Anwendung setzt `html.dark` (store/themeStore.ts). */
+html.dark .ofi-dsp {
+    --dsp-green: #30d158;
+    --dsp-green-soft: rgba(48, 209, 88, 0.18);
+    --dsp-amber: #ffb340;
+    --dsp-amber-soft: rgba(255, 159, 10, 0.18);
+    --dsp-paper: #f4f5f7;
+}
+
+/* ── Kopf: Ring + Satz ───────────────────────────────────── */
+.ofi-dsp-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ofi-dsp-head > span:not(.ofi-dsp-ring) { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-dsp-head b { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.ofi-dsp-head small { color: var(--dsp-muted); font-size: 12px; }
+.ofi-dsp-ring { position: relative; display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px; }
+.ofi-dsp-ring > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ofi-dsp-ring__track { fill: none; stroke: var(--dsp-fill); stroke-width: 3; }
+.ofi-dsp-ring__arc { fill: none; stroke: var(--dsp-accent); stroke-width: 3; stroke-linecap: round; transition: stroke-dasharray 520ms var(--dsp-spring), stroke 300ms ease; }
+.ofi-dsp-ring.is-full .ofi-dsp-ring__arc { stroke: var(--dsp-green); }
+.ofi-dsp-ring > b { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+/* ── Die Karten ──────────────────────────────────────────── */
+.ofi-dsp-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ofi-dsp-card {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--dsp-line);
+    border-radius: 14px;
+    background: var(--dsp-surface);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+    animation: ofi-dsp-arrive 520ms var(--dsp-spring) forwards;
+    transition: border-color 260ms ease, background-color 260ms ease, box-shadow 260ms ease;
+}
+.ofi-dsp-card.is-pdf,
+.ofi-dsp-card.is-sending { border-color: color-mix(in srgb, var(--dsp-accent) 35%, transparent); box-shadow: 0 6px 18px rgba(10, 122, 255, 0.08); }
+.ofi-dsp-card.is-sent { border-color: color-mix(in srgb, var(--dsp-green) 30%, transparent); }
+.ofi-dsp-card.is-failed,
+.ofi-dsp-card.is-skipped { border-color: color-mix(in srgb, var(--dsp-amber) 38%, transparent); background: var(--dsp-amber-soft); }
+@keyframes ofi-dsp-arrive {
+    to { opacity: 1; transform: none; }
+}
+.ofi-dsp-card__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-dsp-card__text > b { overflow: hidden; font-size: 13.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-dsp-card__text > small { color: var(--dsp-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ofi-dsp-card__phase { color: var(--dsp-muted); font-size: 12px; animation: ofi-dsp-fade 260ms ease; }
+.ofi-dsp-card.is-sent .ofi-dsp-card__phase { color: var(--dsp-green); }
+.ofi-dsp-card__phase.is-warn { color: var(--dsp-amber); }
+@keyframes ofi-dsp-fade { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+.ofi-dsp-card__end { display: inline-flex; align-items: center; gap: 6px; }
+
+.ofi-dsp-mini {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 9px;
+    border: 1px solid var(--dsp-line);
+    border-radius: 7px;
+    background: var(--dsp-surface);
+    color: var(--dsp-text);
+    font: 500 12px/1 inherit;
+    cursor: pointer;
+    transition: background-color 160ms ease, border-color 160ms ease;
+}
+.ofi-dsp-mini:hover { background: var(--dsp-fill); }
+.ofi-dsp-mini > svg { width: 13px; height: 13px; }
+
+/* ── Das Blatt ───────────────────────────────────────────── */
+.ofi-dsp-paper {
+    position: relative;
+    display: block;
+    width: 38px;
+    height: 48px;
+    border-radius: 4px 9px 4px 4px;
+    background: var(--dsp-paper);
+    box-shadow: 0 0 0 1px rgba(16, 24, 40, 0.1), 0 2px 6px rgba(16, 24, 40, 0.08);
+    overflow: hidden;
+    transition: transform 360ms var(--dsp-spring), box-shadow 300ms ease;
+}
+.ofi-dsp-paper.is-writing { transform: translateY(-1px) rotate(-2deg); box-shadow: 0 0 0 1px rgba(10, 122, 255, 0.25), 0 6px 14px rgba(10, 122, 255, 0.16); }
+.ofi-dsp-paper.is-off { opacity: 0.6; }
+.ofi-dsp-paper__fold {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    background: linear-gradient(225deg, transparent 50%, #e3e6ec 50%);
+    border-bottom-left-radius: 3px;
+}
+.ofi-dsp-paper__lines { position: absolute; top: 9px; left: 6px; right: 8px; display: flex; flex-direction: column; gap: 4px; }
+.ofi-dsp-paper__lines > i { display: block; height: 2.5px; border-radius: 2px; background: var(--dsp-paper-line); transform-origin: left; }
+.ofi-dsp-paper__lines > i:nth-child(1) { width: 70%; background: #1f2654; }
+.ofi-dsp-paper__lines > i:nth-child(3) { width: 85%; }
+.ofi-dsp-paper__lines > i:nth-child(5) { width: 55%; }
+.ofi-dsp-paper.is-writing .ofi-dsp-paper__lines > i { animation: ofi-dsp-type 1100ms ease-in-out infinite both; }
+@keyframes ofi-dsp-type {
+    0% { transform: scaleX(0); opacity: 0.2; }
+    45% { transform: scaleX(1); opacity: 1; }
+    100% { transform: scaleX(1); opacity: 1; }
+}
+.ofi-dsp-paper__code {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: 12px;
+    overflow: hidden;
+    color: #1f2654;
+    font: 700 5.5px/1 'Inter Variable', sans-serif;
+    text-overflow: clip;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 260ms ease 120ms;
+}
+.ofi-dsp-paper.is-done .ofi-dsp-paper__code { opacity: 1; }
+.ofi-dsp-paper__badge {
+    position: absolute;
+    left: 4px;
+    bottom: 3px;
+    padding: 1px 3px;
+    border-radius: 2px;
+    background: var(--dsp-red);
+    color: #fff;
+    font: 800 5.5px/1 'Inter Variable', sans-serif;
+    letter-spacing: 0.04em;
+    transform: scale(0);
+    transform-origin: left bottom;
+    transition: transform 380ms var(--dsp-spring) 60ms;
+}
+.ofi-dsp-paper.is-done .ofi-dsp-paper__badge { transform: scale(1); }
+
+/* ── Das Zeichen ─────────────────────────────────────────── */
+.ofi-dsp-status { display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; }
+.ofi-dsp-status > svg { width: 22px; height: 22px; }
+.ofi-dsp-status.is-wait { color: var(--dsp-line); }
+.ofi-dsp-status.is-wait > svg { width: 16px; height: 16px; opacity: 0.4; }
+.ofi-dsp-status.is-spin > svg { animation: ofi-dsp-spin 900ms linear infinite; }
+.ofi-dsp-status.is-spin circle { fill: none; stroke: var(--dsp-accent); stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 38 60; }
+@keyframes ofi-dsp-spin { to { transform: rotate(360deg); } }
+.ofi-dsp-status.is-plane { color: var(--dsp-accent); }
+.ofi-dsp-status.is-plane > svg { width: 18px; height: 18px; animation: ofi-dsp-fly 1200ms ease-in-out infinite; }
+@keyframes ofi-dsp-fly {
+    0% { transform: translate(-3px, 3px) scale(0.9); opacity: 0.3; }
+    40% { transform: translate(0, 0) scale(1); opacity: 1; }
+    80% { transform: translate(5px, -5px) scale(0.95); opacity: 0; }
+    100% { transform: translate(-3px, 3px) scale(0.9); opacity: 0; }
+}
+.ofi-dsp-status.is-done .ofi-dsp-status__disc { fill: var(--dsp-green-soft); stroke: var(--dsp-green); stroke-width: 1.5; animation: ofi-dsp-pop 420ms var(--dsp-spring) both; transform-origin: center; }
+.ofi-dsp-status.is-done .ofi-dsp-status__tick { fill: none; stroke: var(--dsp-green); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 16; stroke-dashoffset: 16; animation: ofi-dsp-draw 380ms ease 180ms forwards; }
+.ofi-dsp-status.is-preview .ofi-dsp-status__disc { fill: var(--dsp-fill); stroke: var(--dsp-muted); }
+.ofi-dsp-status.is-preview .ofi-dsp-status__tick { stroke: var(--dsp-muted); }
+@keyframes ofi-dsp-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes ofi-dsp-draw { to { stroke-dashoffset: 0; } }
+.ofi-dsp-status.is-warn { color: var(--dsp-amber); animation: ofi-dsp-pop 360ms var(--dsp-spring) both; }
+.ofi-dsp-status.is-warn > svg { width: 18px; height: 18px; }
+
+.ofi-dsp-foot { color: var(--ofi-cal-muted, #6e6e73); font-size: 12px; }
+.ofi-dsp-note {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--dsp-fill);
+    color: var(--dsp-muted);
+    font-size: 12px;
+}
+.ofi-dsp-note b { color: var(--dsp-text); font-weight: 600; }
+
+@media (max-width: 560px) {
+    .ofi-dsp-card { grid-template-columns: 38px minmax(0, 1fr); }
+    .ofi-dsp-card__end { grid-column: 1 / -1; justify-content: flex-end; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ofi-dsp-card,
+    .ofi-dsp-card__phase,
+    .ofi-dsp-paper__lines > i,
+    .ofi-dsp-status > svg,
+    .ofi-dsp-status.is-done .ofi-dsp-status__disc,
+    .ofi-dsp-status.is-done .ofi-dsp-status__tick,
+    .ofi-dsp-status.is-warn { animation: none !important; opacity: 1; transform: none; stroke-dashoffset: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIE SENDUNG EINES BOM-BELEGS AUF DER AUFTRAGSSEITE (30.09.2026)
+   Eine ruhige Tafel unter dem Band der BOM: links das Blatt (schreibt sich
+   beim Senden), der Stand in einem Wort, die letzte Sendung/Antwort; rechts
+   die Knöpfe. Steht auf der Seite (nicht im Portal) — Tokens aus `.ofi-dsp`.
+   ═════════════════════════════════════════════════════════════════════════ */
+.ofi-dsp.ofi-psend {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--dsp-line);
+    border-radius: 12px;
+    background: var(--dsp-surface);
+    box-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.05);
+    transition: border-color 240ms ease, box-shadow 240ms ease;
+}
+.ofi-dsp.ofi-psend.is-live.is-pdf,
+.ofi-dsp.ofi-psend.is-live.is-sending { border-color: color-mix(in srgb, var(--dsp-accent) 38%, transparent); box-shadow: 0 6px 18px rgba(10, 122, 255, 0.08); }
+.ofi-dsp.ofi-psend.is-live.is-sent { border-color: color-mix(in srgb, var(--dsp-green) 34%, transparent); }
+.ofi-dsp.ofi-psend.is-live.is-failed,
+.ofi-dsp.ofi-psend.is-live.is-skipped { border-color: color-mix(in srgb, var(--dsp-amber) 40%, transparent); background: var(--dsp-amber-soft); }
+.ofi-psend__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-psend__text > b { font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em; }
+.ofi-psend.is-awaiting .ofi-psend__text > b,
+.ofi-psend.is-askSent .ofi-psend__text > b { color: var(--dsp-amber); }
+.ofi-psend.is-confirmed .ofi-psend__text > b,
+.ofi-psend.is-received .ofi-psend__text > b,
+.ofi-psend.is-replied .ofi-psend__text > b { color: var(--dsp-green); }
+.ofi-psend.is-revised .ofi-psend__text > b { color: var(--dsp-red); }
+.ofi-psend__text > small { color: var(--dsp-muted); font-size: 12px; animation: ofi-dsp-fade 260ms ease; }
+.ofi-psend__text > small.is-warn { color: var(--dsp-amber); }
+.ofi-psend__log { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 2px; color: var(--dsp-muted); font-size: 11.5px; }
+.ofi-psend__log > span { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.ofi-psend__log > span > svg { flex: none; width: 13px; height: 13px; }
+.ofi-psend__log > span.is-ok > svg { color: var(--dsp-green); }
+.ofi-psend__log > span.is-warn { color: var(--dsp-amber); }
+#root .ofi-psend__log button {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 20px;
+    min-height: 0;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 5px !important;
+    background: var(--dsp-fill);
+    box-shadow: none;
+    color: var(--dsp-text);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+#root .ofi-psend__log button > svg { width: 12px; height: 12px; color: #e5484d; }
+.ofi-psend__acts { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+#root .ofi-psend__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    min-height: 0;
+    padding: 0 12px;
+    border: 1px solid var(--dsp-line);
+    border-radius: 8px !important;
+    background: var(--dsp-surface);
+    box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06);
+    color: var(--dsp-text);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+#root .ofi-psend__btn > svg { flex: none; width: 15px; height: 15px; }
+#root .ofi-psend__btn:hover:not(:disabled) { background: var(--dsp-fill); }
+#root .ofi-psend__btn:disabled { cursor: default; opacity: 0.45; }
+#root .ofi-psend__btn.is-quiet { border-color: transparent; background: transparent; box-shadow: none; color: var(--dsp-muted); }
+#root .ofi-psend__btn.is-quiet:hover:not(:disabled) { color: var(--dsp-text); }
+#root .ofi-psend__btn.is-primary { border-color: var(--dsp-accent); background: var(--dsp-accent); color: #fff; -webkit-text-fill-color: #fff; }
+#root .ofi-psend__btn.is-primary:hover:not(:disabled) { filter: brightness(1.06); background: var(--dsp-accent); }
+#root .ofi-psend__btn.is-confirm { border-color: color-mix(in srgb, #ff9500 55%, transparent); color: #b25000; }
+#root .ofi-psend__btn.is-confirm:hover:not(:disabled) { border-color: #ff9500; background: #ff9500; color: #fff; -webkit-text-fill-color: #fff; }
+html.dark #root .ofi-psend__btn.is-confirm { color: #ffb340; }
+#root .ofi-psend__btn .ofi-buy-spinner { width: 13px; height: 13px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ofi-dsp-spin 700ms linear infinite; }
+.ofi-psend .ofi-dsp-status { width: 24px; height: 24px; }
+@media (max-width: 760px) {
+    .ofi-dsp.ofi-psend { grid-template-columns: 38px minmax(0, 1fr); }
+    .ofi-psend__acts { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ofi-psend__text > small { animation: none; }
+}
+
+/* Jede Fassung, die hinausging (auch jede Revision), mit ihrem PDF (30.09.2026). */
+.ofi-psend__history { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+#root .ofi-psend__history > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    min-height: 0;
+    padding: 0 7px 0 5px;
+    border: 0;
+    border-radius: 6px !important;
+    background: var(--dsp-fill);
+    box-shadow: none;
+    color: var(--dsp-text);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+}
+#root .ofi-psend__history > button > svg { width: 12px; height: 12px; color: #e5484d; }

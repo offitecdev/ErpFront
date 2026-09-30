@@ -46,13 +46,14 @@
       "labelsSkipped_one": "{{count}} card without an ERP code was skipped.",
       "labelsSkipped_other": "{{count}} cards without an ERP code were skipped.",
       "listReady_one": "{{count}} card downloaded.",
-      "listReady_other": "{{count}} cards downloaded."
+      "listReady_other": "{{count}} cards downloaded.",
+      "draftFilterHint": "Draft card"
     },
     "columns": {
       "erpCode": "ERP code",
       "name": "Product name",
       "brand": "Brand",
-      "modelNumber": "Model number",
+      "modelNumber": "Manufacturer code",
       "supplier": "Supplier",
       "description": "Description",
       "quantity": "Quantity",
@@ -82,7 +83,8 @@
       "cancel": "Cancel",
       "discard": "Discard changes",
       "close": "Close",
-      "done": "Done"
+      "done": "Done",
+      "saveDraft": "Save as draft"
     },
     "product": {
       "newTitle": "New product card",
@@ -102,7 +104,16 @@
       "tabs": {
         "details": "Product details",
         "serials": "Serial numbers"
-      }
+      },
+      "draftChip": "Draft",
+      "draftTitle": "This card is a draft",
+      "incompleteTitle": "The card is not complete yet",
+      "draftMissing": "Missing: {{fields}}.",
+      "draftComplete": "All required fields are filled — «Save» completes the card.",
+      "draftHint": "Required: product name, unit, at least one supplier and one supplier e-mail. While something is missing the card is saved as a draft only; a supplier without e-mail gets no automatic price request.",
+      "incompleteToast": "Required fields are missing — you can save the card as a draft.",
+      "createdDraft": "Product card created as a draft.",
+      "savedDraft": "Draft saved."
     },
     "section": {
       "identity": "Identification",
@@ -118,7 +129,7 @@
       "name": "Product name",
       "required": "Required",
       "brand": "Brand",
-      "modelNumber": "Model number",
+      "modelNumber": "Manufacturer code",
       "supplierName": "Supplier name",
       "description": "Product description",
       "quantity": "Quantity",
@@ -139,7 +150,11 @@
       "barcodeHint": "Assigned automatically together with the ERP code (GS1 EAN-13).",
       "barcodeGs1": "GS1 EAN-13 · company-internal (04…)",
       "printLabel": "Print label",
-      "printNeedsCode": "A label needs an ERP code."
+      "printNeedsCode": "A label needs an ERP code.",
+      "productCode": "Product code",
+      "productCodeHint": "Printed on the price request and order PDF; may stay empty for now.",
+      "modelNumberHint": "The manufacturer's part number — not printed.",
+      "unit": "Unit"
     },
     "supplier": {
       "pick": "Choose a supplier",
@@ -151,7 +166,8 @@
       "change": "Change supplier",
       "columns": {
         "name": "Supplier",
-        "barcode": "Product barcode"
+        "barcode": "Product barcode",
+        "email": "Supplier e-mail"
       },
       "barcodePlaceholder": "Scan or type the barcode",
       "barcodeLabel": "Product barcode of row {{index}}",
@@ -164,7 +180,11 @@
       "noBarcode": "No barcode yet",
       "pickerLabel": "Manufacturer barcode by supplier",
       "pickerHint": "Once suppliers are added, choose one here to see its barcode.",
-      "unassignedHint": "This barcode has no supplier yet — choose one in its row under Suppliers."
+      "unassignedHint": "This barcode has no supplier yet — choose one in its row under Suppliers.",
+      "emailPlaceholder": "sales@supplier.com",
+      "emailOf": "E-mail of {{name}}",
+      "emailLabel": "E-mail of row {{index}}",
+      "emailInvalid": "«{{email}}» is not a valid e-mail, or the row has no supplier."
     },
     "scan": {
       "openCamera": "Scan with the camera",
@@ -309,7 +329,10 @@
       "SUPPLIER_DUPLICATE": "«{{name}}» is already on this card.",
       "TOO_MANY_SUPPLIERS": "A card can have at most {{max}} suppliers.",
       "MANUFACTURER_BARCODE_TAKEN": "Manufacturer barcode «{{code}}» already belongs to «{{name}}» — a manufacturer barcode can belong to one product only.",
-      "RECEIPT_UNDO_INVALID": "This goods receipt can no longer be undone — the order or its record has changed."
+      "RECEIPT_UNDO_INVALID": "This goods receipt can no longer be undone — the order or its record has changed.",
+      "UNIT_INVALID": "This unit is unknown.",
+      "SUPPLIER_EMAIL_INVALID": "Invalid e-mail for «{{name}}»: {{email}}",
+      "PRODUCT_INCOMPLETE": "Required fields are missing — the card can only be saved as a draft."
     },
     "settings": {
       "title": "Warehouse settings",
@@ -478,14 +501,16 @@
         "category": "Main category",
         "group": "Material group",
         "brand": "Brand",
-        "modelNumber": "Model number",
+        "modelNumber": "Manufacturer code",
         "supplier": "Suppliers",
         "makerBarcodes": "Manufacturer barcodes",
         "description": "Description",
         "quantity": "Quantity",
         "purchasePrice": "Purchase price",
         "currency": "Currency",
-        "serialRequired": "Serial number required"
+        "serialRequired": "Serial number required",
+        "productCode": "Product code",
+        "unit": "Unit"
       },
       "yes": "Yes",
       "no": "No",
@@ -496,16 +521,19 @@
         "group": "Material group",
         "name": "Product name *",
         "brand": "Brand",
-        "modelNumber": "Model number",
+        "modelNumber": "Manufacturer code",
         "supplierName": "Supplier name",
         "description": "Description",
         "quantity": "Quantity",
         "purchasePrice": "Purchase price",
         "currency": "Currency",
         "manufacturerBarcode": "Manufacturer barcode",
-        "serialRequired": "Serial number required"
+        "serialRequired": "Serial number required",
+        "productCode": "Product code",
+        "unit": "Unit",
+        "supplierEmail": "Supplier e-mail"
       },
-      "help1": "Each row is one product card. Only «Product name» is required. «Manufacturer barcode» is the product barcode of the supplier in the same row.",
+      "help1": "Each row is one product card. «Product name» is required; cards without unit, supplier or supplier e-mail are imported as drafts. «Manufacturer barcode» is the product barcode of the supplier in the same row.",
       "help2": "Pick the «Material group» from the list. The ERP code (e.g. ELK-PLC-00001) and the GS1 barcode are assigned automatically after the import.",
       "help3": "Quantity and purchase price are numbers (e.g. 12.50). An empty currency counts as CHF.",
       "help4": "For serial-numbered products choose «Serial number required» = Yes and leave the quantity empty; units are added with their serial numbers.",
@@ -522,6 +550,23 @@
       "page": "Page {{page}} / {{pages}}",
       "listFile": "warehouse-product-cards-{{date}}.pdf",
       "labelsFile": "warehouse-labels-{{date}}.pdf"
+    },
+    "units": {
+      "PCS": "Piece",
+      "M": "Metre",
+      "KG": "Kilogram",
+      "SET": "Set",
+      "PACK": "Pack"
+    },
+    "missing": {
+      "name": "product name",
+      "unit": "unit",
+      "supplier": "supplier",
+      "supplierEmail": "supplier e-mail",
+      "nameHint": "The product name is required.",
+      "unitHint": "Pick a unit (piece, metre …).",
+      "supplierHint": "Add at least one supplier.",
+      "supplierEmailHint": "Enter the e-mail of at least one supplier — the price request goes there."
     }
   },
   "notify": {

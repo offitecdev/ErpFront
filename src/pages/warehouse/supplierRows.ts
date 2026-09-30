@@ -22,7 +22,12 @@ export interface SupplierRow {
     key: string;
     value: SupplierValue | null;
     barcode: string;
+    /** Die E-Mail des Lieferanten für diese Karte (30.09.2026) — an sie geht die Preisanfrage. */
+    email: string;
 }
+
+/** Eine E-Mail, wie ein Mailprogramm sie annimmt. */
+export const isEmail = (value: string): boolean => /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[^\s@<>(),;:"]{2,}$/.test(value.trim());
 
 /** Höchstens so viele Lieferanten je Karte (wie der Server). */
 export const MAX_SUPPLIERS = 20;
@@ -32,11 +37,11 @@ let rowSeq = 0;
 /** Eine neue, leere Zeile. */
 export const emptySupplierRow = (): SupplierRow => {
     rowSeq += 1;
-    return { key: `sr-${rowSeq}`, value: null, barcode: '' };
+    return { key: `sr-${rowSeq}`, value: null, barcode: '', email: '' };
 };
 
 /** Ohne Lieferant und ohne Barcode — die bereitstehende Zeile. */
-export const isBlankRow = (row: SupplierRow): boolean => !row.value && !row.barcode.trim();
+export const isBlankRow = (row: SupplierRow): boolean => !row.value && !row.barcode.trim() && !row.email.trim();
 
 /** Am Ende steht immer eine leere Zeile bereit (solange ein Lieferant mehr erlaubt ist). */
 export const withBlankRow = (rows: SupplierRow[]): SupplierRow[] => {
@@ -55,12 +60,13 @@ export const supplierRowsOf = (
     product: Pick<WarehouseProduct, 'suppliers' | 'manufacturerBarcode'> | null,
 ): SupplierRow[] => {
     const rows: SupplierRow[] = [];
-    if (product?.manufacturerBarcode) rows.push({ key: 'sr-maker', value: null, barcode: product.manufacturerBarcode });
+    if (product?.manufacturerBarcode) rows.push({ key: 'sr-maker', value: null, barcode: product.manufacturerBarcode, email: '' });
     (product?.suppliers ?? []).forEach((entry, index) => {
         rows.push({
             key: `sr-saved-${index}-${entry.name}`,
             value: { id: entry.id, name: entry.name },
             barcode: entry.barcode ?? '',
+            email: entry.email ?? '',
         });
     });
     return withBlankRow(rows);
@@ -75,13 +81,16 @@ export type SupplierEntries = NonNullable<WarehouseProductInput['suppliers']>;
  */
 export const supplierInputOf = (
     rows: SupplierRow[],
-): { suppliers: SupplierEntries; manufacturerBarcode: string | null } | { errorKey: string; code: string } => {
+): { suppliers: SupplierEntries; manufacturerBarcode: string | null } | { errorKey: string; code: string; kind?: 'email' } => {
     const suppliers: SupplierEntries = [];
     let manufacturerBarcode: string | null = null;
     for (const row of rows) {
         const barcode = row.barcode.trim() || null;
+        const email = row.email.trim() || null;
+        // Eine E-Mail muss eine E-Mail sein — und braucht ihren Lieferanten.
+        if (email && (!row.value || !isEmail(email))) return { errorKey: row.key, code: email, kind: 'email' };
         if (row.value) {
-            suppliers.push({ supplierId: row.value.id, name: row.value.name, barcode });
+            suppliers.push({ supplierId: row.value.id, name: row.value.name, barcode, email });
         } else if (barcode) {
             if (manufacturerBarcode !== null) return { errorKey: row.key, code: barcode };
             manufacturerBarcode = barcode;

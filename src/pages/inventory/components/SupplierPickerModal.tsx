@@ -17,6 +17,8 @@ export const SupplierPickerModal = ({
     onClose,
     onPick,
     onPickMany,
+    onPickName,
+    acceptNames = false,
 }: {
     open: boolean;
     embedded?: boolean;
@@ -25,8 +27,12 @@ export const SupplierPickerModal = ({
     selectedIds?: string[];
     onClose: () => void;
     onPick?: (supplier: SupplierSearchItem) => void;
-    /** Newly selected suppliers only, in selection order. */
-    onPickMany?: (suppliers: SupplierSearchItem[]) => void;
+    /** Newly selected suppliers only, in selection order — with `acceptNames` also the typed names. */
+    onPickMany?: (suppliers: SupplierSearchItem[], names: string[]) => void;
+    /** Optional free-name selection, without creating a supplier record. */
+    onPickName?: (name: string) => void;
+    /** Multiple mode: a typed name that is not in the list joins the selection (returned by `onPickMany`). */
+    acceptNames?: boolean;
 }) => {
     const [query, setQuery] = useState('');
     const [items, setItems] = useState<SupplierSearchItem[]>([]);
@@ -34,6 +40,8 @@ export const SupplierPickerModal = ({
     const [failed, setFailed] = useState(false);
     const [retry, setRetry] = useState(0);
     const [chosen, setChosen] = useState<Map<string, SupplierSearchItem>>(() => new Map());
+    const [names, setNames] = useState<string[]>([]);
+    const [resolvedQuery, setResolvedQuery] = useState<string | null>(null);
     const debouncedQuery = useDebouncedValue(query);
     // Sürüklenebilir sütunlar; ad sütununun genişliği yoktur, kalanı o emer.
     const grid = useColumnWidths({
@@ -43,14 +51,14 @@ export const SupplierPickerModal = ({
     });
 
     useEffect(() => {
-        if (!open) { setQuery(''); setChosen(new Map()); return; }
+        if (!open) { setQuery(''); setChosen(new Map()); setNames([]); return; }
         let cancelled = false;
         setLoading(true);
         setFailed(false);
         inventoryApi
             .searchSuppliers(debouncedQuery, 30)
-            .then((result) => { if (!cancelled) setItems(result); })
-            .catch(() => { if (!cancelled) { setItems([]); setFailed(true); } })
+            .then((result) => { if (!cancelled) { setItems(result); setResolvedQuery(debouncedQuery); } })
+            .catch(() => { if (!cancelled) { setItems([]); setFailed(true); setResolvedQuery(null); } })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [open, debouncedQuery, retry]);
@@ -60,6 +68,7 @@ export const SupplierPickerModal = ({
     const close = () => {
         setQuery('');
         setChosen(new Map());
+        setNames([]);
         onClose();
     };
     const existing = new Set(selectedIds);
@@ -77,25 +86,49 @@ export const SupplierPickerModal = ({
         if (multiple) toggle(supplier);
         else { onPick?.(supplier); close(); }
     };
+    const typedName = query.replace(/\s+/g, ' ').trim();
+    const fold = (name: string) => name.replace(/\s+/g, ' ').trim().toLocaleLowerCase('tr-TR');
+    const namesMode = multiple && acceptNames;
+    const canPickName = Boolean((onPickName || namesMode) && typedName && !loading && !failed && resolvedQuery === query
+        && ![...items, ...chosen.values()].some((supplier) => fold(supplier.companyName) === fold(typedName))
+        && !names.some((name) => fold(name) === fold(typedName)));
+    const pickName = () => {
+        if (!canPickName) return;
+        if (namesMode) {
+            setNames((current) => [...current, typedName]);
+            setQuery('');
+            return;
+        }
+        onPickName?.(typedName);
+        if (multiple) setQuery('');
+        else close();
+    };
+    const pickedCount = selection.length + names.length;
 
     return (
         <PopupDialog open={open} embedded={embedded} onClose={close} title={t('inv.orders.supplierModal.title')} width={760}
-            footer={multiple ? <PopupActions start={t('productionBom.procurement.selected', { count: selection.length })}>
+            footer={multiple ? <PopupActions start={t('productionBom.procurement.selected', { count: pickedCount })}>
                 <PopupButton onClick={close}>{t('productionBom.common.cancel')}</PopupButton>
-                <PopupButton variant="primary" disabled={!selection.length || !onPickMany} onClick={() => { onPickMany?.(selection); close(); }}>{t('common.apply')}</PopupButton>
+                <PopupButton variant="primary" disabled={!pickedCount || !onPickMany} onClick={() => { onPickMany?.(selection, names); close(); }}>{t('common.apply')}</PopupButton>
             </PopupActions> : undefined}>
             <div className="flex min-h-0 flex-col gap-3">
                 <div>
-                    <SearchBox value={query} onChange={setQuery} placeholder={t('inv.suppliers.searchPlaceholder')} autoFocus />
+                    <SearchBox value={query} onChange={setQuery} placeholder={t(onPickName ? 'warehouse.supplier.search' : 'inv.suppliers.searchPlaceholder')} autoFocus />
                 </div>
-                {multiple && selection.length > 0 && <div className="flex flex-wrap gap-1.5">
+                {canPickName && <div><PopupButton onClick={pickName}>{t('warehouse.supplier.use', { name: typedName })}</PopupButton></div>}
+                {multiple && pickedCount > 0 && <div className="flex flex-wrap gap-1.5">
                     {selection.map((supplier) => <button key={supplier.id} type="button" onClick={() => toggle(supplier)}
                         className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-transparent px-2 py-1 text-xs text-slate-700 dark:border-white/15 dark:text-white/80"
                         aria-label={`${t('productionBom.common.remove')}: ${supplier.companyName}`}>
                         {supplier.companyName}<X size={12} aria-hidden />
                     </button>)}
+                    {names.map((name) => <button key={`name:${name}`} type="button" onClick={() => setNames((current) => current.filter((entry) => entry !== name))}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 bg-transparent px-2 py-1 text-xs text-slate-700 dark:border-white/25 dark:text-white/80"
+                        aria-label={`${t('productionBom.common.remove')}: ${name}`}>
+                        {name}<X size={12} aria-hidden />
+                    </button>)}
                 </div>}
-                <div className="min-h-0 flex-1 overflow-auto" style={{ maxHeight: 'min(50vh, 480px)' }}>
+                <div className="min-h-0 flex-1 overflow-auto" style={{ maxHeight: 'min(calc(50vh / var(--ofi-zoom, 1)), 480px)' }}>
                     <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                         <colgroup>
                             {multiple && <col style={{ width: 38 }} />}

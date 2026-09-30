@@ -138,6 +138,8 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
     const [addresses, setAddresses] = useState<OrderAddresses>(EMPTY_ADDRESSES);
     const [nextNumber, setNextNumber] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    /** Lagerbestand je Artikel — nur in der Maske, nie auf dem PDF (29.09.2026). */
+    const [stock, setStock] = useState<Record<string, number>>({});
 
     // ── Erfassung ────────────────────────────────────────────────────────────
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -189,7 +191,16 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
         setView('edit');
     };
 
+    const loadStock = (ids: Array<string | null | undefined>) => {
+        const missing = [...new Set(ids.filter((id): id is string => Boolean(id)))].filter((id) => !(id in stock));
+        if (missing.length === 0) return;
+        void deliveryNotesApi.articleInfo(missing)
+            .then((info) => setStock((current) => ({ ...current, ...info.stock })))
+            .catch(() => undefined);
+    };
+
     const startEdit = (note: DeliveryNoteDto) => {
+        loadStock(note.lines.map((line) => line.articleId));
         const before = deliveredByPosition(notes, note.id);
         setEditingId(note.id);
         setDate(note.deliveryDate || today());
@@ -225,7 +236,10 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
                 ]);
                 const draft = detail ? draftLinesFromPositions(detail.positions || []) : [];
                 const ids = draft.map((line) => line.articleId || '').filter(Boolean);
-                const codes = ids.length ? await deliveryNotesApi.articleCodes(ids).catch(() => ({} as Record<string, string>)) : {};
+                const empty = { codes: {} as Record<string, string>, stock: {} as Record<string, number> };
+                const info = ids.length ? await deliveryNotesApi.articleInfo(ids).catch(() => empty) : empty;
+                const codes = info.codes;
+                setStock((current) => ({ ...current, ...info.stock }));
                 draft.forEach((line) => {
                     if (line.articleId && codes[line.articleId]) line.articleCode = codes[line.articleId];
                 });
@@ -270,12 +284,15 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
     const patchLine = (key: string, patch: Partial<EditorLine>) =>
         setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
 
-    const pickArticle = (key: string, article: ArticleQuickPick) => patchLine(key, {
-        articleId: article.id,
-        articleCode: article.articleCode ?? null,
-        description: article.name,
-        unit: article.unit || null,
-    });
+    const pickArticle = (key: string, article: ArticleQuickPick) => {
+        patchLine(key, {
+            articleId: article.id,
+            articleCode: article.articleCode ?? null,
+            description: article.name,
+            unit: article.unit || null,
+        });
+        loadStock([article.id]);
+    };
 
     const addLine = () => {
         const key = nextKey();
@@ -296,11 +313,6 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
     };
 
     const removeLine = (key: string) => setLines((current) => current.filter((line) => line.key !== key));
-
-    const chooseSite = (choice: SiteChoice) => {
-        setSite(choice);
-        setSiteText(choice === 'NONE' ? '' : addresses.sites[choice] || '');
-    };
 
     // ── PDF ──────────────────────────────────────────────────────────────────
     const showPdf = async (note: DeliveryNoteDto, allNotes: DeliveryNoteDto[]) => {
@@ -413,10 +425,16 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
     };
 
     const disabled = !orderId || cancelled;
-    const siteOptions = (['INSTALLATION', 'DELIVERY'] as DeliverySiteKind[]).filter((kind) => addresses.sites[kind]);
     const siteLabel = (kind: DeliverySiteKind) =>
         kind === 'INSTALLATION' ? t('deliveryNote.siteInstallation') : t('deliveryNote.siteDelivery');
     const editingNote = editingId ? notes.find((note) => note.id === editingId) : null;
+    // Die EINE Anschrift des Lieferscheins (29.09.2026, Samet): die Projekt-
+    // ODER Lieferadresse, für die der Auftrag erstellt wurde — sonst die des
+    // Kunden. Keine Umschaltung, keine zweite Anschrift daneben.
+    const shownName = editingNote ? editingNote.customerName : addresses.customerName;
+    const shownAddress = site !== 'NONE' && siteText
+        ? siteText
+        : (editingNote ? editingNote.customerAddress : addresses.customerAddress);
     const allDelivered = view === 'edit' && !editingId && lines.length === 0 && draftBase.length > 0;
 
     // ── Liste der Lieferscheine ──────────────────────────────────────────────
@@ -503,35 +521,11 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
 
             <div className="ofi-ls-addr">
                 <div className="ofi-ls-addr__box">
-                    <div className="ofi-ls-addr__label">{t('deliveryNote.recipient')}</div>
-                    {(editingNote ? editingNote.customerName : addresses.customerName) || '—'}
-                    {(editingNote ? editingNote.customerAddress : addresses.customerAddress)
-                        ? <div>{editingNote ? editingNote.customerAddress : addresses.customerAddress}</div>
-                        : null}
-                </div>
-                <div className="ofi-ls-addr__box">
                     <div className="ofi-ls-addr__label">
-                        {site === 'NONE' ? t('deliveryNote.siteAddress') : siteLabel(site)}
+                        {site === 'NONE' ? t('deliveryNote.recipient') : siteLabel(site)}
                     </div>
-                    {siteOptions.length > 1 && (
-                        <div className="ofi-ls-seg" role="radiogroup" aria-label={t('deliveryNote.siteAddress')}>
-                            {siteOptions.map((kind) => (
-                                <button
-                                    key={kind}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={site === kind}
-                                    className={`ofi-ls-seg__item ${site === kind ? 'is-active' : ''}`}
-                                    onClick={() => chooseSite(kind)}
-                                >
-                                    {siteLabel(kind)}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                    {site !== 'NONE' && siteText
-                        ? <div>{siteText}</div>
-                        : <div className="ofi-ls-muted">{t('deliveryNote.customerOnly')}</div>}
+                    {shownName || '—'}
+                    {shownAddress ? <div>{shownAddress}</div> : null}
                     <div className="ofi-ls-hint">{t('deliveryNote.siteHint')}</div>
                 </div>
             </div>
@@ -546,6 +540,7 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
                             <th className="ofi-ls-col-pos">{t('deliveryNote.colPos')}</th>
                             <th className="ofi-ls-col-code">{t('deliveryNote.colCode')}</th>
                             <th>{t('deliveryNote.colDescription')}</th>
+                            <th className="ofi-ls-num" title={t('deliveryNote.colStockHint')}>{t('deliveryNote.colStock')}</th>
                             <th className="ofi-ls-num">{t('deliveryNote.colOrdered')}</th>
                             <th className="ofi-ls-num">{t('deliveryNote.colBefore')}</th>
                             <th className="ofi-ls-num">{t('deliveryNote.colDelivered')}</th>
@@ -559,6 +554,8 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
                             const open = fromOrder ? Math.max(0, roundQty(line.orderedQty - line.before)) : null;
                             const typed = parseQty(line.qtyText);
                             const over = open !== null && typed > open;
+                            const onHand = line.articleId ? stock[line.articleId] : undefined;
+                            const short = onHand !== undefined && typed > onHand;
                             return (
                                 <tr key={line.key}>
                                     <td className="ofi-ls-muted">{line.positionNumber || ''}</td>
@@ -582,6 +579,12 @@ export const DeliveryNoteButton = ({ order, fallbackTenderId, projectNumber, cla
                                                 }}
                                             />
                                         )}
+                                    </td>
+                                    <td
+                                        className={`ofi-ls-num ofi-ls-stock ${short ? 'is-short' : ''}`}
+                                        title={short ? t('deliveryNote.stockShort') : undefined}
+                                    >
+                                        {onHand !== undefined ? fmtQty(onHand) : '–'}
                                     </td>
                                     <td className="ofi-ls-num">{fromOrder ? fmtQty(line.orderedQty) : '–'}</td>
                                     <td className="ofi-ls-num ofi-ls-muted">{fromOrder ? fmtQty(line.before) : '–'}</td>

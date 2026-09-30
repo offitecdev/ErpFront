@@ -56,12 +56,17 @@ export const deliveryNotesApi = {
         return Array.isArray(res.data?.notes) ? res.data.notes : [];
     },
 
-    /** Artikelnummern zu Artikel-Ids (die Offertpositionen kennen nur die Id). */
-    articleCodes: async (ids: string[]): Promise<Record<string, string>> => {
+    /**
+     * Artikelnummern und Lagerbestand zu Artikel-Ids (die Offertpositionen
+     * kennen nur die Id). Der Bestand ist nur für die Erfassungsmaske — er
+     * kommt nie auf das PDF.
+     */
+    articleInfo: async (ids: string[]): Promise<{ codes: Record<string, string>; stock: Record<string, number> }> => {
         const unique = [...new Set(ids.filter(Boolean))].slice(0, 500);
-        if (unique.length === 0) return {};
+        if (unique.length === 0) return { codes: {}, stock: {} };
         const res = await apiClient.get('/delivery-notes/article-codes', { params: { ids: unique.join(',') } });
-        return res.data?.codes && typeof res.data.codes === 'object' ? res.data.codes : {};
+        const obj = (value: unknown) => (value && typeof value === 'object' ? value as Record<string, never> : {});
+        return { codes: obj(res.data?.codes), stock: obj(res.data?.stock) };
     },
 
     /** Vorschau der nächsten Nummer — keine Reservierung. */

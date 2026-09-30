@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom';
 import { useEffect } from 'react';
 import { AlertTriangle, Check, X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
-import type { OrderCalcMode, PurchaseTemplateDocumentType, SupplierCalcConfig, TemplateLabel } from '@/types/inventory';
+import type { OrderCalcMode, SupplierCalcConfig } from '@/types/inventory';
 import { CALC_REQUIRED_LABELS, missingCalcLabels, templateColumns, templateLabelName } from '../import/importTemplate';
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -35,49 +35,41 @@ const MODE_HINT: Record<OrderCalcMode, string> = {
 
 export const CalcModeCard = ({
     open,
-    embedded = false,
     onClose,
     mode,
     config,
-    documentType,
     onApply,
     error,
 }: {
     open: boolean;
-    embedded?: boolean;
     onClose: () => void;
     mode: OrderCalcMode;
     config: SupplierCalcConfig;
-    documentType?: PurchaseTemplateDocumentType;
     /** Die Seite prüft und rechnet um; die Karte zeigt nur. */
     onApply: (mode: OrderCalcMode) => void;
     /** Die fehlenden Schlüssel des letzten Versuchs (null = kein Fehler). */
     error: string | null;
 }) => {
     useEffect(() => {
-        if (!open || embedded) return undefined;
+        if (!open) return undefined;
         const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [open, onClose, embedded]);
+    }, [open, onClose]);
 
     if (!open) return null;
 
-    const columns = documentType === 'PRICE_REQUEST' ? config.columns : templateColumns(config);
-    const present = new Set(columns.map((column) => column.label).filter(Boolean));
-    const requiredLabels: TemplateLabel[] = documentType === 'PRICE_REQUEST'
-        ? (mode === 'DIRECT' ? [] : ['productName', 'quantity', mode === 'SUPPLIER' ? 'netPrice' : 'grossPrice'])
-        : CALC_REQUIRED_LABELS;
+    const present = new Set(templateColumns(config).map((column) => column.label).filter(Boolean));
 
-    const content = (
+    return createPortal(
         <div
-            className={embedded ? 'ofi-inline-tool' : 'ofi-ord-scrim'}
-            role={embedded ? 'region' : 'dialog'}
-            aria-modal={embedded ? undefined : true}
+            className="ofi-ord-scrim"
+            role="dialog"
+            aria-modal="true"
             aria-label={t('inv.orders.calcMode.title')}
-            onMouseDown={(event) => { if (!embedded && event.target === event.currentTarget) onClose(); }}
+            onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
         >
-            <div className={embedded ? 'ofi-ord ofi-calc ofi-ord-inline' : 'ofi-ord ofi-calc'}>
+            <div className="ofi-ord ofi-calc">
                 <div className="ofi-ord-head">
                     <span className="ofi-ord-ghost" />
                     <b>{t('inv.orders.calcMode.title')}</b>
@@ -89,7 +81,7 @@ export const CalcModeCard = ({
                 <div className="ofi-ord-body">
                     <div className="ofi-ord-group">
                         {MODES.map((entry) => {
-                            const missing = missingCalcLabels(config, entry, documentType);
+                            const missing = missingCalcLabels(config, entry);
                             const active = entry === mode;
                             return (
                                 <button
@@ -114,9 +106,9 @@ export const CalcModeCard = ({
 
                     {/* Die Schlüssel, die Automatik und Lieferantenberechnung
                         verlangen — grün zugeordnet, rot fehlend. */}
-                    {requiredLabels.length > 0 && <span className="ofi-ord-cap">{t('inv.orders.calcMode.requiredKeys')}</span>}
+                    <span className="ofi-ord-cap">{t('inv.orders.calcMode.requiredKeys')}</span>
                     <div className="ofi-ord-group ofi-calc-keys">
-                        {requiredLabels.map((label) => {
+                        {CALC_REQUIRED_LABELS.map((label) => {
                             const ok = present.has(label);
                             return (
                                 <span key={label} className={`ofi-calc-key${ok ? ' is-ok' : ' is-missing'}`}>
@@ -142,7 +134,7 @@ export const CalcModeCard = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
-    return embedded ? content : createPortal(content, document.body);
 };

@@ -22,6 +22,7 @@ const ORIGIN_LABEL: Record<MovementOrigin, string> = {
     QUICK_ADD: 'inv.origin.quickAdd',
     QUICK_DELETE: 'inv.origin.quickDelete',
     ORDER_RECEIPT: 'inv.origin.orderReceipt',
+    PRODUCTION: 'inv.origin.production',
     REPORT: 'inv.origin.report',
     MANUAL: 'inv.origin.manual',
 };

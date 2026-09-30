@@ -3,14 +3,14 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { MacSpinnerScreen } from '@/components/ui-shared/Loader';
 import { t } from '@/i18n/translate';
-import { productionErrorOf, readProductionDevices } from '@/lib/api/production';
+import { productionErrorOf, readProductionDeviceHeader } from '@/lib/api/production';
 import { useBackTarget } from '@/lib/backNav';
 import { hrefFor, isModifiedClick } from '@/lib/navLink';
 import { useStaffDirectory } from '@/pages/crm/hooks/useStaffDirectory';
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { useAuthStore } from '@/store/authStore';
 import { useNavGuardStore } from '@/store/navGuardStore';
-import type { ProductionProjectDevices } from '@/types/production';
+import type { ProductionDeviceHeader } from '@/types/production';
 import type { TaskArea, TaskPerson } from '@/types/productionTasks';
 import '@/styles/modules/production.css';
 import '@/styles/modules/productionDevice.css';
@@ -34,27 +34,14 @@ import { useDeviceTasks } from './useDeviceTasks';
  *
  * Die Seite hat ihren EIGENEN RAHMEN: keine Kopfleiste, eine schmale
  * Modulleiste mit Glocke, Sprache und Profil (MainLayout erkennt die Adresse
- * an `isDeviceFocusPath`). Beim Öffnen steht kurz der Mac-Kreisel — die Daten
- * kommen meist schon aus dem Speicher der Projektseite, er bleibt trotzdem
- * einen Augenblick stehen, damit das Laden als Laden zu sehen ist.
+ * an `isDeviceFocusPath`). Der Kopf lädt nur das gewählte Gerät. Der Kreisel
+ * verschwindet, sobald diese Daten da sind.
  *
  * Die Stufe steht in der Adresse (`?stage=`); der Anfang braucht keinen
  * Parameter. Stufenwechsel ersetzen den Verlaufseintrag — «zurück» (der
  * hellblaue Knopf oben in der Leiste, RailBackButton) verlässt das Gerät,
  * statt durch die Stufen zu laufen.
  */
-
-/** So lange steht der Kreisel mindestens: kurz, aber als Laden erkennbar. */
-const LOADING_MIN_MS = 420;
-
-const useMinimumWait = (key: string, ms: number): boolean => {
-    const [doneFor, setDoneFor] = useState<string | null>(null);
-    useEffect(() => {
-        const timer = window.setTimeout(() => setDoneFor(key), ms);
-        return () => window.clearTimeout(timer);
-    }, [key, ms]);
-    return doneFor === key;
-};
 
 export const ProductionDevicePage = () => {
     useLanguageTick();
@@ -64,15 +51,14 @@ export const ProductionDevicePage = () => {
     const back = useBackTarget();
     const isAdmin = useAuthStore((state) => state.isSystemAdmin);
     const meId = useAuthStore((state) => state.user?.id ?? null);
-    const [data, setData] = useState<ProductionProjectDevices | null>(null);
+    const [data, setData] = useState<ProductionDeviceHeader | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const waited = useMinimumWait(deviceId, LOADING_MIN_MS);
 
-    useEffect(() => readProductionDevices(
-        projectId,
+    useEffect(() => readProductionDeviceHeader(
+        projectId, deviceId,
         (value) => { setData(value); setError(null); },
         (failure) => setError(productionErrorOf(failure).message || t('production.loadFailed')),
-    ), [projectId]);
+    ), [projectId, deviceId]);
 
     /* Görevlendirme (26.09.2026): die Aufgaben des Geräts und — für die
        Administratorrolle — das Personalverzeichnis der Auswahl. */
@@ -134,11 +120,11 @@ export const ProductionDevicePage = () => {
         else navigate(projectPath);
     });
 
-    const shown = data && data.project.id === projectId ? data : null;
-    const device = shown?.devices.find((row) => row.id === deviceId) ?? null;
+    const shown = data && data.project.id === projectId && data.device.id === deviceId ? data : null;
+    const device = shown?.device ?? null;
 
     // Derselbe Kreisel an derselben Stelle wie der Platzhalter der Route.
-    if (!waited || (!shown && !error)) return <MacSpinnerScreen />;
+    if (!shown && !error) return <MacSpinnerScreen />;
 
     if (!shown || !device) {
         const toProject = (event: MouseEvent<HTMLAnchorElement>) => {
