@@ -27,7 +27,7 @@ import type {
     CostingProject,
     CostingProjectSummary,
 } from '../../types/productionBom';
-import type { TaskArea } from '../../types/productionTasks';
+import type { BuiltInArea, TaskArea } from '../../types/productionTasks';
 
 /**
  * ── BOM DER PRODUKTION (27.09.2026) ──────────────────────────────────────────
@@ -60,8 +60,9 @@ export const productionBomApi = {
     },
     seedExamples: async (): Promise<{ templates: number; products: number; groups: number }> =>
         (await apiClient.post('/production/bom/templates/examples', {})).data,
-    searchProducts: async (q: string, signal?: AbortSignal): Promise<BomProduct[]> =>
-        ((await apiClient.get('/production/bom/products', { params: { q }, signal })).data as { items: BomProduct[] }).items,
+    /** `area` (01.10.2026): nur Karten der Kod türleri dieses Bereichs (Depo-Einstellungen). */
+    searchProducts: async (q: string, signal?: AbortSignal, area?: BuiltInArea): Promise<BomProduct[]> =>
+        ((await apiClient.get('/production/bom/products', { params: { q, ...(area ? { area } : {}) }, signal })).data as { items: BomProduct[] }).items,
 
     deviceView: async (deviceId: string, area: TaskArea, signal?: AbortSignal): Promise<BomAreaView> =>
         (await apiClient.get(`/production/bom/devices/${enc(deviceId)}`, { params: { area: areaParam(area), view: 'summary' }, signal })).data,

@@ -126,7 +126,11 @@
       "searching": "Searching…",
       "short": "ERP code, model or name",
       "addActive": "Add the selected product",
-      "typeToSearch": "Type an ERP code, model no. or product name — + adds the selected product"
+      "typeToSearch": "Type an ERP code, model no. or product name — + adds the selected product",
+      "areaScope": {
+        "MECHANICAL": "Only code types assigned to mechanical BOMs are searched (Warehouse settings › Material groups).",
+        "ELECTRICAL": "Only code types assigned to electrical BOMs are searched (Warehouse settings › Material groups)."
+      }
     },
     "quickCard": {
       "title": "New product card",
@@ -523,6 +527,7 @@
       "PRICE_MISSING": "{{code}} gave no price for this line.",
       "COMPARE_COUNT": "Select at most {{max}} quotes.",
       "COMPARE_PDF_REQUIRED": "{{supplier}} ({{code}}): no quote PDF — upload a PDF first.",
+      "COMPARE_PDF_MISSING": "{{supplier}} ({{code}}): the quote PDF file is missing on the server — upload the PDF again.",
       "COMPARE_PDF_UNREADABLE": "{{supplier}}: the quote PDF cannot be read.",
       "COMPARISON_NOT_FOUND": "Comparison not found.",
       "MAILBOX_INVALID": "Mailbox details are missing or invalid.",

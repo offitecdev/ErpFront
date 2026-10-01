@@ -19,7 +19,7 @@ import type { BomTemplate, BomTemplateSummary } from '@/types/productionBom';
 import '@/styles/modules/warehouse.css';
 import '@/styles/modules/productionBom.css';
 
-import { EmptyState, LoadingState } from '../bomUi';
+import { BomSpinner, EmptyState, LoadingState } from '../bomUi';
 import { BomTemplateEditor } from './BomTemplateEditor';
 import { BomTemplateList } from './BomTemplateList';
 import { draftDirty, draftFromTemplate, draftInput, emptyDraft, linesValid, type TemplateDraft } from './templateDraft';
@@ -240,7 +240,7 @@ export const BomTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
                 <div className="ofi-bom-head__actions">
                     {canEdit && list && !hasExamples && (
                         <button type="button" className="ofi-bom-btn ofi-nosize" disabled={seeding} onClick={() => void seed()}>
-                            {seeding ? <span className="ofi-bom-spinner is-small" /> : <Sparkles />}
+                            {seeding ? <BomSpinner small /> : <Sparkles />}
                             {t('productionBom.templates.examples')}
                         </button>
                     )}

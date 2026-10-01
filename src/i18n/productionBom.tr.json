@@ -126,7 +126,11 @@
       "searching": "Aranıyor…",
       "short": "ERP kodu, model veya ad",
       "addActive": "Seçili ürünü ekle",
-      "typeToSearch": "ERP kodu, model no veya ürün adı yazın — + seçili ürünü ekler"
+      "typeToSearch": "ERP kodu, model no veya ürün adı yazın — + seçili ürünü ekler",
+      "areaScope": {
+        "MECHANICAL": "Yalnızca mekanik BOM'a atanmış kod türlerinde aranır (Depo ayarları › Malzeme grupları).",
+        "ELECTRICAL": "Yalnızca elektrik BOM'una atanmış kod türlerinde aranır (Depo ayarları › Malzeme grupları)."
+      }
     },
     "quickCard": {
       "title": "Yeni ürün kartı",
@@ -523,6 +527,7 @@
       "PRICE_MISSING": "{{code}} bu kalem için fiyat vermedi.",
       "COMPARE_COUNT": "En fazla {{max}} teklif seçin.",
       "COMPARE_PDF_REQUIRED": "{{supplier}} ({{code}}): teklif PDF'i yok — önce PDF yükleyin.",
+      "COMPARE_PDF_MISSING": "{{supplier}} ({{code}}): teklif PDF dosyası sunucuda bulunamadı — PDF'i yeniden yükleyin.",
       "COMPARE_PDF_UNREADABLE": "{{supplier}}: teklif PDF'i okunamadı.",
       "COMPARISON_NOT_FOUND": "Karşılaştırma bulunamadı.",
       "MAILBOX_INVALID": "Posta kutusu bilgileri eksik ya da hatalı.",

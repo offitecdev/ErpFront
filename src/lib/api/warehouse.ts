@@ -4,6 +4,7 @@ import { apiClient } from '../axios';
 import { cachedQuery, readQuery, refreshQuery } from './queryCache';
 import type {
     WarehouseAvailability,
+    WarehouseBomArea,
     WarehouseCatalog,
     WarehouseCategory,
     WarehouseExport,
@@ -94,9 +95,9 @@ export const warehouseApi = {
 
     /* Hauptkategorien und Materialgruppen */
     catalog: async (): Promise<WarehouseCatalog> => (await apiClient.get('/warehouse/material-groups')).data,
-    createCategory: async (input: { name: string; code: string }): Promise<WarehouseCategory> =>
+    createCategory: async (input: { name: string; code: string; bomArea?: WarehouseBomArea }): Promise<WarehouseCategory> =>
         (await apiClient.post('/warehouse/categories', input)).data,
-    updateCategory: async (id: string, input: { name?: string; code?: string }): Promise<WarehouseCategory> =>
+    updateCategory: async (id: string, input: { name?: string; code?: string; bomArea?: WarehouseBomArea }): Promise<WarehouseCategory> =>
         (await apiClient.patch(`/warehouse/categories/${id}`, input)).data,
     removeCategory: async (id: string): Promise<void> => { await apiClient.delete(`/warehouse/categories/${id}`); },
     createGroup: async (input: { categoryId: string; name: string; code: string }): Promise<WarehouseGroup> =>

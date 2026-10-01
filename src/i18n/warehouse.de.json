@@ -340,7 +340,8 @@
       "RECEIPT_UNDO_INVALID": "Dieser Wareneingang lässt sich nicht mehr zurücknehmen — Bestellung oder Protokoll haben sich geändert.",
       "UNIT_INVALID": "Diese Einheit ist unbekannt.",
       "SUPPLIER_EMAIL_INVALID": "Ungültige E-Mail für «{{name}}»: {{email}}",
-      "PRODUCT_INCOMPLETE": "Pflichtangaben fehlen — die Karte lässt sich nur als Entwurf speichern."
+      "PRODUCT_INCOMPLETE": "Pflichtangaben fehlen — die Karte lässt sich nur als Entwurf speichern.",
+      "CATEGORY_BOM_AREA_INVALID": "Unbekannter BOM-Bereich."
     },
     "settings": {
       "title": "Depo-Einstellungen",
@@ -389,7 +390,24 @@
       "codesAssigned_one": "{{count}} Karte hat einen ERP-Code bekommen.",
       "codesAssigned_other": "{{count}} Karten haben einen ERP-Code bekommen.",
       "groupCount_one": "{{count}} Gruppe",
-      "groupCount_other": "{{count}} Gruppen"
+      "groupCount_other": "{{count}} Gruppen",
+      "bomArea": {
+        "label": "BOM-Bereich",
+        "MECHANICAL": "Mechanik",
+        "ELECTRICAL": "Elektrik",
+        "BOTH": "Beide",
+        "inList": {
+          "MECHANICAL": "Mechanik-BOM",
+          "ELECTRICAL": "Elektrik-BOM",
+          "BOTH": "Mechanik- + Elektrik-BOM"
+        },
+        "hint": {
+          "MECHANICAL": "{{code}}-Material erscheint nur in der Suche mechanischer BOMs.",
+          "ELECTRICAL": "{{code}}-Material erscheint nur in der Suche elektrischer BOMs.",
+          "BOTH": "{{code}}-Material erscheint in der Suche mechanischer und elektrischer BOMs."
+        },
+        "saved": "{{code}} → {{area}} gespeichert."
+      }
     },
     "labels": {
       "size": "Etikettengrösse",

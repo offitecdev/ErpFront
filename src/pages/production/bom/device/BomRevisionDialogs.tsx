@@ -9,7 +9,7 @@ import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBo
 import type { Bom, BomLineChange, BomOrderAction, BomRevisionPreview } from '@/types/productionBom';
 
 import { fmtQty, orderUnitLabel, shownPurchaseCode, unitLabel } from '../bomFormat';
-import { Note } from '../bomUi';
+import { LoadingState, Note } from '../bomUi';
 import { PurchaseStatus } from './PurchaseStatus';
 
 /**
@@ -309,7 +309,7 @@ export const RevisionApproveDialog = ({
         >
             <div className="ofi-bom-pop ofi-bom-revdialog">
                 {error && <Note tone="error">{error}</Note>}
-                {!preview && loading && <div className="ofi-bom-state" aria-busy="true"><span className="ofi-bom-spinner" /></div>}
+                {!preview && loading && <LoadingState />}
                 {preview && (
                     <div className={`ofi-bom-revdialog__body${loading ? ' is-loading' : ''}`}>
                         {preview.reason && (

@@ -14,6 +14,7 @@ export const BOM_UNITS: BomUnit[] = ['PCS', 'M', 'KG', 'SET', 'PACK'];
 
 /** Makine ↔ Mekanik, Elektrik ↔ Elektrik. */
 export const CATEGORY_OF_AREA: Record<BuiltInArea, BomCategory> = { MECHANICAL: 'MACHINE', ELECTRICAL: 'ELECTRICAL' };
+export const AREA_OF_CATEGORY: Record<BomCategory, BuiltInArea> = { MACHINE: 'MECHANICAL', ELECTRICAL: 'ELECTRICAL' };
 
 /** Ein Alt-BOM-Kod der Einstellungen (MAK-COOL · Soğutma devresi). */
 export interface BomCode {

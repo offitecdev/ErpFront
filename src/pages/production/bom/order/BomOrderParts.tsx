@@ -8,6 +8,7 @@ import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBo
 import type { BomOrigin } from '@/types/productionBom';
 import '@/styles/modules/productionBom.css';
 
+import { BomSpinner } from '../bomUi';
 import { openQuoteFile } from '../device/bomFiles';
 
 /** Der Weg zurück in die BOM — genau zu dieser Bestellung. */
@@ -119,12 +120,12 @@ export const BomOrderBanner = ({
                     </span>
                     {hasFile ? (
                         <button type="button" className="ofi-bom-btn is-small is-quiet ofi-nosize" disabled={busy} onClick={() => void openQuoteFile(purchaseOrderId)}>
-                            {busy ? <span className="ofi-bom-spinner is-small" /> : <Eye />}
+                            {busy ? <BomSpinner small /> : <Eye />}
                             {t('productionBom.purchase.view')}
                         </button>
                     ) : (
                         <button type="button" className="ofi-bom-btn is-small ofi-nosize" disabled={busy} onClick={() => fileRef.current?.click()}>
-                            {busy ? <span className="ofi-bom-spinner is-small" /> : <Upload />}
+                            {busy ? <BomSpinner small /> : <Upload />}
                             {t('productionBom.purchase.upload')}
                         </button>
                     )}

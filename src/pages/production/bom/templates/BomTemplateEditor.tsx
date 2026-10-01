@@ -2,10 +2,10 @@ import { Copy, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { t } from '@/i18n/translate';
-import type { BomCategory, BomProduct, BomTemplateSummary, BomUnit } from '@/types/productionBom';
+import { AREA_OF_CATEGORY, type BomCategory, type BomProduct, type BomTemplateSummary, type BomUnit } from '@/types/productionBom';
 
 import { BomLinesTable } from '../BomLinesTable';
-import { Note } from '../bomUi';
+import { BomSpinner, Note } from '../bomUi';
 import { ProductSearch } from '../ProductSearch';
 import { addProduct, draftRows, type TemplateDraft } from './templateDraft';
 
@@ -87,7 +87,7 @@ export const BomTemplateEditor = ({
                     )}
                     {canEdit && (
                         <button type="button" className="ofi-bom-btn is-primary ofi-nosize" disabled={!dirty || saving} onClick={onSave} title="⌘S">
-                            {saving ? <span className="ofi-bom-spinner is-small is-light" /> : <Save />}
+                            {saving ? <BomSpinner small /> : <Save />}
                             {saving ? t('productionBom.common.saving') : t('productionBom.common.save')}
                         </button>
                     )}
@@ -155,7 +155,7 @@ export const BomTemplateEditor = ({
                         <span className="ofi-bom-group__meta">{t('productionBom.templates.usedBy', { count: summary.usedBy })}</span>
                     )}
                 </h3>
-                {canEdit && <ProductSearch onPick={pick} />}
+                {canEdit && <ProductSearch area={AREA_OF_CATEGORY[draft.category]} onPick={pick} />}
                 <BomLinesTable
                     rows={draftRows(draft.lines)}
                     mode="template"
