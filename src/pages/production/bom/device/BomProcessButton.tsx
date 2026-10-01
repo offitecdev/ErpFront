@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Minus } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
-import type { Bom } from '@/types/productionBom';
+import type { Bom, BomSummary } from '@/types/productionBom';
 
 import { bomProcess } from './bomProcess';
 
@@ -64,7 +64,7 @@ const EDGE = 8;
  * Kreise nacheinander aufgehen — erledigt (blauer Haken), dran (Ring),
  * offen (Nummer), übersprungen (Strich). Keine Lieferanten, keine Preise.
  */
-export const BomProcessButton = ({ bom, subs = [] }: { bom: Bom; subs?: Bom[] }) => {
+export const BomProcessButton = ({ bom, subs = [] }: { bom: Bom; subs?: BomSummary[] }) => {
     const process = bomProcess(bom, subs);
     const container = bom.kind === 'MAIN' && bom.lines.length === 0;
     const [open, setOpen] = useState(false);

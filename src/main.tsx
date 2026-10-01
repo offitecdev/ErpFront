@@ -1,3 +1,6 @@
+// Grosse Bildschirme: rechnet die Browser-Koordinaten in den gezoomten
+// Seitenraum um — MUSS vor jedem Modul laufen, das misst.
+import './lib/uiZoom'
 import { StrictMode, startTransition, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/fonts.css'

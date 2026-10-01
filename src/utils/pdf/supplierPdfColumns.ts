@@ -23,9 +23,12 @@
  *
  * OHNE Schnappschuss (Bestellungen vor dem 11.09.2026) entsteht genau die
  * bisherige Reihenfolge: Beschreibung, eigene Spalten, Menge, Preise.
- * Der ERP-Code steht nie im PDF; ausgeblendete Schluessel (`hiddenColumnKeys`)
- * bleiben weg. Beide Lieferanten-PDFs (Bestellung, Preisanfrage) lesen NUR
- * diese Liste — Titel, Masse und Zeilen sehen dieselben Spalten.
+ * Der ERP-Code steht nie im PDF — weder das Feld `code` noch die fruehere
+ * ERP-Spalte einer BOM-Bestellung (`stdErp`; Samet, 29.09.2026: «sipariş
+ * PDF'lerinde ERP kodları gözükmesin»); ausgeblendete Schluessel
+ * (`hiddenColumnKeys`) bleiben weg. Beide Lieferanten-PDFs (Bestellung,
+ * Preisanfrage) lesen NUR diese Liste — Titel, Masse und Zeilen sehen
+ * dieselben Spalten.
  */
 import type { PurchaseOrderRow, TemplateLabel } from '../../types/inventory';
 import type { PurchaseDocLang } from '../purchaseCode';
@@ -57,7 +60,16 @@ export interface SupplierPdfColumnOptions {
     maxExtras: number;
     /** Sprache des Blatts — die Standardvorlage (`std…`) benennt ihre Spalten danach. */
     lang?: PurchaseDocLang;
+    /**
+     * Eine freie Spalte, deren Zellen in ALLEN Positionen leer sind, fällt weg
+     * (01.10.2026, Samet: «bir sütunun tüm hücreleri boş ise o sütunu gösterme»
+     * — etwa die Produkttyp-/Bestellnummer, wenn der Lieferant keine hat).
+     */
+    dropEmptyExtras?: boolean;
 }
+
+/** Unsere Hausnummern — nie auf einem Blatt fuer den Lieferanten, egal was die Bestellung traegt. */
+const NEVER_PRINTED = new Set(['code', 'stdErp']);
 
 /** Welche feste Spalte eine Zuordnung der Vorlage bedeutet. */
 const LABEL_KIND: Record<TemplateLabel, SupplierPdfFixedKind> = {
@@ -95,8 +107,12 @@ export function resolveSupplierPdfColumns(order: PurchaseOrderRow, options: Supp
     const columns: SupplierPdfColumn[] = [];
     let extras = 0;
 
+    const filled = (key: string): boolean => (order.items ?? []).some((item) =>
+        String(item.extras?.find((entry) => entry?.key === key)?.value ?? '').trim() !== '');
+
     const pushExtra = (key: string, caption: string) => {
-        if (options.hidden.has(key) || placedKeys.has(key) || extras >= options.maxExtras) return;
+        if (NEVER_PRINTED.has(key) || options.hidden.has(key) || placedKeys.has(key) || extras >= options.maxExtras) return;
+        if (options.dropEmptyExtras && !filled(key)) return;
         placedKeys.add(key);
         extras += 1;
         columns.push({ kind: 'extra', key, caption });

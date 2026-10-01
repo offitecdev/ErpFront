@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, FolderTree, LayoutTemplate, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
-import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBom';
+import { productionBomApi, productionBomErrorText, readBomTemplates } from '@/lib/api/productionBom';
+import { LoadingState } from '../bomUi';
 import type { Bom, BomCode, BomTemplate, BomTemplateSummary } from '@/types/productionBom';
 
 /**
@@ -117,19 +118,30 @@ export const AddSubBomDialog = ({
 export const InsertTemplateDialog = ({
     open,
     bom,
-    templates,
     factor,
     onClose,
     onInsert,
 }: {
     open: boolean;
     bom: Bom;
-    templates: BomTemplateSummary[];
     factor: number;
     onClose: () => void;
     onInsert: (template: BomTemplate) => void;
 }) => {
     const navigate = useNavigate();
+    const [templates, setTemplates] = useState<BomTemplateSummary[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [retry, setRetry] = useState(0);
+    useEffect(() => {
+        if (!open) return;
+        setLoading(true);
+        setError(null);
+        return readBomTemplates(
+            (value) => { setTemplates(value.items.filter((entry) => entry.category === (bom.area === 'ELECTRICAL' ? 'ELECTRICAL' : 'MACHINE'))); setLoading(false); },
+            (failure) => { setError(productionBomErrorText(failure)); setLoading(false); },
+        );
+    }, [open, bom.area, retry]);
     const [chosen, setChosen] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const selected = chosen && templates.some((template) => template.id === chosen) ? chosen : null;
@@ -165,14 +177,16 @@ export const InsertTemplateDialog = ({
             footer={(
                 <PopupActions>
                     <PopupButton onClick={onClose} disabled={busy}>{t('productionBom.common.cancel')}</PopupButton>
-                    <PopupButton variant="primary" disabled={!selected} loading={busy} onClick={() => void insert()}>
+                    <PopupButton variant="primary" disabled={!selected || loading || Boolean(error)} loading={busy} onClick={() => void insert()}>
                         {t('productionBom.insert.add')}
                     </PopupButton>
                 </PopupActions>
             )}
         >
             <div className="ofi-bom-pop ofi-bom-pickpanel">
-                {templates.length ? (
+                {loading ? <LoadingState /> : error ? <div className="ofi-bom-state is-error"><b>{error}</b>
+                    <button type="button" className="ofi-bom-btn ofi-nosize" onClick={() => setRetry((value) => value + 1)}>{t('productionBom.common.retry')}</button>
+                </div> : templates.length ? (
                     [...groups.entries()].map(([mainCard, list]) => (
                         <div key={mainCard} className="ofi-bom-pickpanel__group">
                             <span className="ofi-bom-pickpanel__caption">{mainCard}</span>

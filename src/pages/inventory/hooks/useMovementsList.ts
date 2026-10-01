@@ -12,8 +12,9 @@ export interface MovementColumnFilters {
     description: string;
 }
 
-/** Schnellwahl des Zeitraums (10.09.2026): Heute, Diese Woche, Dieser Monat, Dieses Jahr, Gesamt. */
-export type QuickRange = 'today' | 'week' | 'month' | 'year' | 'all';
+/** Schnellwahl des Zeitraums (10.09.2026): Heute, Diese Woche, Dieser Monat, Dieses Jahr, Gesamt.
+    29.09.2026: + «Letzter Monat» (die Wahl der neuen Stok-Hareketleri-Seite). */
+export type QuickRange = 'today' | 'week' | 'month' | 'lastMonth' | 'year' | 'all';
 
 const ISO = 'YYYY-MM-DD';
 export const quickRangeBounds = (range: QuickRange): { from: string; to: string } => {
@@ -22,6 +23,10 @@ export const quickRangeBounds = (range: QuickRange): { from: string; to: string 
         case 'today': return { from: now.format(ISO), to: now.format(ISO) };
         case 'week': return { from: now.startOf('isoWeek').format(ISO), to: now.endOf('isoWeek').format(ISO) };
         case 'month': return { from: now.startOf('month').format(ISO), to: now.endOf('month').format(ISO) };
+        case 'lastMonth': {
+            const last = now.subtract(1, 'month');
+            return { from: last.startOf('month').format(ISO), to: last.endOf('month').format(ISO) };
+        }
         case 'year': return { from: now.startOf('year').format(ISO), to: now.endOf('year').format(ISO) };
         default: return { from: '', to: '' };
     }
@@ -36,7 +41,13 @@ export const quickRangeBounds = (range: QuickRange): { from: string; to: string 
  * Bestellung, Rapport/Projekt, manuell) und die Schnellwahl des Zeitraums;
  * das Suchfeld deckt ERP-Code, Bezeichnung, Modell, Serie und Barcode ab.
  */
-export const useMovementsList = ({ articleId }: { articleId?: string } = {}) => {
+export const useMovementsList = ({ articleId, kinds, origins }: {
+    articleId?: string;
+    /** Mehrfachwahl der Typen (Stok Hareketleri, 29.09.2026) — gesteuert von der Seite. */
+    kinds?: MovementKind[];
+    /** Mehrfachwahl der Herkunft — gesteuert von der Seite. */
+    origins?: MovementOrigin[];
+} = {}) => {
     const [items, setItems] = useState<MovementListItem[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -52,15 +63,18 @@ export const useMovementsList = ({ articleId }: { articleId?: string } = {}) => 
 
     const debouncedSearch = useDebouncedValue(search);
     const debouncedFilters = useDebouncedValue(filters);
+    /* Die Listen als Schlüssel: ein neues Array mit demselben Inhalt lädt nicht neu. */
+    const kindsKey = (kinds ?? []).join(',');
+    const originsKey = (origins ?? []).join(',');
 
-    useEffect(() => { setPage(1); }, [debouncedSearch, type, origin, dateFrom, dateTo, debouncedFilters]);
+    useEffect(() => { setPage(1); }, [debouncedSearch, type, origin, kindsKey, originsKey, dateFrom, dateTo, debouncedFilters]);
 
     const [reloadTick, setReloadTick] = useState(0);
     const reload = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
     /** Welche Schnellwahl die Grenzen gerade beschreiben — oder keine, wenn von Hand gewählt. */
     const quickRange = useMemo<QuickRange | null>(() => {
-        for (const range of ['today', 'week', 'month', 'year', 'all'] as QuickRange[]) {
+        for (const range of ['today', 'week', 'month', 'lastMonth', 'year', 'all'] as QuickRange[]) {
             const bounds = quickRangeBounds(range);
             if (bounds.from === dateFrom && bounds.to === dateTo) return range;
         }
@@ -87,6 +101,8 @@ export const useMovementsList = ({ articleId }: { articleId?: string } = {}) => 
                 description: debouncedFilters.description || undefined,
                 type: type || undefined,
                 origin: origin || undefined,
+                kinds: kindsKey ? (kindsKey.split(',') as MovementKind[]) : undefined,
+                origins: originsKey ? (originsKey.split(',') as MovementOrigin[]) : undefined,
                 dateFrom: dateFrom || undefined,
                 dateTo: dateTo || undefined,
             })
@@ -100,7 +116,7 @@ export const useMovementsList = ({ articleId }: { articleId?: string } = {}) => 
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [articleId, page, debouncedSearch, type, origin, dateFrom, dateTo, debouncedFilters, reloadTick]);
+    }, [articleId, page, debouncedSearch, type, origin, kindsKey, originsKey, dateFrom, dateTo, debouncedFilters, reloadTick]);
 
     const totalPages = useMemo(() => Math.max(1, Math.ceil(total / MOVEMENTS_PAGE_SIZE)), [total]);
 

@@ -8,6 +8,7 @@ import { ProductionSettingsPage } from '../bom/ProductionSettingsPage';
 import { BomTemplatesPage } from '../bom/templates/BomTemplatesPage';
 import { TaskTemplatesPage } from '../tasks/TaskTemplatesPage';
 import { ProductionAccessPage } from './ProductionAccessPage';
+import { ProductionMailPage } from './mail/ProductionMailPage';
 import { ProductionHubTabs, TEMPLATE_TABS, type HubTab } from './ProductionHubTabs';
 
 /**
@@ -23,6 +24,8 @@ import { ProductionHubTabs, TEMPLATE_TABS, type HubTab } from './ProductionHubTa
 const SETTINGS_TABS: HubTab[] = [
     { key: 'general', path: '/production/settings', labelKey: 'productionBom.hub.settingsTab' },
     { key: 'access', path: '/production/settings/access', labelKey: 'productionBom.hub.accessTab' },
+    // Die Postfächer der Automatik (rfq@…, Bestellungen) — 30.09.2026.
+    { key: 'mail', path: '/production/settings/mail', labelKey: 'productionBom.hub.mailTab' },
 ];
 
 /** Die Vorlagen-Reiter, die diese Anmeldung sehen darf. */
@@ -47,11 +50,12 @@ export const ProductionTemplatesHub = ({ tab }: { tab: 'tasks' | 'bom' }) => {
     return tab === 'tasks' ? <TaskTemplatesPage tabs={strip} /> : <BomTemplatesPage tabs={strip} />;
 };
 
-export const ProductionSettingsHub = ({ tab }: { tab: 'general' | 'access' }) => {
+export const ProductionSettingsHub = ({ tab }: { tab: 'general' | 'access' | 'mail' }) => {
     useLanguageTick();
     const isSystemAdmin = useAuthStore((state) => state.isSystemAdmin);
     if (!isSystemAdmin) return <Navigate to="/production/orders" replace />;
     const strip = <ProductionHubTabs tabs={SETTINGS_TABS} active={tab} label="nav.productionSettingsMenu" />;
+    if (tab === 'mail') return <ProductionMailPage tabs={strip} />;
     return tab === 'general' ? <ProductionSettingsPage tabs={strip} /> : <ProductionAccessPage tabs={strip} />;
 };
 
@@ -61,3 +65,4 @@ export const ProductionTemplatesTasksPage = () => <ProductionTemplatesHub tab="t
 export const ProductionTemplatesBomPage = () => <ProductionTemplatesHub tab="bom" />;
 export const ProductionSettingsGeneralPage = () => <ProductionSettingsHub tab="general" />;
 export const ProductionSettingsAccessPage = () => <ProductionSettingsHub tab="access" />;
+export const ProductionSettingsMailPage = () => <ProductionSettingsHub tab="mail" />;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, Ellipsis, ShoppingCart, Tag } from 'lucide-react';
+import { ChevronLeft, Ellipsis } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
@@ -9,21 +9,21 @@ import { purchasingApi } from '@/lib/api/purchasing';
 import type { ProcurementDetail } from '@/types/purchasing';
 
 import { shortDate } from '../../bom/bomFormat';
-import { daysLeft, daysText, eventText, isUrgent, whenText } from '../purchasingModel';
-import { StageText } from '../purchasingUi';
+import { daysLeft, daysText, isUrgent, whenText } from '../purchasingModel';
+import { KindPill, StageText } from '../purchasingUi';
 
 const P = 'productionBom.purchasing';
 
 /**
- * Kopf des Talep: zurück · Nummer · Art · Stand, rechts der letzte Handgriff
- * («son işlem hep gözüksün») und ⋯ (Tamamlandı say · İptal et · Yeniden aç).
- * Darunter die fünf Angaben, die jeder Schritt braucht.
+ * Kopf des Talep: zurück · Nummer · Art · Stand und rechts ⋯ (Tamamlandı say ·
+ * İptal et). Darunter die fünf Angaben, die jeder Schritt braucht. Den letzten
+ * Handgriff zeigt seit dem 29.09.2026 nur noch die Liste («işlem geçmişi
+ * olmayacak»).
  */
 export const RequestHead = ({ detail, onBack, onChanged }: { detail: ProcurementDetail; onBack: () => void; onChanged: () => void }) => {
-    const { request, bom, stage, history, canProcure } = detail;
+    const { request, bom, stage, canProcure } = detail;
     const [menu, setMenu] = useState<HTMLElement | null>(null);
     const [busy, setBusy] = useState(false);
-    const last = history[0] ?? null;
     const open = request.status === 'OPEN' || request.status === 'IN_PROGRESS';
     const delivery = request.project?.deliveryDate ?? null;
     const days = open ? daysLeft(delivery) : null;
@@ -41,7 +41,8 @@ export const RequestHead = ({ detail, onBack, onChanged }: { detail: Procurement
             setBusy(false);
         }
     };
-    const actions: Array<'close' | 'cancel'> = ['close', 'cancel'];
+    // Ein geschlossener Talep lässt sich wieder öffnen — etwa für weitere Lieferanten (29.09.2026).
+    const actions: Array<'close' | 'cancel' | 'reopen'> = open ? ['close', 'cancel'] : request.status === 'DONE' ? ['reopen'] : [];
 
     return (
         <>
@@ -51,22 +52,12 @@ export const RequestHead = ({ detail, onBack, onChanged }: { detail: Procurement
                     {t(`${P}.back`)}
                 </button>
                 <h1 className="is-code">{request.requestNumber}</h1>
-                <span className="ofi-buy-kind">
-                    {request.kind === 'PRICE' ? <Tag aria-hidden /> : <ShoppingCart aria-hidden />}
-                    {t(`productionBom.procurement.kind.${request.kind}`)}
-                </span>
+                <KindPill kind={request.kind} ordered={detail.docs.some((doc) => doc.kind === 'ORDER' && doc.state !== 'CANCELLED')} />
                 <StageText stage={stage} />
-                {last && (
-                    <span className="ofi-buy-last">
-                        <small>{t(`${P}.col.last`)}</small>
-                        <b>{eventText(last)}</b>
-                        <small>{[last.actorName, whenText(last.at)].filter(Boolean).join(' · ')}</small>
-                    </span>
-                )}
-                {canProcure && open && (
+                {canProcure && actions.length > 0 && (
                     <button
                         type="button"
-                        className="ofi-buy-btn is-icon ofi-nosize"
+                        className="ofi-buy-btn is-icon ofi-nosize ofi-buy-more"
                         aria-label={t(`${P}.more`)}
                         aria-expanded={Boolean(menu)}
                         disabled={busy}
@@ -87,10 +78,15 @@ export const RequestHead = ({ detail, onBack, onChanged }: { detail: Procurement
             </AnchoredPicker>
 
             <dl className="ofi-buy-facts">
+                {/* Projektnummer und Kommission (= Projektname) getrennt — 29.09.2026. */}
                 <div>
                     <dt>{t(`${P}.col.project`)}</dt>
-                    <dd>{request.project?.projectName || request.project?.customerName || '—'}</dd>
-                    <dd className="is-sub is-code">{request.project?.projectNumber ?? ''}</dd>
+                    <dd className="is-code">{request.project?.projectNumber || '—'}</dd>
+                    <dd className="is-sub">{request.project?.customerName ?? ''}</dd>
+                </div>
+                <div>
+                    <dt>{t(`${P}.col.commission`)}</dt>
+                    <dd>{request.project?.projectName || '—'}</dd>
                 </div>
                 <div>
                     <dt>{t(`${P}.col.device`)}</dt>

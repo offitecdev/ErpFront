@@ -71,3 +71,43 @@
 .ofi-pur-docitem + .ofi-pur-docitem { border-top: 1px solid var(--bom-hairline); }
 #root .ofi-bom .ofi-pur-docitem > button.ofi-pur-docrow { flex: 1; min-width: 0; }
 #root .ofi-bom .ofi-pur-docitem > .ofi-pur-docitem__act { flex: none; margin: 0 12px 0 0; }
+
+/* ── Üretim › Ayarlar › E-posta (30.09.2026): die Postfächer der Automatik ── */
+.ofi-pmail-page { display: flex; flex-direction: column; min-width: 0; overflow-y: auto; }
+.ofi-pmail__intro { margin: 0; color: var(--bom-secondary, #6e6e73); font-size: 12.5px; line-height: 1.5; }
+.ofi-pmail__pill { display: inline-flex; align-items: center; height: 18px; padding: 0 8px; border-radius: 9px; font-size: 11px; font-weight: 600; }
+.ofi-pmail__pill.is-on { background: rgba(52, 199, 89, 0.14); color: #1b7a34; }
+.ofi-pmail__pill.is-off { background: var(--bom-fill, rgba(0, 0, 0, 0.045)); color: var(--bom-secondary, #6e6e73); }
+.ofi-pmail__pill.is-warn { background: rgba(255, 149, 0, 0.16); color: #b25000; }
+.dark .ofi-pmail__pill.is-on { background: rgba(48, 209, 88, 0.2); color: #7ee29a; }
+.dark .ofi-pmail__pill.is-warn { background: rgba(255, 159, 10, 0.2); color: #ffb340; }
+.ofi-pmail__hostport { flex-wrap: nowrap !important; }
+#root .ofi-bom .ofi-pmail__hostport > .ofi-bom-input:first-child { flex: 1 1 auto; }
+#root .ofi-bom .ofi-pmail__hostport > .ofi-bom-input:last-child { flex: none; width: 76px; text-align: center; }
+.ofi-pmail__servers .ofi-bom-row__chev { transition: transform 200ms ease; }
+.ofi-pmail__servers .ofi-bom-row__chev.is-open { transform: rotate(180deg); }
+.ofi-pmail__last,
+.ofi-pmail__test { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 2px 4px 0; color: var(--bom-secondary, #6e6e73); font-size: 11.5px; }
+.ofi-pmail__last > svg { flex: none; width: 13px; height: 13px; color: var(--bom-success, #1f8a3b); }
+.ofi-pmail__last.is-warn { color: var(--bom-warning, #b25000); }
+.ofi-pmail__last.is-warn > svg { color: currentColor; }
+.ofi-pmail__test > span { display: inline-flex; align-items: center; gap: 5px; }
+.ofi-pmail__test > span::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.ofi-pmail__test > span.is-ok { color: var(--bom-success, #1f8a3b); }
+.ofi-pmail__test > span.is-warn { color: var(--bom-danger, #d70015); }
+.ofi-pmail__acts { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.ofi-pmail__gap { flex: 1; }
+.ofi-pmail__right { justify-content: flex-end; }
+.ofi-pmail__check {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--bom-border, rgba(0, 0, 0, 0.1));
+    border-radius: 12px;
+    background: var(--bom-surface, #fff);
+}
+.ofi-pmail__check > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-pmail__check b { font-size: 13px; font-weight: 600; }
+.ofi-pmail__check small { color: var(--bom-secondary, #6e6e73); font-size: 11.5px; }

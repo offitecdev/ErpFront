@@ -54,7 +54,7 @@ export const ReportsSheet = ({
                 /* Tall as well as wide: the sheet used to be square (height tied to
                    its own width), which left the editor scrolling inside a short
                    box. It now takes the screen like the calendar's modal does. */
-                style={{ maxWidth: width, height: 'calc(100dvh - 40px)' }}
+                style={{ maxWidth: width, height: 'calc(100dvh / var(--ofi-zoom, 1) - 40px)' }}
             >
                 <header className="relative border-b border-slate-200 dark:border-white/10">
                     <div className="mx-auto flex min-h-[64px] w-full max-w-[1400px] items-center justify-between gap-4 px-6 py-3 pr-16 sm:px-8 sm:pr-20">

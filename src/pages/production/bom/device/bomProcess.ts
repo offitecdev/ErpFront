@@ -1,4 +1,4 @@
-import type { Bom, BomProcurementSummary } from '@/types/productionBom';
+import type { Bom, BomSummary, BomProcurementSummary } from '@/types/productionBom';
 
 /**
  * ── DER WEG EINER BOM (27.09.2026 abends, Vorgabe Samet) ─────────────────────
@@ -9,8 +9,9 @@ import type { Bom, BomProcurementSummary } from '@/types/productionBom';
  *
  * Die Stationen, gerechnet aus der BOM (ohne Lieferant, ohne Preis):
  *
- *   Liste › Fiyat talebi (wahlweise) › Onay › Sipariş talebi › Satın alma ›
- *   Tedarikçi onayı › Mal kabul & rezerve › Tamamlandı › Stoktan düşüldü
+ *   Liste › Onay › Fiyat talebi › Satın alma › Tedarikçi onayı ›
+ *   Mal kabul & rezerve › Tamamlandı › Stoktan düşüldü
+ *   (die Station «Sipariş talebi» gibt es seit dem 30.09.2026 nicht mehr)
  *
  * Jede Station ist erledigt, dran, offen oder übersprungen. Die erste offene
  * ist «şu an»; was danach kommt, ist «kalan». Eine Haupt-BOM ohne eigene
@@ -22,7 +23,6 @@ export type BomStepKey =
     | 'list'
     | 'price'
     | 'approve'
-    | 'orderRequest'
     | 'purchasing'
     | 'confirmed'
     | 'received'
@@ -42,48 +42,42 @@ export interface BomStep {
 }
 
 export const BOM_STEP_KEYS: BomStepKey[] = [
-    'list', 'price', 'approve', 'orderRequest', 'purchasing', 'confirmed', 'received', 'completed', 'consumed',
+    'list', 'approve', 'price', 'purchasing', 'confirmed', 'received', 'completed', 'consumed',
 ];
 
 const OPEN = new Set(['OPEN', 'IN_PROGRESS']);
-const LIVE = new Set(['OPEN', 'IN_PROGRESS', 'DONE']);
 const EPS = 1e-9;
 
 interface RawStep { key: BomStepKey; done: boolean; skipped?: boolean; optional?: boolean; count?: [number, number] | null }
 
 /** Die Stationen EINER BOM mit eigenen Zeilen. */
-const rawSteps = (bom: Bom): RawStep[] => {
+const rawSteps = (bom: BomSummary): RawStep[] => {
     const consumed = Boolean(bom.consumedAt);
     const approved = bom.status !== 'DRAFT' || consumed;
-    const requests: BomProcurementSummary[] = bom.procurement ?? [];
-    const price = requests.filter((entry) => entry.kind === 'PRICE' && LIVE.has(entry.status));
-    const orders = requests.filter((entry) => entry.kind === 'ORDER' && LIVE.has(entry.status));
-    const lines = bom.lines.length;
+    const detail = 'lines' in bom ? bom as Bom : null;
+    const lines = bom.counts.lines;
 
-    // Was fehlt, und was davon schon beim Einkauf liegt.
-    const requested = new Set(orders.flatMap((entry) => entry.lines.map((line) => line.bomLineId)));
-    const missingLines = bom.lines.filter((line) => line.coverage.missing > EPS);
-    const missingRequested = missingLines.filter((line) => requested.has(line.id)).length;
-    const orderDocs = bom.purchases.filter((purchase) => purchase.kind === 'ORDER');
-    const confirmedDocs = orderDocs.filter((purchase) => purchase.checks.confirmed).length;
-    const priceDone = price.filter((entry) => entry.status === 'DONE' || entry.progress.covered >= entry.progress.total).length;
+    /* «Bomda artık sipariş talebi yok, sadece fiyat talebi var» (30.09.2026): der
+       Einkauf beginnt mit dem Fiyat talebi (auch nach der Freigabe) — bestellt wird
+       aus dem Vergleich der Angebote. Gebraucht wird er für jede Zeile, der etwas
+       fehlt (im Entwurf: jede Zeile). */
+    const asked = detail ? priceRequestedLines(detail) : new Map<string, string>();
+    const needingLines = (detail?.lines ?? []).filter((line) => !approved || line.coverage.missing > EPS);
+    const needing = bom.activity?.needing ?? needingLines.length;
+    const askedNeeding = bom.activity?.requestedNeeding ?? needingLines.filter((line) => asked.has(line.id)).length;
+    const orderDocs = (detail?.purchases ?? []).filter((purchase) => purchase.kind === 'ORDER');
+    const orderCount = bom.activity?.orderCount ?? orderDocs.length;
+    const confirmedDocs = bom.activity?.confirmedOrders ?? orderDocs.filter((purchase) => purchase.checks.confirmed).length;
 
     return [
         { key: 'list', done: approved || lines > 0, count: lines ? [lines, lines] : null },
-        {
-            key: 'price',
-            optional: true,
-            // Ohne Anfrage ist sie nach der Freigabe übersprungen; davor offen, aber wahlweise.
-            done: price.length > 0 && priceDone === price.length,
-            skipped: price.length === 0 && approved,
-            count: price.length ? [priceDone, price.length] : null,
-        },
         { key: 'approve', done: approved },
         {
-            key: 'orderRequest',
-            // Erledigt, wenn nichts fehlt, das nicht schon angefragt wäre.
-            done: approved && missingLines.length === missingRequested,
-            count: approved && missingLines.length ? [missingRequested, missingLines.length] : null,
+            key: 'price',
+            done: needing > 0 && askedNeeding === needing,
+            // Nichts fehlt (alles am Lager) — dann braucht es keine Anfrage.
+            skipped: approved && needing === 0,
+            count: needing ? [askedNeeding, needing] : null,
         },
         {
             key: 'purchasing',
@@ -93,7 +87,7 @@ const rawSteps = (bom: Bom): RawStep[] => {
         {
             key: 'confirmed',
             done: approved && bom.completion.ordered && bom.completion.confirmed,
-            count: orderDocs.length ? [confirmedDocs, orderDocs.length] : null,
+            count: orderCount ? [confirmedDocs, orderCount] : null,
         },
         {
             key: 'received',
@@ -131,13 +125,14 @@ const withStates = (raw: RawStep[]): BomStep[] => {
  * Die Klammer (Haupt-BOM ohne eigene Zeilen): jede Station über alle
  * Alt-BOMs — erledigt, wenn alle es sind; die Zahl sagt, wie viele.
  */
-const containerSteps = (main: Bom, subs: Bom[]): RawStep[] => {
+const containerSteps = (main: Bom, subs: BomSummary[]): RawStep[] => {
     if (!subs.length) {
-        return BOM_STEP_KEYS.map((key) => ({ key, done: false, optional: key === 'price' }));
+        return BOM_STEP_KEYS.map((key) => ({ key, done: false }));
     }
     const perSub = subs.map((sub) => withStates(rawSteps(sub)));
-    return BOM_STEP_KEYS.map((key, index) => {
-        const states = perSub.map((steps) => steps[index]!.state);
+    return BOM_STEP_KEYS.map((key) => {
+        // Nach dem SCHLÜSSEL, nicht nach der Stelle: eine Alt-BOM, der eine Station fehlt, zählt als offen.
+        const states = perSub.map((steps) => steps.find((step) => step.key === key)?.state ?? 'todo');
         const done = states.filter((state) => state === 'done').length;
         const skipped = states.filter((state) => state === 'skipped').length;
         if (key === 'completed') {
@@ -146,7 +141,6 @@ const containerSteps = (main: Bom, subs: Bom[]): RawStep[] => {
         if (key === 'consumed') return { key, done: Boolean(main.consumedAt) };
         return {
             key,
-            optional: key === 'price',
             done: done > 0 && done + skipped === subs.length,
             skipped: skipped === subs.length,
             count: [done, subs.length - skipped] as [number, number],
@@ -163,7 +157,7 @@ export interface BomProcess {
     progress: number;
 }
 
-export const bomProcess = (bom: Bom, subs: Bom[] = []): BomProcess => {
+export const bomProcess = (bom: Bom, subs: BomSummary[] = []): BomProcess => {
     const container = bom.kind === 'MAIN' && bom.lines.length === 0;
     const steps = withStates(container ? containerSteps(bom, subs) : rawSteps(bom));
     const required = steps.filter((step) => !step.optional && step.state !== 'skipped');
@@ -181,32 +175,29 @@ export const bomProcess = (bom: Bom, subs: Bom[] = []): BomProcess => {
 export const openRequests = (bom: Bom): BomProcurementSummary[] =>
     (bom.procurement ?? []).filter((entry) => OPEN.has(entry.status));
 
-/** Remaining quantities in the current draft, after open price requests. */
-export const priceRequestRemaining = (bom: Bom): Map<string, number> => {
-    const draft = bom.status !== 'DRAFT' ? bom.revisionDraft : null;
-    const lines = draft?.lines ?? bom.lines;
-    const revision = draft?.revision ?? bom.revision;
-    const remaining = new Map(lines.map((line) => [line.id, line.quantity]));
-    for (const request of openRequests(bom)) {
-        if (request.kind !== 'PRICE' || request.bomRevision !== revision) continue;
-        for (const line of request.lines) {
-            if (!remaining.has(line.bomLineId)) continue;
-            remaining.set(line.bomLineId, Math.round(Math.max(0, remaining.get(line.bomLineId)! - Math.max(0, line.quantity)) * 1000) / 1000);
-        }
+/**
+ * «Fiyat talebi alınan üründen bir daha fiyat talebi istenemeyecek» (Samet,
+ * 30.09.2026): eine Zeile, die in einem Fiyat talebi steht (jede Revision,
+ * nur ein verworfener zählt nicht), ist gesperrt — Zeile → Talep-Nummer.
+ * Dieselbe Regel wie der Server (`priceRequestedLineIds`).
+ */
+export const priceRequestedLines = (bom: Bom): Map<string, string> => {
+    if (bom.activity) return new Map(Object.entries(bom.activity.priceRequests));
+    const map = new Map<string, string>();
+    for (const entry of bom.procurement ?? []) {
+        if (entry.kind !== 'PRICE' || entry.status === 'CANCELLED') continue;
+        for (const line of entry.lines) if (!map.has(line.bomLineId)) map.set(line.bomLineId, entry.requestNumber);
     }
-    return remaining;
+    return map;
 };
 
-/** A partially requested PRICE line remains selectable for its remaining quantity. */
+/** PRICE: Zeilen in einem Fiyat talebi (gesperrt); ORDER: Zeilen in einem offenen Satın alma talebi. */
 export const pendingLineIds = (bom: Bom, kind: 'PRICE' | 'ORDER'): Map<string, string> => {
+    if (kind === 'PRICE') return priceRequestedLines(bom);
     const map = new Map<string, string>();
-    const remaining = kind === 'PRICE' ? priceRequestRemaining(bom) : null;
-    const revision = bom.status !== 'DRAFT' && bom.revisionDraft ? bom.revisionDraft.revision : bom.revision;
     for (const entry of openRequests(bom)) {
         if (entry.kind !== kind) continue;
-        if (kind === 'PRICE' && entry.bomRevision !== revision) continue;
         for (const line of entry.lines) {
-            if (remaining && (remaining.get(line.bomLineId) ?? 0) > EPS) continue;
             if (!map.has(line.bomLineId)) map.set(line.bomLineId, entry.requestNumber);
         }
     }

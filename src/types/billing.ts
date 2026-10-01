@@ -79,8 +79,13 @@ export type InvoiceStateKey = 'DRAFT' | 'OPEN' | 'OVERDUE' | 'PAID' | 'CANCELLED
 export type InvoiceSortKey = 'activity' | 'invoiceDate' | 'dueDate' | 'amount' | 'number';
 
 /** EINE Seite: die Zeilen, wie viele es insgesamt sind, die Zähler der Reiter. */
+export type InvoiceListSummary = Pick<InvoiceDto,
+    'id' | 'invoiceNumber' | 'kind' | 'category' | 'status' | 'invoiceDate' | 'dueDate'
+    | 'createdAt' | 'activityAt' | 'amount' | 'billedPercent' | 'paidAmount' | 'openAmount'
+    | 'recipientName' | 'customer' | 'project' | 'salesOrder' | 'reversesInvoice'>;
+
 export interface InvoicePageDto {
-    items: InvoiceDto[];
+    items: InvoiceListSummary[];
     total: number;
     page: number;
     pageSize: number;

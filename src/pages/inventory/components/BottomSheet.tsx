@@ -44,7 +44,7 @@ export const BottomSheet = ({
                 /* `.ofi-pop.is-sheet` — siehe index.css, "FENSTER-OBERFLÄCHE":
                    die zwei oberen Ecken in der Fensterkante der Anwendung. */
                 className="ofi-sheet ofi-sheet-up ofi-pop is-sheet relative flex w-full flex-col overflow-hidden"
-                style={{ maxWidth: width, height: `min(${height}px, 92vh)` }}
+                style={{ maxWidth: width, height: `min(${height}px, calc(92vh / var(--ofi-zoom, 1)))` }}
             >
                 <header className="ofi-pop__rule flex items-center justify-between gap-3 border-b px-4 py-3">
                     <div className="flex min-w-0 items-center gap-2">

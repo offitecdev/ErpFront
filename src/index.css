@@ -7305,13 +7305,7 @@ html:not(.dark) #root .ofi-quote-page table[data-tender-detail-table] td { color
     .ofi-mail-search { flex: 1 1 220px; }
 }
 @keyframes ofi-mail-spin { to { transform: rotate(360deg); } }
-@media (min-width: 1024px) {
-    .ofi-mail-body { grid-template-columns: 200px minmax(0, 1fr); }
-}
-@media (min-width: 1024px) { .ofi-mail-rail { position: sticky; top: 0; align-self: start; } }
-@media (min-width: 1200px) {
-    .ofi-mail-split { grid-template-columns: minmax(340px, 420px) minmax(0, 1fr); }
-}
+/* Spalten der Mailseite: styles/modules/mailModule.css, «macOS-MAIL-FENSTER». */
 .ofi-mailc { display: flex; flex-direction: column; padding: 0 16px 12px; }
 /* Hinweis über dem "Mail senden"-Schalter: die Einladung geht ohnehin raus. */
 .ofi-cal-invitehint {

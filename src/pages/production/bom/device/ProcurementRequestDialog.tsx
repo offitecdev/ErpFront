@@ -8,7 +8,7 @@ import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBo
 import type { Bom, BomProcurementKind, BomUnit } from '@/types/productionBom';
 
 import { fmtQty, parseQuantityText, quantityToText, unitLabel } from '../bomFormat';
-import { pendingLineIds, priceRequestRemaining } from './bomProcess';
+import { pendingLineIds } from './bomProcess';
 import '@/styles/procurementRequestPage.css';
 
 interface RequestRow {
@@ -30,8 +30,8 @@ interface RowState { include: boolean; text: string }
 const rowsOf = (bom: Bom, kind: BomProcurementKind): RequestRow[] => {
     const pending = pendingLineIds(bom, kind);
     if (kind === 'PRICE') {
-        const remaining = priceRequestRemaining(bom);
-        // Im Entwurf die Zeilen der BOM, in einer Revision die der Arbeitskopie.
+        // Die Zeilen, die gelten: im Entwurf die der BOM, in einer Revision die der Arbeitskopie,
+        // sonst die der freigegebenen BOM (30.09.2026: der Fiyat talebi geht auch nach der Freigabe).
         const source = bom.status !== 'DRAFT' && bom.revisionDraft ? bom.revisionDraft.lines : bom.lines;
         return source.map((line) => ({
             id: line.id,
@@ -39,7 +39,7 @@ const rowsOf = (bom: Bom, kind: BomProcurementKind): RequestRow[] => {
             name: line.product?.name ?? line.name,
             modelNumber: line.product?.modelNumber ?? line.modelNumber,
             unit: line.unit as BomUnit,
-            suggested: remaining.get(line.id) ?? line.quantity,
+            suggested: line.quantity,
             floor: 0,
             pending: pending.get(line.id) ?? null,
         }));
@@ -205,7 +205,7 @@ export const ProcurementRequestDialog = ({
                             </span>
                             <span role="columnheader">{t('productionBom.columns.erpCode')}</span>
                             <span role="columnheader">{t('productionBom.columns.name')}</span>
-                            <span role="columnheader" className="is-num">{t(kind === 'ORDER' ? 'productionBom.columns.missing' : 'productionBom.receipt.remaining')}</span>
+                            <span role="columnheader" className="is-num">{t(kind === 'ORDER' ? 'productionBom.columns.missing' : 'productionBom.columns.quantity')}</span>
                             <span role="columnheader" className="is-num">{t('productionBom.procurement.quantity')}</span>
                         </div>
                         {rows.map((row) => {

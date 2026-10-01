@@ -3551,3 +3551,28 @@ body > .ofi-bom-pop.ofi-bom-revnote button.ofi-bom-revnote__ok:focus-visible { o
     .ofi-bom-revbubble__content,
     .ofi-bom-revbubble__dot { animation: none !important; }
 }
+
+/* Die Freigabe einer Revision durch die Administratorrolle (30.09.2026): wartet / zurückgewiesen. */
+.ofi-bom-revstate { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ofi-bom-revstate.is-submitted { background: rgba(255, 149, 0, 0.14); color: #b25000; }
+.ofi-bom-revstate.is-rejected { background: rgba(215, 0, 21, 0.1); color: #c4001a; }
+.dark .ofi-bom-revstate.is-submitted { background: rgba(255, 159, 10, 0.2); color: #ffb340; }
+.dark .ofi-bom-revstate.is-rejected { background: rgba(255, 69, 58, 0.18); color: #ff8a82; }
+
+/* Das Fenster «Reddet» ist ein Portal — die Notiz trägt ihr eigenes Kleid (ohne #root). */
+.ofi-bom-rejectnote {
+    display: block;
+    width: 100%;
+    min-height: 96px;
+    padding: 9px 11px;
+    border: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.12));
+    border-radius: 8px;
+    background: var(--ofi-cal-surface, #fff);
+    color: var(--ofi-cal-text, #1d1d1f);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.45;
+    resize: vertical;
+    outline: none;
+}
+.ofi-bom-rejectnote:focus { border-color: var(--ofi-cal-accent, #0a7aff); box-shadow: 0 0 0 3px rgba(10, 122, 255, 0.2); }

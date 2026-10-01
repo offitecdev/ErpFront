@@ -60,7 +60,7 @@ export const billingApi = {
         category?: InvoiceCategory | '';
         sort?: InvoiceSortKey;
         today?: string;
-    }): Promise<InvoicePageDto> => {
+    }, signal?: AbortSignal): Promise<InvoicePageDto> => {
         const params = new URLSearchParams();
         params.set('page', String(Math.max(1, input.page)));
         params.set('pageSize', String(input.pageSize ?? 20));
@@ -71,7 +71,7 @@ export const billingApi = {
         if (input.sort) params.set('sort', input.sort);
         // Der Kalendertag der PERSON entscheidet, was überfällig ist.
         if (input.today) params.set('today', input.today);
-        const res = await apiClient.get(`/billing/invoices?${params.toString()}`);
+        const res = await apiClient.get(`/billing/invoices?${params.toString()}`, { signal });
         return res.data;
     },
 

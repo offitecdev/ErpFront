@@ -224,11 +224,17 @@ export const OrderActionCard = ({
 export const RevisionApproveDialog = ({
     open,
     bom,
+    mode = 'approve',
     onClose,
     onApproved,
 }: {
     open: boolean;
     bom: Bom;
+    /**
+     * `approve` = die Administratorrolle gibt frei; `submit` = wer die Revision
+     * bearbeitet, reicht sie ein (30.09.2026: «admin'e onay düşsün»).
+     */
+    mode?: 'approve' | 'submit';
     onClose: () => void;
     onApproved: (bom: Bom) => void;
 }) => {
@@ -260,6 +266,12 @@ export const RevisionApproveDialog = ({
         if (!preview || busy) return;
         setBusy(true);
         try {
+            if (mode === 'submit') {
+                const submitted = await productionBomApi.submitRevision(bom.id);
+                toast.success(t('productionBom.revision.submitted', { revision: preview.toRevision }));
+                onApproved(submitted.bom);
+                return;
+            }
             const result = await productionBomApi.approveRevision(bom.id, keep);
             toast.success(t('productionBom.revision.approved', { revision: preview.toRevision }));
             onApproved(result.bom);
@@ -277,8 +289,8 @@ export const RevisionApproveDialog = ({
         <PopupDialog
             open={open}
             onClose={() => { if (!busy) onClose(); }}
-            title={t('productionBom.revision.approveTitle', { number: bom.bomNumber, revision: to })}
-            subtitle={t('productionBom.revision.approveSubtitle', { from, to })}
+            title={t(mode === 'submit' ? 'productionBom.revision.submitTitle' : 'productionBom.revision.approveTitle', { number: bom.bomNumber, revision: to })}
+            subtitle={t(mode === 'submit' ? 'productionBom.revision.submitSubtitle' : 'productionBom.revision.approveSubtitle', { from, to })}
             icon={<CheckCircle2 size={18} />}
             width={720}
             footer={(
@@ -290,7 +302,7 @@ export const RevisionApproveDialog = ({
                         loading={busy}
                         onClick={() => void approve()}
                     >
-                        {t('productionBom.revision.approveButton', { revision: to })}
+                        {t(mode === 'submit' ? 'productionBom.revision.submitButton' : 'productionBom.revision.approveButton', { revision: to })}
                     </PopupButton>
                 </PopupActions>
             )}
@@ -319,7 +331,7 @@ export const RevisionApproveDialog = ({
                                             key={action.purchaseOrderId}
                                             action={action}
                                             kept={keep.includes(action.purchaseOrderId)}
-                                            onKeep={(value) => toggleKeep(action.purchaseOrderId, value)}
+                                            onKeep={mode === 'approve' ? (value) => toggleKeep(action.purchaseOrderId, value) : undefined}
                                         />
                                     ))}
                                 </div>
@@ -354,8 +366,68 @@ export const RevisionApproveDialog = ({
                         {preview.reopens.bom && <Note>{t('productionBom.revision.reopensBom')}</Note>}
                         {preview.reopens.main && <Note>{t('productionBom.revision.reopensMain', { number: preview.reopens.main })}</Note>}
                         {!preview.changes.length && <Note tone="warn">{t('productionBom.err.REVISION_NO_CHANGES')}</Note>}
+                        {mode === 'submit' && preview.changes.length > 0 && <Note>{t('productionBom.revision.submitNote')}</Note>}
+                        {mode === 'approve' && orders.some((action) => action.action === 'REVISE') && <Note>{t('productionBom.revision.approveSendsNote')}</Note>}
                     </div>
                 )}
+            </div>
+        </PopupDialog>
+    );
+};
+
+/**
+ * «Reddet» (30.09.2026): die Administratorrolle weist eine eingereichte Revision
+ * zurück — mit einer Notiz für die Person, die sie eingereicht hat. Die
+ * Revision bleibt im Entwurf; sie kann geändert und neu eingereicht werden.
+ */
+export const RevisionRejectDialog = ({ open, bom, onClose, onRejected }: {
+    open: boolean;
+    bom: Bom;
+    onClose: () => void;
+    onRejected: (bom: Bom) => void;
+}) => {
+    const [note, setNote] = useState('');
+    const [busy, setBusy] = useState(false);
+    const revision = bom.revisionDraft?.revision ?? bom.revision + 1;
+    const reject = async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+            const result = await productionBomApi.rejectRevision(bom.id, note.trim());
+            toast.success(t('productionBom.revision.rejected', { revision }));
+            onRejected(result.bom);
+        } catch (failure) {
+            toast.error(productionBomErrorText(failure));
+        } finally {
+            setBusy(false);
+        }
+    };
+    return (
+        <PopupDialog
+            open={open}
+            onClose={() => { if (!busy) onClose(); }}
+            title={t('productionBom.revision.rejectTitle', { number: bom.bomNumber, revision })}
+            subtitle={t('productionBom.revision.rejectSubtitle')}
+            icon={<Trash2 size={18} />}
+            tone="danger"
+            width={520}
+            footer={(
+                <PopupActions>
+                    <PopupButton onClick={onClose} disabled={busy}>{t('productionBom.common.cancel')}</PopupButton>
+                    <PopupButton variant="danger" loading={busy} onClick={() => void reject()}>{t('productionBom.revision.rejectButton')}</PopupButton>
+                </PopupActions>
+            )}
+        >
+            <div className="ofi-bom-pop">
+                <textarea
+                    className="ofi-bom-rejectnote"
+                    rows={4}
+                    maxLength={1000}
+                    value={note}
+                    placeholder={t('productionBom.revision.rejectPlaceholder')}
+                    aria-label={t('productionBom.revision.rejectPlaceholder')}
+                    onChange={(event) => setNote(event.target.value)}
+                />
             </div>
         </PopupDialog>
     );

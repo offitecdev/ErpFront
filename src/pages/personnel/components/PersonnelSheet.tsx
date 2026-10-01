@@ -123,7 +123,7 @@ export const PersonnelSheet = ({
                 aria-modal="true"
                 aria-labelledby={titleId}
                 tabIndex={-1}
-                style={{ width: `min(100%, ${width}px)`, height: `min(${height}px, 92vh)` }}
+                style={{ width: `min(100%, ${width}px)`, height: `min(${height}px, calc(92vh / var(--ofi-zoom, 1)))` }}
                 /* `.ofi-pop.is-sheet` — siehe index.css, "FENSTER-OBERFLÄCHE". */
                 className="ofi-sheet ofi-sheet-up ofi-pop is-sheet relative flex flex-col overflow-hidden outline-none"
             >

@@ -22,11 +22,13 @@ const EPS = 1e-9;
  * wartende Zeile mit dem frühesten Liefertermin. Was im Depo gescannt wird,
  * bucht sich ohnehin selbst.
  */
-export const ReceivePanel = ({ requestId, purchaseOrderId, onClose, onDone }: {
+export const ReceivePanel = ({ requestId, purchaseOrderId, onClose, onDone, onOpenOrder }: {
     requestId: string;
     purchaseOrderId: string;
     onClose: () => void;
     onDone: () => void;
+    /** «Siparişe git» — die Bestellung selbst öffnen. */
+    onOpenOrder: () => void;
 }) => {
     const { detail, purchase, error } = usePurchase(requestId, purchaseOrderId);
     const [amounts, setAmounts] = useState<Record<number, string>>({});
@@ -87,7 +89,7 @@ export const ReceivePanel = ({ requestId, purchaseOrderId, onClose, onDone }: {
 
     return (
         <SidePanel
-            purchaseOrderId={purchaseOrderId}
+            onOpenOrder={onOpenOrder}
             icon={<PackageCheck />}
             title={title}
             subtitle={<><b className="is-code">{shownPurchaseCode(purchase.referenceNumber)}</b> · {purchase.supplierName}</>}

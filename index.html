@@ -32,6 +32,10 @@
         }
       } catch (e) { /* storage may be unavailable (privacy mode) */ }
       if (window.name === 'offitec-split-pane') root.classList.add('sk-pane');
+      // Grosse Bildschirme (Zoomstufen im <style> unten, src/lib/uiZoom.ts):
+      // nur im obersten Fenster — der Split-View-Rahmen erbt den Zoom seines
+      // Elternfensters — und nur mit standardisiertem CSS-zoom.
+      if (window.self === window.top && 'currentCSSZoom' in Element.prototype) root.classList.add('ofi-zoomable');
       // Zwei Bereiche öffnen mit IHREM Zeichen statt mit dem Marken-Stern:
       // die Aufgaben mit dem Häkchen, das Postfach mit dem Outlook-Zeichen —
       // entschieden aus der Adresse beim Einlesen; unter Electrons file://
@@ -131,7 +135,17 @@
        first paint — without the reset here everything shifts 8px when it
        lands (layout shift). */
     body { margin: 0; }
-    #root { min-height: 100vh; }
+    #root { min-height: calc(100vh / var(--ofi-zoom, 1)); }
+
+    /* Grosse Bildschirme (Samet, 30.09.2026): über 2000 px Fensterbreite
+       wächst die GANZE Oberfläche — Schrift, Symbole, Logos, Abstände —
+       wie mit dem Browser-Zoom. Hier, damit schon das erste Bild stimmt.
+       Chrome vergrössert mit `zoom` auch vh/vw: vite.config
+       (viewportZoomFix) teilt jede Viewport-Länge durch --ofi-zoom, und
+       src/lib/uiZoom.ts rechnet die Koordinaten der Browser-APIs um. */
+    @media (min-width: 2001px) { html.ofi-zoomable { --ofi-zoom: 1.3; zoom: var(--ofi-zoom); } }
+    @media (min-width: 2501px) { html.ofi-zoomable { --ofi-zoom: 1.4; } }
+    @media (min-width: 3001px) { html.ofi-zoomable { --ofi-zoom: 1.5; } }
 
     #ofi-splash {
       position: fixed;

@@ -1,5 +1,3 @@
-import { MacLoading } from '@/components/ui-shared/MacLoading';
-import { WorkspaceSection } from '@/components/ui-shared/WorkspaceSection';
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { AlignLeft, ArrowLeft, ArrowUp, Eraser, FileSpreadsheet, FileText, Trash2, Zap } from 'lucide-react';
 
@@ -60,8 +58,6 @@ export const BomTableAiDialog = ({
     initialFiles,
     onApply,
     onClose,
-    embedded = false,
-    onBusyChange,
 }: {
     purchaseOrderId: string;
     /** Die Spalten der Vorlage, die gefüllt werden dürfen (ohne ERP-Code, Name, Menge). */
@@ -73,14 +69,8 @@ export const BomTableAiDialog = ({
     initialFiles?: File[];
     onApply: (changes: TableAiChange[]) => void;
     onClose: () => void;
-    embedded?: boolean;
-    onBusyChange?: (busy: boolean) => void;
 }) => {
     const [phase, setPhase] = useState<Phase>('source');
-    useEffect(() => {
-        onBusyChange?.(phase === 'reading');
-        return () => onBusyChange?.(false);
-    }, [phase, onBusyChange]);
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [images, setImages] = useState<AnnotatedImage[]>(() => (initialFiles ?? [])
         .filter(isImageFile)
@@ -170,7 +160,7 @@ export const BomTableAiDialog = ({
             /* Erst die Sitzung auffrischen, dann der lange Aufruf — sonst läuft
                der Zugangskeks mitten im Lesen ab und alles geht zweimal hoch
                (dieselbe Vorsicht wie beim Beleg-Import). */
-            const sessionReady = purchaseOrdersApi.aiStatus().catch(() => undefined);
+            await purchaseOrdersApi.aiStatus().catch(() => undefined);
             const payload: Parameters<typeof productionBomApi.fillTable>[1] = {
                 columns: columns.map(({ key, name, type, label }) => ({ key, name, type, label })),
                 language: (i18n.resolvedLanguage || i18n.language || 'tr').slice(0, 2),
@@ -184,7 +174,6 @@ export const BomTableAiDialog = ({
                 payload.fileName = documentFile.name;
                 payload.mimeType = documentFile.type || 'application/pdf';
             }
-            await sessionReady;
             const answer = await productionBomApi.fillTable(purchaseOrderId, payload);
             const plans = planRows(columns, rows, answer);
             setResult(answer);
@@ -215,7 +204,7 @@ export const BomTableAiDialog = ({
         onClose();
     };
 
-    const usageText = result && !embedded ? (result.usage.estimatedUsd !== null
+    const usageText = result ? (result.usage.estimatedUsd !== null
         ? t('productionBom.ai.usageCost', {
             model: result.model,
             tokens: result.usage.totalTokens.toLocaleString('de-CH'),
@@ -252,7 +241,21 @@ export const BomTableAiDialog = ({
     const body = (() => {
         if (phase === 'reading') {
             return (
-                <MacLoading label={t(embedded ? 'common.loadingData' : 'productionBom.ai.reading')} detail={elapsed >= 30 ? t('productionBom.ai.elapsed', { seconds: elapsed }) : undefined} />
+                <div className="ofi-bom-fill__reading" role="status">
+                    {/* Ein Blatt, über das ein blaues Glasband läuft; die Zeilen
+                        leuchten nacheinander auf, wenn das Band sie erreicht. */}
+                    <span className="ofi-bom-scan" aria-hidden>
+                        <i className="ofi-bom-scan__row" />
+                        <i className="ofi-bom-scan__row" />
+                        <i className="ofi-bom-scan__row" />
+                        <i className="ofi-bom-scan__row" />
+                        <i className="ofi-bom-scan__row" />
+                        <i className="ofi-bom-scan__band" />
+                    </span>
+                    <b>{t('productionBom.ai.reading')}</b>
+                    <small>{images.length ? t('productionBom.ai.readingNote') : ' '}</small>
+                    {elapsed >= 5 && <small className="ofi-bom-fill__clock">{t('productionBom.ai.elapsed', { seconds: elapsed })}</small>}
+                </div>
             );
         }
 
@@ -270,7 +273,6 @@ export const BomTableAiDialog = ({
                                 <tr>
                                     <th className="is-check" aria-label={t('productionBom.ai.includeRow')} />
                                     <th className="is-num">#</th>
-                                    <th>{t('productionBom.columns.erpCode')}</th>
                                     <th>{t('productionBom.columns.name')}</th>
                                     {columns.map((column) => (
                                         <th key={column.key} className={column.label || column.type === 'number' ? 'is-num' : undefined}>{column.name}</th>
@@ -294,7 +296,6 @@ export const BomTableAiDialog = ({
                                                 />
                                             </td>
                                             <td className="is-num">{plan.row.index + 1}</td>
-                                            <td className="is-code">{plan.row.code ?? '—'}</td>
                                             <td className="is-name">
                                                 {plan.row.name}
                                                 <small>{plan.row.quantity}</small>
@@ -494,11 +495,6 @@ export const BomTableAiDialog = ({
     );
 
     const reading = phase === 'reading';
-    if (embedded) return (
-        <WorkspaceSection title={t('productionBom.purchasing.pdfImport')} footer={footer}>
-            <div className="ofi-bom-pop ofi-bom-ai ofi-bom-fill">{body}</div>
-        </WorkspaceSection>
-    );
     return (
         <PopupDialog
             open
@@ -510,7 +506,7 @@ export const BomTableAiDialog = ({
             subtitle={t('productionBom.ai.subtitle')}
             icon={<Zap size={18} />}
             /* Die Prüfung wächst mit ihren Spalten, damit die Zeile des Belegs rechts sichtbar bleibt. */
-            width={1320}
+            width={phase === 'review' ? Math.min(1280, 820 + columns.length * 80) : 820}
             footer={footer}
         >
             <div className="ofi-bom-pop ofi-bom-ai ofi-bom-fill">{body}</div>

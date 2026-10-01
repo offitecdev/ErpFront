@@ -3,7 +3,7 @@ import { FilePen, History, TriangleAlert } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBom';
-import type { Bom, BomRevisionDetail, BomRevisionSummary } from '@/types/productionBom';
+import type { BomSummary, BomHistory, BomRevisionDetail, BomRevisionSummary } from '@/types/productionBom';
 
 import { fmtQty, shortDate, unitLabel } from '../bomFormat';
 import { Dash, EmptyState, LoadingState } from '../bomUi';
@@ -28,10 +28,23 @@ export const ChangeChips = ({ counts }: { counts: ChangeCounts }) => {
  * Grund und dem, was sie änderte — die neueste oben. Eine Revision im Entwurf
  * steht als Hinweis darüber (bearbeitet wird sie in der BOM selbst).
  */
-export const BomRevisionsView = ({ context, bom }: { context: BomViewContext; bom: Bom }) => {
+export const BomRevisionsView = ({ context, bom }: { context: BomViewContext; bom: BomSummary }) => {
     const { nav } = context;
-    const list = [...bom.revisions].sort((a, b) => b.revision - a.revision);
-    const draft = bom.revisionDraft;
+    const key = `${bom.id}:${bom.updatedAt}`;
+    const [state, setState] = useState<{ key: string; data: BomHistory | null; error: string | null } | null>(null);
+    const [retry, setRetry] = useState(0);
+    useEffect(() => {
+        const controller = new AbortController();
+        setState(null);
+        productionBomApi.bomHistory(bom.id, controller.signal)
+            .then((data) => { if (!controller.signal.aborted) setState({ key, data, error: null }); })
+            .catch((failure) => { if (!controller.signal.aborted) setState({ key, data: null, error: productionBomErrorText(failure) }); });
+        return () => controller.abort();
+    }, [bom.id, key, retry]);
+    const history = state?.key === key ? state.data : null;
+    const error = state?.key === key ? state.error : null;
+    const list = [...(history?.revisions ?? [])].sort((a, b) => b.revision - a.revision);
+    const draft = history?.draft;
 
     const row = (entry: BomRevisionSummary) => (
         <button
@@ -68,6 +81,10 @@ export const BomRevisionsView = ({ context, bom }: { context: BomViewContext; bo
         <>
             <NavBar nav={nav} backTitle={context.backTitle} title={t('productionBom.revision.history')} subtitle={bom.bomNumber} />
             <div className="ofi-bom-body">
+                {!history && !error && <LoadingState />}
+                {error && <div className="ofi-bom-state is-error"><b>{error}</b>
+                    <button type="button" className="ofi-bom-btn ofi-nosize" onClick={() => setRetry((value) => value + 1)}>{t('productionBom.common.retry')}</button>
+                </div>}
                 {draft && (
                     <div className="ofi-bom-links is-draft">
                         <NavLinkRow
@@ -87,16 +104,16 @@ export const BomRevisionsView = ({ context, bom }: { context: BomViewContext; bo
                         </h3>
                         <div className="ofi-bom-group__box is-list">{list.map(row)}</div>
                     </section>
-                ) : (
+                ) : history ? (
                     <EmptyState icon={<History />} title={t('productionBom.revision.historyEmpty')} hint={t('productionBom.revision.historyEmptyHint')} />
-                )}
+                ) : null}
             </div>
         </>
     );
 };
 
 /** Eine Revision: wer, wann, warum — der Unterschied, die Bestellungen und ihre Zeilen (nur lesen). */
-export const BomRevisionView = ({ context, bom, revision }: { context: BomViewContext; bom: Bom; revision: number }) => {
+export const BomRevisionView = ({ context, bom, revision }: { context: BomViewContext; bom: BomSummary; revision: number }) => {
     const { nav } = context;
     const [state, setState] = useState<{ key: string; detail: BomRevisionDetail | null; error: string | null } | null>(null);
     const key = `${bom.id}:${revision}:${bom.revision}`;
@@ -188,22 +205,18 @@ export const BomRevisionView = ({ context, bom, revision }: { context: BomViewCo
                                         <tr>
                                             <th className="is-code">{t('productionBom.columns.erpCode')}</th>
                                             <th className="is-name">{t('productionBom.columns.name')}</th>
-                                            <th>{t('productionBom.columns.brand')}</th>
-                                            <th>{t('productionBom.columns.modelNumber')}</th>
                                             <th className="is-num is-accent">{t('productionBom.columns.need')}</th>
                                             <th>{t('productionBom.columns.note')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {!detail.lines.length && (
-                                            <tr className="is-empty"><td colSpan={6}>{t('productionBom.detail.empty')}</td></tr>
+                                            <tr className="is-empty"><td colSpan={4}>{t('productionBom.detail.empty')}</td></tr>
                                         )}
                                         {detail.lines.map((line) => (
                                             <tr key={line.id}>
                                                 <td className="is-code"><span className="ofi-bom-code">{line.erpCode ?? '—'}</span></td>
                                                 <td className="is-name">{line.name}</td>
-                                                <td>{line.brand ?? <Dash />}</td>
-                                                <td className="is-mono">{line.modelNumber ?? <Dash />}</td>
                                                 <td className="is-num is-accent"><span className="ofi-bom-qty">{fmtQty(line.quantity)}<small>{unitLabel(line.unit)}</small></span></td>
                                                 <td>{line.note ?? <Dash />}</td>
                                             </tr>

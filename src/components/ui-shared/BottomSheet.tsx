@@ -125,7 +125,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                 aria-modal="true"
                 aria-labelledby={titleId}
                 tabIndex={-1}
-                style={{ width: `min(100%, ${size}px)`, height: `min(${size}px, 92vh)` }}
+                style={{ width: `min(100%, ${size}px)`, height: `min(${size}px, calc(92vh / var(--ofi-zoom, 1)))` }}
                 /* `.ofi-pop.is-sheet` = die gemeinsame Fensteroberfläche
                    (index.css, "FENSTER-OBERFLÄCHE") mit den zwei OBEREN Ecken:
                    `rounded-t-2xl` kam als 4px an, das Fenster stand also

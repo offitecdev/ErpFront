@@ -1,5 +1,5 @@
 import { t } from '@/i18n/translate';
-import type { Bom, BomAreaView } from '@/types/productionBom';
+import type { BomSummary, BomAreaView } from '@/types/productionBom';
 
 import type { NavEntry } from '../navStackState';
 
@@ -42,9 +42,9 @@ export const viewKey = (view: BomView): string => {
 export const entryOf = (view: BomView): NavEntry<BomView> => ({ key: viewKey(view), view });
 
 /** Der Name einer Ansicht — für ihre Leiste und den Zurück-Pfeil der nächsten. */
-export const viewTitle = (view: BomView, data: BomAreaView | null, boms: Map<string, Bom>): string => {
+export const viewTitle = (view: BomView, data: BomAreaView | null, boms: Map<string, BomSummary>): string => {
     const bomId = 'bomId' in view ? (view.bomId === MAIN_ALIAS ? data?.main?.id ?? view.bomId : view.bomId) : null;
-    const bom = bomId ? boms.get(bomId) ?? data?.boms.find((entry) => entry.id === bomId) ?? null : null;
+    const bom = bomId ? boms.get(bomId) ?? null : null;
     switch (view.kind) {
         case 'list': return data?.main?.bomNumber ?? t('productionBom.device.title');
         case 'tasks': return t('productionBom.tasks.title');

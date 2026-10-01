@@ -103,6 +103,7 @@ const MAIN_PAGES: Record<string, string> = {
     '/production/templates/bom': 'nav.productionBomTemplates',
     '/production/settings': 'nav.productionSettingsMenu',
     '/production/settings/access': 'nav.productionSettingsMenu',
+    '/production/settings/mail': 'nav.productionSettingsMenu',
     '/production/purchasing': 'nav.productionPurchasing',
 
     '/warehouse/products': 'nav.warehouseProducts',

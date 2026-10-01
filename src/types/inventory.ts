@@ -403,7 +403,7 @@ export type MovementKind = MovementType | 'DEFINITION';
  * Löschen per Scan), Wareneingang einer Bestellung, Rapport/Projekt, manuell.
  * Altbestand ohne Herkunft kommt als MANUAL.
  */
-export type MovementOrigin = 'QUICK_ADD' | 'QUICK_DELETE' | 'ORDER_RECEIPT' | 'REPORT' | 'MANUAL';
+export type MovementOrigin = 'QUICK_ADD' | 'QUICK_DELETE' | 'ORDER_RECEIPT' | 'PRODUCTION' | 'REPORT' | 'MANUAL';
 
 export interface MovementListItem {
     id: string;
@@ -421,6 +421,7 @@ export interface MovementListItem {
     article?: {
         articleCode: string;
         name: string;
+        unit?: string | null;
         modelNumber?: string | null;
         serialNumber?: string | null;
         supplierBarcode?: string | null;
@@ -450,6 +451,10 @@ export interface MovementListQuery {
     description?: string;
     type?: MovementKind | '';
     origin?: MovementOrigin | '';
+    /** Mehrfachwahl (29.09.2026): Typen ODER-verknüpft, z. B. IN + OUT. */
+    kinds?: MovementKind[];
+    /** Mehrfachwahl der Herkunft, ODER-verknüpft. */
+    origins?: MovementOrigin[];
     dateFrom?: string;
     dateTo?: string;
 }
@@ -809,6 +814,37 @@ export interface PurchaseRequestSupplier {
     emailRecipient: string | null;
 }
 
+/** Fiyat talebinin satın almaya gönderimi (29.09.2026) — `DocumentEvent` izinden. */
+export interface PurchaseForwarding {
+    at: string;
+    byName: string | null;
+    /** Mail ve bildirimi alanların adları. */
+    recipients: string[];
+}
+
+/** Talebi alacak kişi: satın alma (Purser, muhasebe …) ya da yönetici. Adres yok, yalnız var mı. */
+export interface PurchaseForwardRecipient {
+    id: string;
+    name: string;
+    kind: 'PURCHASER' | 'ADMIN';
+    hasEmail: boolean;
+}
+
+export interface PurchaseForwardInfo {
+    recipients: PurchaseForwardRecipient[];
+    history: Array<PurchaseForwarding & { id: string; mailed: boolean; subject: string | null }>;
+}
+
+export interface PurchaseForwardResult {
+    /** Mail gerçekten çıktı. */
+    mailed: boolean;
+    /** Mail sunucusu / adres yok — yalnız bildirim gitti. */
+    preview: boolean;
+    notified: number;
+    recipients: PurchaseForwardRecipient[];
+    forwarding: PurchaseForwarding;
+}
+
 /** Kaydederken gönderilen tedarikçi: bilinen id ile, yeni ad ile. */
 export interface PurchaseRequestSupplierInput {
     supplierId: string | null;
@@ -878,6 +914,21 @@ export interface PurchaseOrderRow {
      * mailini alır; ilki `supplier*` alanlarının aynısıdır. Siparişte boş.
      */
     requestSuppliers?: PurchaseRequestSupplier[];
+    /**
+     * Talebi satın alma rolü OLMAYAN biri açtıysa (ör. mühendis) onun adı —
+     * satın almacı «… tarafından iletildi» görür (29.09.2026). Yalnızca detayda.
+     */
+    forwardedBy?: { name: string } | null;
+    /**
+     * TALEP EDEN (30.09.2026) — fiyat talebini açan kişi, rolü ne olursa olsun.
+     * Liste ve detay; siparişte boş.
+     */
+    requestedBy?: { name: string } | null;
+    /**
+     * SATIN ALMAYA SON GÖNDERİM (29.09.2026) — satın alma rolü olmayan biri
+     * talebi Purser + yöneticilere gönderdiyse: ne zaman, kim, kime. Liste ve detay.
+     */
+    forwarding?: PurchaseForwarding | null;
     items: PurchaseOrderItem[];
     /** Sipariş düzeyindeki ek ücretler (eski kayıtlarda boş dizi). */
     additionalFees: PurchaseOrderFee[];
@@ -914,6 +965,8 @@ export interface PurchaseOrderRow {
     production?: ProductionPurchaseAssignment | null;
     /** BOM (27.09.2026): kam der Beleg aus einer BOM, stehen hier ihre Regeln. */
     bomOrigin?: BomOrigin | null;
+    /** Liste (29.09.2026): das zugeordnete Produktionsprojekt — Nummer und Name, getrennt von der Kommission. */
+    project?: { number: string; name: string } | null;
 }
 
 export interface PurchaseOrderListPage {
@@ -1140,6 +1193,12 @@ export interface SendPurchaseOrderMailInput {
     attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
     /** Çok tedarikçili talep: mailin gittiği tedarikçinin sırası. */
     supplierIndex?: number;
+    /** Mail kartının dili (metnin dili) — `tr` | `de` | `en`. */
+    lang?: string;
+    /** Ekteki PDF'in dili: başlıktaki kod onun yazımıyla (BE-/SP-/PO-). */
+    documentLang?: string;
+    /** Ekteki PDF'in taşıdığı revizyon (BOM) — kartta «Revision n». */
+    revision?: number;
 }
 
 export interface SendPurchaseOrderMailResult {

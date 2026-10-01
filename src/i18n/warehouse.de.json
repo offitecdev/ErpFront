@@ -46,13 +46,14 @@
       "labelsSkipped_one": "{{count}} Karte ohne ERP-Code wurde übersprungen.",
       "labelsSkipped_other": "{{count}} Karten ohne ERP-Code wurden übersprungen.",
       "listReady_one": "{{count}} Karte heruntergeladen.",
-      "listReady_other": "{{count}} Karten heruntergeladen."
+      "listReady_other": "{{count}} Karten heruntergeladen.",
+      "draftFilterHint": "Entwurf"
     },
     "columns": {
       "erpCode": "ERP-Code",
       "name": "Produktname",
       "brand": "Marke",
-      "modelNumber": "Modellnummer",
+      "modelNumber": "Herstellercode",
       "supplier": "Lieferant",
       "description": "Beschreibung",
       "quantity": "Menge",
@@ -82,7 +83,8 @@
       "cancel": "Abbrechen",
       "discard": "Änderungen verwerfen",
       "close": "Schliessen",
-      "done": "Fertig"
+      "done": "Fertig",
+      "saveDraft": "Als Entwurf speichern"
     },
     "product": {
       "newTitle": "Neue Produktkarte",
@@ -102,7 +104,16 @@
       "tabs": {
         "details": "Produktdetails",
         "serials": "Seriennummern"
-      }
+      },
+      "draftChip": "Entwurf",
+      "draftTitle": "Diese Karte ist ein Entwurf",
+      "incompleteTitle": "Die Karte ist noch nicht vollständig",
+      "draftMissing": "Es fehlt: {{fields}}.",
+      "draftComplete": "Alle Pflichtangaben sind da — «Speichern» macht die Karte fertig.",
+      "draftHint": "Pflicht: Produktname, Einheit, mindestens ein Lieferant und eine E-Mail eines Lieferanten. Fehlt etwas, wird die Karte nur als Entwurf gespeichert; ein Lieferant ohne E-Mail bekommt keine automatische Preisanfrage.",
+      "incompleteToast": "Pflichtangaben fehlen — die Karte lässt sich als Entwurf speichern.",
+      "createdDraft": "Produktkarte als Entwurf angelegt.",
+      "savedDraft": "Entwurf gespeichert."
     },
     "section": {
       "identity": "Kennzeichnung",
@@ -118,7 +129,7 @@
       "name": "Produktname",
       "required": "Pflicht",
       "brand": "Marke",
-      "modelNumber": "Modellnummer",
+      "modelNumber": "Herstellercode",
       "supplierName": "Lieferant",
       "description": "Produktbeschreibung",
       "quantity": "Menge",
@@ -139,7 +150,9 @@
       "barcodeHint": "Wird mit dem ERP-Code automatisch vergeben (GS1 EAN-13).",
       "barcodeGs1": "GS1 EAN-13 · firmenintern (04…)",
       "printLabel": "Etikett drucken",
-      "printNeedsCode": "Für ein Etikett braucht es einen ERP-Code."
+      "printNeedsCode": "Für ein Etikett braucht es einen ERP-Code.",
+      "modelNumberHint": "Teilenummer des Herstellers — wird nicht gedruckt.",
+      "unit": "Einheit"
     },
     "supplier": {
       "pick": "Lieferant wählen",
@@ -151,7 +164,8 @@
       "change": "Lieferant ändern",
       "columns": {
         "name": "Lieferant",
-        "barcode": "Produkt-Barcode"
+        "barcode": "Produkt-Barcode",
+        "email": "E-Mail des Lieferanten"
       },
       "barcodePlaceholder": "Barcode scannen oder eingeben",
       "barcodeLabel": "Produkt-Barcode der Zeile {{index}}",
@@ -164,7 +178,21 @@
       "noBarcode": "Noch kein Barcode",
       "pickerLabel": "Herstellerbarcode je Lieferant",
       "pickerHint": "Sind Lieferanten erfasst, wählt man hier einen und sieht seinen Barcode.",
-      "unassignedHint": "Dieser Barcode hat noch keinen Lieferanten — in seiner Zeile unter «Lieferanten» wählen."
+      "unassignedHint": "Dieser Barcode hat noch keinen Lieferanten — in seiner Zeile unter «Lieferanten» wählen.",
+      "emailPlaceholder": "offerte@lieferant.ch",
+      "emailOf": "E-Mail von {{name}}",
+      "emailLabel": "E-Mail der Zeile {{index}}",
+      "emailInvalid": "«{{email}}» ist keine gültige E-Mail, oder der Zeile fehlt der Lieferant.",
+      "articleNumber": "Produkttyp-Nr.",
+      "orderNumber": "Bestell-Nr.",
+      "articleNumberPlaceholder": "Produkttypnummer des Lieferanten",
+      "orderNumberPlaceholder": "Bestellnummer des Lieferanten",
+      "articleNumberOf": "Produkttypnummer von {{name}}",
+      "orderNumberOf": "Bestellnummer von {{name}}",
+      "articleNumberLabel": "Produkttypnummer der Zeile {{index}}",
+      "orderNumberLabel": "Bestellnummer der Zeile {{index}}",
+      "numbersHint": "Steht in Preisanfrage und Bestellung an diesen Lieferanten",
+      "numbersWithoutSupplier": "Für die Nummer «{{code}}» zuerst den Lieferanten der Zeile wählen."
     },
     "scan": {
       "openCamera": "Mit der Kamera scannen",
@@ -309,7 +337,10 @@
       "SUPPLIER_DUPLICATE": "«{{name}}» steht schon auf dieser Karte.",
       "TOO_MANY_SUPPLIERS": "Eine Karte hat höchstens {{max}} Lieferanten.",
       "MANUFACTURER_BARCODE_TAKEN": "Der Herstellerbarcode «{{code}}» gehört schon zu «{{name}}» — ein Herstellerbarcode gehört zu genau einem Produkt.",
-      "RECEIPT_UNDO_INVALID": "Dieser Wareneingang lässt sich nicht mehr zurücknehmen — Bestellung oder Protokoll haben sich geändert."
+      "RECEIPT_UNDO_INVALID": "Dieser Wareneingang lässt sich nicht mehr zurücknehmen — Bestellung oder Protokoll haben sich geändert.",
+      "UNIT_INVALID": "Diese Einheit ist unbekannt.",
+      "SUPPLIER_EMAIL_INVALID": "Ungültige E-Mail für «{{name}}»: {{email}}",
+      "PRODUCT_INCOMPLETE": "Pflichtangaben fehlen — die Karte lässt sich nur als Entwurf speichern."
     },
     "settings": {
       "title": "Depo-Einstellungen",
@@ -478,14 +509,17 @@
         "category": "Hauptkategorie",
         "group": "Materialgruppe",
         "brand": "Marke",
-        "modelNumber": "Modellnummer",
+        "modelNumber": "Herstellercode",
         "supplier": "Lieferanten",
         "makerBarcodes": "Herstellerbarcodes",
         "description": "Beschreibung",
         "quantity": "Menge",
         "purchasePrice": "Einkaufspreis",
         "currency": "Währung",
-        "serialRequired": "Seriennummer nötig"
+        "serialRequired": "Seriennummer nötig",
+        "supplierArticleNumbers": "Produkttypnummer des Lieferanten",
+        "supplierOrderNumbers": "Bestellnummer des Lieferanten",
+        "unit": "Einheit"
       },
       "yes": "Ja",
       "no": "Nein",
@@ -496,16 +530,20 @@
         "group": "Materialgruppe",
         "name": "Produktname *",
         "brand": "Marke",
-        "modelNumber": "Modellnummer",
+        "modelNumber": "Herstellercode",
         "supplierName": "Lieferant",
         "description": "Beschreibung",
         "quantity": "Menge",
         "purchasePrice": "Einkaufspreis",
         "currency": "Währung",
         "manufacturerBarcode": "Herstellerbarcode",
-        "serialRequired": "Seriennummer nötig"
+        "serialRequired": "Seriennummer nötig",
+        "supplierArticleNumber": "Produkttypnummer des Lieferanten",
+        "supplierOrderNumber": "Bestellnummer des Lieferanten",
+        "unit": "Einheit",
+        "supplierEmail": "E-Mail des Lieferanten"
       },
-      "help1": "Jede Zeile ist eine Produktkarte. Pflicht ist nur der «Produktname». Der «Herstellerbarcode» ist der Produkt-Barcode des Lieferanten derselben Zeile.",
+      "help1": "Jede Zeile ist eine Produktkarte. Pflicht ist der «Produktname»; Karten ohne Einheit, Lieferant oder E-Mail des Lieferanten kommen als Entwurf. Der «Herstellerbarcode» ist der Produkt-Barcode des Lieferanten derselben Zeile. Auch «Produkttypnummer des Lieferanten» und «Bestellnummer des Lieferanten» gehören diesem Lieferanten; sie stehen in Preisanfrage und Bestellung.",
       "help2": "Die «Materialgruppe» aus der Liste wählen. ERP-Code (z. B. ELK-PLC-00001) und GS1-Barcode werden nach dem Import automatisch vergeben.",
       "help3": "Menge und Einkaufspreis als Zahl (z. B. 12.50). Ohne Währung gilt CHF.",
       "help4": "Bei Produkten mit Seriennummer «Seriennummer nötig» = Ja wählen und keine Menge eintragen; die Stücke kommen mit ihrer Seriennummer.",
@@ -522,6 +560,23 @@
       "page": "Seite {{page}} / {{pages}}",
       "listFile": "depo-produktkarten-{{date}}.pdf",
       "labelsFile": "depo-etiketten-{{date}}.pdf"
+    },
+    "units": {
+      "PCS": "Stück",
+      "M": "Meter",
+      "KG": "Kilogramm",
+      "SET": "Set",
+      "PACK": "Paket"
+    },
+    "missing": {
+      "name": "Produktname",
+      "unit": "Einheit",
+      "supplier": "Lieferant",
+      "supplierEmail": "E-Mail des Lieferanten",
+      "nameHint": "Der Produktname ist Pflicht.",
+      "unitHint": "Eine Einheit wählen (Stück, Meter …).",
+      "supplierHint": "Mindestens einen Lieferanten eintragen.",
+      "supplierEmailHint": "Die E-Mail mindestens eines Lieferanten eintragen — dorthin geht die Preisanfrage."
     }
   },
   "notify": {

@@ -333,19 +333,25 @@
    Karte beginnt 10px vom oberen und rechten Rand, auf der Linie der
    Sonner-Toasts (App.tsx `offset`) — 2px + 8px Luft für den Schliess-
    kreis. Über jedem Fenster (Popups enden bei 1200), wie die Toasts. */
+/* 30.09. (Samet: «arkasında kare bir gölge»): der Stapel scrollt, und ein
+   Scroll-Kasten schneidet den Kartenschatten an SEINEN Kanten ab — das war
+   das graue Rechteck hinter den Erinnerungen. Darum rundum so viel Luft,
+   wie der Schatten braucht (24px Unschärfe + 6px Versatz), und der Kasten
+   rückt um genau diese Luft nach rechts hinaus: die Karte selbst bleibt
+   10px vom Rand, 352px breit. */
 .ofi-notice-stack {
     position: fixed;
     top: 2px;
-    right: 10px;
+    right: -14px;
     z-index: 1300;
     display: flex;
-    width: 360px;
-    max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 18px);
+    width: 408px;
+    max-width: calc(100vw + 16px);
+    max-height: calc(100vh - 2px);
     flex-direction: column;
     gap: 10px;
-    /* Der Schliesskreis ragt über die Karte hinaus — Luft dafür. */
-    padding: 8px 0 8px 8px;
+    /* Oben: Luft für den Schliesskreis; sonst: Luft für den Schatten. */
+    padding: 8px 24px 32px 32px;
     overflow-y: auto;
     overflow-x: visible;
     pointer-events: none;
@@ -729,8 +735,8 @@ body > :not(#root) .ofi-nc__row:hover {
         max-height: calc(100vh - 80px);
     }
     .ofi-notice-stack {
-        right: 8px;
-        width: calc(100vw - 16px);
+        right: -16px;
+        width: calc(100vw + 40px);
         max-width: none;
     }
     .offitec-toaster { --width: calc(100vw - 32px); }

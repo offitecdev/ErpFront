@@ -12,6 +12,8 @@ import { PickerCreateRow, PickerPanel, PickerRow, PickerState, TokenField } from
 export interface SupplierValue {
     id: string | null;
     name: string;
+    /** Aus der Lieferantenliste (nur als Vorschlag für die E-Mail der Zeile). */
+    email?: string | null;
 }
 
 /**

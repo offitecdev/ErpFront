@@ -25,7 +25,15 @@ const collectRoleNames = (user: AnyUser): string[] =>
  * `poCanPickRequestSuppliers` ile ayrıca uygular — ikisi birlikte değişir.
  */
 export const canPickRequestSuppliers = (user: AnyUser, isSystemAdmin: boolean): boolean =>
-    isSystemAdmin || collectRoleNames(user).some((role) => /muhasebe|buchhalt|accounting/i.test(role));
+    isSystemAdmin || collectRoleNames(user).some((role) => /muhasebe|buchhalt|accounting|purser|purchas|einkauf|sat[ıi]n ?alma/i.test(role));
+
+/**
+ * SATIN ALMA ROLÜ (29.09.2026, Samet): muhasebe = «Purser». Yalnızca bu rol ve
+ * Administrator belgeyi tedarikçiye gönderir (PDF + e-posta sekmeleri);
+ * diğer roller talebi/siparişi hazırlar ve satın almaya iletir. Sunucu aynı
+ * kuralı `poPurchaserOnly` ile uygular.
+ */
+export const isPurchasingRole = canPickRequestSuppliers;
 
 export const getRoleProfile = (user: AnyUser): RoleProfile => {
     const roles = collectRoleNames(user);

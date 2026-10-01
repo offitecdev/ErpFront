@@ -296,11 +296,15 @@ body > :not(#root) .ofi-mail-datefield input {
     color: var(--ofi-cal-text);
 }
 
-.ofi-mail-body {
+/* Die drei Spalten — Postfächer · Liste · Lesebereich. Hiess bis 29.09.2026
+   `.ofi-mail-body`; unter dem Namen lag auch das Textfeld des Lager-
+   Mailfensters (orderDetails.css), und je nach Ladefolge stand hier alles
+   untereinander bzw. dort ein bildschirmhohes Textfeld. Maße: Block
+   «macOS-MAIL-FENSTER» am Ende der Datei. */
+.ofi-mail-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-    min-height: calc(100vh - 150px);
+    min-height: 0;
 }
 
 /* ── Leiste ─────────────────────────────────────────────────────────────── */
@@ -1031,3 +1035,244 @@ body > :not(#root) .ofi-mailc__recipient button:hover,
 }
 #root .ofi-mailconfirm__footer .ofi-cal-btn,
 body > :not(#root) .ofi-mailconfirm__footer .ofi-cal-btn { height: 34px; font-size: 12.5px; }
+
+/* ═══════════════ macOS-MAIL-FENSTER (29.09.2026) ═══════════════════════════
+   Vorgabe Samet: «Apple/Outlook gibi temiz, MacBook Outlook gibi — alt alta
+   değil, sol ve sağ». Die Seite ist EIN Programmfenster wie der Kalender
+   (calendarMac.css): Werkzeugleiste oben, darunter drei Spalten nebeneinander
+   — Postfächer (graue Seitenleiste) · Nachrichtenliste · Lesebereich. Jede
+   Spalte rollt für sich; die Seite selbst rollt nicht.
+   Farben: dieselbe Mac-Tafel wie der Kalender, hier auf .ofi-mail-page. */
+.ofi-mail-page {
+    --ofi-mail-sidebar: #f5f5f7;
+    --ofi-mail-select: rgba(10, 122, 255, 0.12);
+    --ofi-mail-select-strong: #0a7aff;
+    --ofi-mail-sidebar-active: rgba(0, 0, 0, 0.07);
+    --ofi-cal-surface: #ffffff;
+    --ofi-cal-surface-2: #f5f5f7;
+    --ofi-cal-hover: rgba(0, 0, 0, 0.045);
+    --ofi-cal-border: rgba(0, 0, 0, 0.1);
+    --ofi-cal-border-soft: rgba(0, 0, 0, 0.07);
+    --ofi-cal-line: rgba(0, 0, 0, 0.07);
+    --ofi-cal-text: #1d1d1f;
+    --ofi-cal-muted: #8e8e93;
+    --ofi-cal-faint: #c7c7cc;
+    --ofi-cal-accent: #0a7aff;
+    --ofi-cal-on-accent: #ffffff;
+    --ofi-cal-accent-soft: rgba(10, 122, 255, 0.12);
+    --ofi-cal-tab-active-bg: rgba(10, 122, 255, 0.12);
+    --ofi-cal-tab-active-text: #1d1d1f;
+}
+html.dark .ofi-mail-page {
+    --ofi-mail-sidebar: #232325;
+    --ofi-mail-select: rgba(59, 141, 255, 0.22);
+    --ofi-mail-select-strong: #3b8dff;
+    --ofi-mail-sidebar-active: rgba(255, 255, 255, 0.1);
+    --ofi-cal-surface: #1c1c1e;
+    --ofi-cal-surface-2: #232325;
+    --ofi-cal-hover: rgba(255, 255, 255, 0.06);
+    --ofi-cal-border: rgba(255, 255, 255, 0.11);
+    --ofi-cal-border-soft: rgba(255, 255, 255, 0.08);
+    --ofi-cal-line: rgba(255, 255, 255, 0.08);
+    --ofi-cal-text: #f5f5f7;
+    --ofi-cal-muted: #8e8e93;
+    --ofi-cal-faint: #48484a;
+    --ofi-cal-accent: #3b8dff;
+    --ofi-cal-accent-soft: rgba(59, 141, 255, 0.2);
+    --ofi-cal-tab-active-bg: rgba(59, 141, 255, 0.22);
+    --ofi-cal-tab-active-text: #f5f5f7;
+}
+
+/* Das Fenster: füllt die Höhe, die die Anwendung lässt (wie der Kalender). */
+#root .ofi-mail-page {
+    gap: 0;
+    height: 100%;
+    min-height: 560px;
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 12px;
+    background: var(--ofi-cal-surface);
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.02), 0 6px 22px rgba(0, 0, 0, 0.05);
+}
+html.dark #root .ofi-mail-page { box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); }
+
+/* Werkzeugleiste: Suche · Filter · Abrufen · Blättern, eine Haarlinie darunter. */
+#root .ofi-mail-page > .ofi-mail-topbar {
+    flex: none;
+    min-height: 52px;
+    margin: 0;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+    padding: 8px 12px;
+}
+
+/* Drei Spalten. */
+#root .ofi-mail-layout {
+    flex: 1;
+    grid-template-columns: 228px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+    gap: 0;
+}
+#root .ofi-mail-layout > .ofi-mail-split {
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--ofi-cal-surface);
+}
+
+/* ── Seitenleiste ── */
+#root .ofi-mail-layout > .ofi-mail-rail {
+    position: static;
+    min-height: 0;
+    gap: 14px;
+    overflow-y: auto;
+    border-right: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-mail-sidebar);
+    padding: 14px 10px 16px;
+}
+.ofi-mail-owner { display: flex; min-width: 0; flex-direction: column; gap: 1px; padding: 0 8px 2px; }
+.ofi-mail-owner__kind { font-size: 11px; font-weight: 600; color: var(--ofi-cal-muted); }
+.ofi-mail-owner__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; color: var(--ofi-cal-text); }
+.ofi-mail-owner__address { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--ofi-cal-muted); }
+#root .ofi-mail-layout .ofi-mail-folders { padding-right: 0; }
+#root .ofi-mail-layout .ofi-mail-folder {
+    height: 30px;
+    gap: 9px;
+    border-radius: 7px !important;
+    padding: 0 10px;
+    font-weight: 500;
+}
+#root .ofi-mail-layout .ofi-mail-folder .ofi-mail-folder__icon { color: var(--ofi-mail-select-strong); opacity: 1; }
+#root .ofi-mail-layout .ofi-mail-folder:hover { background: var(--ofi-cal-hover); }
+#root .ofi-mail-layout .ofi-mail-folder.is-active { background: var(--ofi-mail-sidebar-active); color: var(--ofi-cal-text); font-weight: 600; }
+#root .ofi-mail-layout .ofi-mail-folder.has-unread { font-weight: 600; }
+#root .ofi-mail-layout .ofi-mail-folder__count { font-weight: 500; color: var(--ofi-cal-muted); font-variant-numeric: tabular-nums; }
+#root .ofi-mail-layout .ofi-mail-catsection { padding-right: 0; }
+#root .ofi-mail-layout .ofi-mail-catsection__head { padding-left: 8px; }
+#root .ofi-mail-layout .ofi-mail-cats { max-height: none; overflow: visible; }
+#root .ofi-mail-layout .ofi-mail-cat { border-radius: 7px; }
+#root .ofi-mail-layout .ofi-mail-cat.is-active { background: var(--ofi-mail-sidebar-active); }
+#root .ofi-mail-layout .ofi-mail-cat.is-active .ofi-mail-cat__label { color: var(--ofi-cal-text); font-weight: 600; }
+#root .ofi-mail-layout .ofi-mail-cat__main { border-radius: 7px !important; padding: 6px 6px 6px 10px; }
+
+/* ── Liste ── */
+#root .ofi-mail-layout .ofi-mail-listwrap { min-height: 0; overflow: hidden; border-right: 1px solid var(--ofi-cal-border-soft); }
+#root .ofi-mail-layout .ofi-mail-list { min-height: 0; max-height: none; overflow-y: auto; }
+#root .ofi-mail-layout .ofi-mail-list__rows { padding: 6px 8px; }
+#root .ofi-mail-layout .ofi-mail-row {
+    position: relative;
+    gap: 10px;
+    border-bottom: 0;
+    border-radius: 9px !important;
+    padding: 10px 10px 10px 16px;
+}
+/* Trennlinie zwischen den Zeilen — eingerückt ab dem Text, wie in Mail. */
+#root .ofi-mail-layout .ofi-mail-row + .ofi-mail-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 58px;
+    right: 10px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+}
+#root .ofi-mail-layout .ofi-mail-row:hover { background: var(--ofi-cal-hover); }
+#root .ofi-mail-layout .ofi-mail-row.is-active { background: var(--ofi-mail-select); }
+/* dark.css malt die gewählte Zeile weizenfarben — hier gilt das Mail-Blau. */
+html.dark #root .ofi-mail-layout .ofi-mail-row.is-active { background: var(--ofi-mail-select); }
+#root .ofi-mail-layout .ofi-mail-row:hover::before,
+#root .ofi-mail-layout .ofi-mail-row.is-active::before,
+#root .ofi-mail-layout .ofi-mail-row:hover + .ofi-mail-row::before,
+#root .ofi-mail-layout .ofi-mail-row.is-active + .ofi-mail-row::before { content: none; }
+/* Ungelesen = der blaue Punkt links, wie in Mail. */
+#root .ofi-mail-layout .ofi-mail-row.is-unread::after {
+    content: '';
+    position: absolute;
+    top: 21px;
+    left: 5px;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--ofi-mail-select-strong);
+}
+#root .ofi-mail-layout .ofi-mail-row__avatar { width: 32px; height: 32px; font-size: 13px; }
+#root .ofi-mail-layout .ofi-mail-row__from { font-size: 13px; font-weight: 600; }
+#root .ofi-mail-layout .ofi-mail-row__date { font-size: 11.5px; font-variant-numeric: tabular-nums; }
+#root .ofi-mail-layout .ofi-mail-row.is-unread .ofi-mail-row__date { color: var(--ofi-cal-muted); font-weight: 500; }
+#root .ofi-mail-layout .ofi-mail-row__subject { font-size: 12.5px; }
+#root .ofi-mail-layout .ofi-mail-row.is-unread .ofi-mail-row__subject-text { font-weight: 600; }
+.ofi-mail-row__preview {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--ofi-cal-muted);
+    overflow-wrap: anywhere;
+}
+#root .ofi-mail-layout .ofi-mail-row__tags:empty { display: none; }
+
+/* ── Lesebereich ── */
+#root .ofi-mail-layout .ofi-mail-reader {
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    padding: 14px 28px 32px;
+}
+#root .ofi-mail-layout .ofi-mail-reader.is-empty { background: var(--ofi-cal-surface); }
+#root .ofi-mail-layout .ofi-mail-reader__subject { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; }
+
+/* Unter 1024px hat die Anwendung keine feste Höhe (die ganze Seite rollt,
+   MainLayout: `lg:h-screen`), `height: 100%` löst sich dort nicht auf und das
+   Fenster wüchse mit der Liste. Dort misst es sich am Bildschirm: Kopf 64px +
+   zweimal 20px Seitenrand. */
+@media (max-width: 1023.98px) {
+    #root .ofi-mail-page { height: calc(100dvh - 104px); min-height: 480px; }
+}
+
+/* ── Schmalere Fenster ── */
+@media (max-width: 1180px) {
+    #root .ofi-mail-layout { grid-template-columns: 196px minmax(0, 1fr); }
+    #root .ofi-mail-layout > .ofi-mail-split { grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); }
+    #root .ofi-mail-layout .ofi-mail-reader { padding: 12px 20px 28px; }
+}
+/* Tablet: die Seitenleiste wird zur Symbolleiste (wie Mail auf dem iPad),
+   Liste und Lesebereich stehen weiter NEBENEINANDER. */
+@media (max-width: 900px) {
+    #root .ofi-mail-layout { grid-template-columns: 56px minmax(0, 1fr); }
+    #root .ofi-mail-layout > .ofi-mail-rail { padding: 10px 6px; }
+    #root .ofi-mail-layout .ofi-mail-owner,
+    #root .ofi-mail-layout .ofi-mail-folder__label,
+    #root .ofi-mail-layout .ofi-mail-folder__count,
+    #root .ofi-mail-layout .ofi-mail-catsection__title,
+    #root .ofi-mail-layout .ofi-mail-cat__label,
+    #root .ofi-mail-layout .ofi-mail-cat__count,
+    #root .ofi-mail-layout .ofi-mail-cat__actions { display: none !important; }
+    #root .ofi-mail-layout .ofi-mail-folder { justify-content: center; padding: 0; }
+    #root .ofi-mail-layout .ofi-mail-catsection__head { justify-content: center; padding: 0; }
+    #root .ofi-mail-layout .ofi-mail-cat__main { justify-content: center; padding: 8px 0; }
+}
+/* Telefon: EINE Spalte — die Liste, und nach dem Antippen die Nachricht. */
+@media (max-width: 700px) {
+    #root .ofi-mail-page { min-height: 0; border-radius: 0; border-width: 0; box-shadow: none; }
+    /* Werkzeugleiste in zwei Reihen: Suche über die ganze Breite, darunter die
+       Filter (seitwärts rollend) und rechts Abrufen/Blättern. */
+    #root .ofi-mail-page > .ofi-mail-topbar { flex-wrap: wrap; row-gap: 8px; padding: 8px 10px; }
+    #root .ofi-mail-page > .ofi-mail-topbar .ofi-mail-search { flex: 1 1 100%; min-width: 0; }
+    #root .ofi-mail-page > .ofi-mail-topbar .ofi-mail-filterbar { flex: 1 1 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    #root .ofi-mail-page > .ofi-mail-topbar .ofi-mail-filterchip { flex: none; }
+    #root .ofi-mail-page > .ofi-mail-topbar .ofi-mail-toolbar { flex: none; gap: 6px; margin-left: 0; }
+    #root .ofi-mail-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+    #root .ofi-mail-layout > .ofi-mail-rail { flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--ofi-cal-border-soft); }
+    #root .ofi-mail-layout .ofi-mail-folders { flex-direction: row; }
+    #root .ofi-mail-layout .ofi-mail-catsection { display: none; }
+    #root .ofi-mail-layout .ofi-mail-folder { width: 44px; flex: none; }
+    #root .ofi-mail-layout > .ofi-mail-split { grid-template-columns: minmax(0, 1fr); }
+    #root .ofi-mail-layout .ofi-mail-listwrap { border-right: 0; }
+    #root .ofi-mail-layout.has-selection .ofi-mail-listwrap,
+    #root .ofi-mail-layout:not(.has-selection) .ofi-mail-reader { display: none; }
+    #root .ofi-mail-layout .ofi-mail-reader { padding: 12px 16px 24px; }
+}

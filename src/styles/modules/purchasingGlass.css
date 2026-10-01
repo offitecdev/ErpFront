@@ -1,0 +1,233 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ÜRETİM › SATIN ALMA — «EKLE» ALS SPRECHBLASE (30.09.2026, Vorgabe Samet)
+   1. «Glass, çoklu seçim, orta boyutta, hafif yeşil» → 2. Skizze: eine Blase,
+   deren Pfeil auf das «+» zeigt → 3. «Biraz daha küçük, çok parlak olmasın;
+   üretimde tedarikçi seçtiğim gibi (macSelection), biraz daha büyük; kenarları
+   yeşil, içi beyaz.» Also: die ruhige weisse Auswahl der Produktion, 360px,
+   nur der Rand grün.
+   Portal (am body): Klassen ohne #root; dunkel = `html.dark`.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Kein Abdunkeln — die Fläche fängt nur den Klick daneben. */
+.ofi-gpick-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    background: transparent;
+}
+.ofi-gpick {
+    --g-text: #252528;
+    --g-muted: #77777e;
+    --g-line: rgba(50, 50, 60, 0.07);
+    --g-stripe: rgba(50, 50, 60, 0.035);
+    --g-hover: rgba(52, 199, 89, 0.1);
+    --g-accent: #28a745;
+    --g-accent-soft: rgba(52, 199, 89, 0.13);
+    --g-input: rgba(255, 255, 255, 0.7);
+    --g-input-edge: rgba(100, 108, 123, 0.22);
+    /* Innen weiss; nur ein Hauch Grün am Rand. */
+    --g-fill: radial-gradient(130% 110% at 50% 45%, rgba(255, 255, 255, 0.94) 62%, rgba(240, 252, 244, 0.92) 100%);
+    --g-rim: rgba(40, 167, 69, 0.55);
+    --g-shade: rgba(0, 0, 0, 0.1);
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--g-text);
+    font: 400 13px/1.35 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    animation: ofi-gpick-pop 180ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+html.dark .ofi-gpick {
+    --g-text: #f2f2f5;
+    --g-muted: #aaaab3;
+    --g-line: rgba(255, 255, 255, 0.07);
+    --g-stripe: rgba(255, 255, 255, 0.04);
+    --g-hover: rgba(48, 209, 88, 0.14);
+    --g-accent: #34c759;
+    --g-accent-soft: rgba(48, 209, 88, 0.16);
+    --g-input: rgba(255, 255, 255, 0.055);
+    --g-input-edge: rgba(255, 255, 255, 0.2);
+    --g-fill: radial-gradient(130% 110% at 50% 45%, rgba(37, 39, 45, 0.9) 62%, rgba(30, 48, 38, 0.9) 100%);
+    --g-rim: rgba(52, 199, 89, 0.5);
+    --g-shade: rgba(0, 0, 0, 0.4);
+}
+
+/* Glas + Rand + Schatten: ein Umriss mit Pfeil (clip-path / SVG aus glassPopover.ts). */
+.ofi-gpick__shade,
+.ofi-gpick__glass,
+.ofi-gpick__rim {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    pointer-events: none;
+}
+.ofi-gpick.is-above > :is(.ofi-gpick__shade, .ofi-gpick__glass, .ofi-gpick__rim) { top: 0; }
+.ofi-gpick.is-below > :is(.ofi-gpick__shade, .ofi-gpick__glass, .ofi-gpick__rim) { top: calc(-1 * var(--g-arrow, 9px)); }
+.ofi-gpick__shade { overflow: visible; filter: blur(12px); transform: translateY(6px); }
+.ofi-gpick__shade > path { fill: var(--g-shade); }
+.ofi-gpick__glass {
+    background: var(--g-fill);
+    -webkit-backdrop-filter: blur(22px) saturate(1.4);
+    backdrop-filter: blur(22px) saturate(1.4);
+}
+.ofi-gpick__rim { overflow: visible; }
+.ofi-gpick__rim > path { fill: none; stroke: var(--g-rim); stroke-width: 1.25; }
+.ofi-gpick > :not(.ofi-gpick__shade):not(.ofi-gpick__glass):not(.ofi-gpick__rim) { position: relative; }
+
+/* Kopf: ein Titel, klein. */
+.ofi-gpick__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 10px 0 14px; }
+.ofi-gpick__head > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-gpick__head b { font-size: 13px; font-weight: 600; }
+.ofi-gpick__head small { overflow: hidden; color: var(--g-muted); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-gpick button { font: inherit; cursor: pointer; }
+.ofi-gpick .ofi-gpick__close {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--g-stripe);
+    color: var(--g-muted);
+    box-shadow: none;
+}
+.ofi-gpick .ofi-gpick__close:hover { background: var(--g-line); color: var(--g-text); }
+.ofi-gpick__close > svg { width: 13px; height: 13px; }
+
+/* Suche: die runde Kapsel wie in der Auswahl der Produktion. */
+.ofi-gpick__search {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    margin: 8px 9px;
+    padding: 0 12px;
+    border: 1px solid var(--g-input-edge);
+    border-radius: 999px;
+    background: var(--g-input);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.035);
+}
+.ofi-gpick__search:focus-within { border-color: var(--g-accent); box-shadow: 0 0 0 3px var(--g-accent-soft); }
+.ofi-gpick__search > svg { flex: none; width: 14px; height: 14px; color: var(--g-muted); }
+.ofi-gpick__search > input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--g-text);
+    font: inherit;
+    outline: none;
+}
+
+/* Liste: schlichte Zeilen, jede zweite ein Hauch grau. */
+.ofi-gpick__list {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 80px;
+    margin: 0;
+    padding: 5px 7px 6px;
+    overflow-y: auto;
+    list-style: none;
+    border-top: 1px solid var(--g-line);
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+.ofi-gpick__list > li:nth-child(even) > .ofi-gpick__row:not(.is-on) { background: var(--g-stripe); }
+.ofi-gpick .ofi-gpick__row {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 36px;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--g-text);
+    text-align: left;
+    transition: background-color 120ms ease;
+}
+.ofi-gpick .ofi-gpick__row:hover:not(:disabled) { background: var(--g-hover); }
+.ofi-gpick .ofi-gpick__row.is-on { background: var(--g-accent-soft); }
+.ofi-gpick .ofi-gpick__row.is-locked { cursor: default; opacity: 0.5; }
+.ofi-gpick__tick {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    box-sizing: border-box;
+    border: 1.5px solid color-mix(in srgb, var(--g-muted) 50%, transparent);
+    border-radius: 50%;
+    color: #fff;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+.ofi-gpick__tick > svg { width: 11px; height: 11px; stroke-width: 3; }
+.is-on > .ofi-gpick__tick { border-color: var(--g-accent); background: var(--g-accent); }
+.is-locked > .ofi-gpick__tick { border-color: var(--g-muted); background: var(--g-muted); }
+.is-new > .ofi-gpick__tick { border-style: dashed; border-color: var(--g-accent); color: var(--g-accent); }
+.ofi-gpick__text { display: flex; flex-direction: column; min-width: 0; }
+.ofi-gpick__text > b { overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-gpick__text > small { overflow: hidden; color: var(--g-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-gpick__text .is-warn { display: inline-flex; align-items: center; gap: 4px; color: #b25000; }
+html.dark .ofi-gpick__text .is-warn { color: #ffb340; }
+.ofi-gpick__text .is-warn > svg { width: 11px; height: 11px; }
+.ofi-gpick__empty { display: grid; place-items: center; min-height: 64px; color: var(--g-muted); font-size: 12px; }
+.ofi-gpick__spin { width: 16px; height: 16px; border: 2px solid var(--g-accent); border-right-color: transparent; border-radius: 50%; animation: ofi-gpick-spin 700ms linear infinite; }
+
+/* Fuss: die Gewählten als kleine Kapseln, rechts der grüne Knopf. */
+.ofi-gpick__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px 9px 12px; border-top: 1px solid var(--g-line); }
+.ofi-gpick__chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; max-height: 52px; overflow-y: auto; }
+.ofi-gpick__chips > small { color: var(--g-muted); font-size: 11.5px; }
+.ofi-gpick .ofi-gpick__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 22px;
+    min-height: 0;
+    padding: 0 5px 0 9px;
+    border: 0;
+    border-radius: 11px;
+    background: var(--g-accent-soft);
+    box-shadow: none;
+    color: var(--g-text);
+    font-size: 11.5px;
+    font-weight: 500;
+}
+.ofi-gpick__chip > svg { width: 11px; height: 11px; opacity: 0.6; }
+.ofi-gpick .ofi-gpick__go {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    min-height: 0;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--g-accent);
+    box-shadow: none;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.ofi-gpick .ofi-gpick__go:disabled { cursor: default; opacity: 0.4; }
+.ofi-gpick__go > svg { width: 13px; height: 13px; }
+@keyframes ofi-gpick-pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: none; } }
+@keyframes ofi-gpick-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    .ofi-gpick { animation: none; }
+}

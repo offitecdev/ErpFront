@@ -5,6 +5,7 @@ import { readQuery, refreshQuery } from './queryCache';
 import type {
     Bom,
     BomAreaView,
+    BomHistory,
     BomOrderLineInput,
     BomOrdersResult,
     BomProduct,
@@ -26,7 +27,7 @@ import type {
     CostingProject,
     CostingProjectSummary,
 } from '../../types/productionBom';
-import type { BuiltInArea } from '../../types/productionTasks';
+import type { TaskArea } from '../../types/productionTasks';
 
 /**
  * ── BOM DER PRODUKTION (27.09.2026) ──────────────────────────────────────────
@@ -39,7 +40,7 @@ const TAGS = ['production', 'warehouse'];
 const PAGE_CACHE = { freshMs: 15_000, staleMs: 600_000, tags: TAGS };
 const enc = encodeURIComponent;
 
-const areaParam = (area: BuiltInArea) => (area === 'ELECTRICAL' ? 'electrical' : 'mechanical');
+const areaParam = (area: TaskArea) => (area === 'ELECTRICAL' ? 'electrical' : 'mechanical');
 
 export const productionBomApi = {
     settings: async (): Promise<BomSettings> => (await apiClient.get('/production/bom/settings')).data,
@@ -62,10 +63,16 @@ export const productionBomApi = {
     searchProducts: async (q: string, signal?: AbortSignal): Promise<BomProduct[]> =>
         ((await apiClient.get('/production/bom/products', { params: { q }, signal })).data as { items: BomProduct[] }).items,
 
-    deviceView: async (deviceId: string, area: BuiltInArea): Promise<BomAreaView> =>
-        (await apiClient.get(`/production/bom/devices/${enc(deviceId)}`, { params: { area: areaParam(area) } })).data,
+    deviceView: async (deviceId: string, area: TaskArea, signal?: AbortSignal): Promise<BomAreaView> =>
+        (await apiClient.get(`/production/bom/devices/${enc(deviceId)}`, { params: { area: areaParam(area), view: 'summary' }, signal })).data,
+    bomLines: async (bomId: string, signal?: AbortSignal): Promise<{ bom: Bom }> =>
+        (await apiClient.get(`/production/bom/boms/${enc(bomId)}`, { params: { view: 'lines' }, signal })).data,
+    bomHistory: async (bomId: string, signal?: AbortSignal): Promise<BomHistory> =>
+        (await apiClient.get(`/production/bom/boms/${enc(bomId)}`, { params: { view: 'history' }, signal })).data,
+    bomSection: async (bomId: string, view: 'requests' | 'goods', signal?: AbortSignal): Promise<Pick<Bom, 'procurement' | 'goodsIn'>> =>
+        (await apiClient.get(`/production/bom/boms/${enc(bomId)}`, { params: { view }, signal })).data,
     /** Eine leere Alt-BOM unter der Haupt-BOM — ihr Kod kommt aus den Einstellungen. */
-    createSub: async (deviceId: string, area: BuiltInArea, prefix: string): Promise<{ bom: Bom }> =>
+    createSub: async (deviceId: string, area: TaskArea, prefix: string): Promise<{ bom: Bom }> =>
         (await apiClient.post(`/production/bom/devices/${enc(deviceId)}`, { area, prefix })).data,
     bom: async (bomId: string): Promise<{ bom: Bom }> => (await apiClient.get(`/production/bom/boms/${enc(bomId)}`)).data,
     saveLines: async (bomId: string, lines: BomLineInput[]): Promise<{ bom: Bom }> =>
@@ -86,6 +93,12 @@ export const productionBomApi = {
         (await apiClient.get(`/production/bom/boms/${enc(bomId)}/revision/preview`, { params: keep.length ? { keep: keep.join(',') } : {} })).data,
     approveRevision: async (bomId: string, keep: string[]): Promise<{ bom: Bom; preview: BomRevisionPreview }> =>
         (await apiClient.post(`/production/bom/boms/${enc(bomId)}/revision/approve`, { keep })).data,
+    /** «Onaya gönder» — die Revision bei der Administratorrolle einreichen (30.09.2026). */
+    submitRevision: async (bomId: string): Promise<{ bom: Bom }> =>
+        (await apiClient.post(`/production/bom/boms/${enc(bomId)}/revision/submit`, {})).data,
+    /** «Reddet» — nur die Administratorrolle; die Revision bleibt im Entwurf. */
+    rejectRevision: async (bomId: string, note: string): Promise<{ bom: Bom }> =>
+        (await apiClient.post(`/production/bom/boms/${enc(bomId)}/revision/reject`, { note })).data,
     revisionDetail: async (bomId: string, revision: number): Promise<BomRevisionDetail> =>
         (await apiClient.get(`/production/bom/boms/${enc(bomId)}/revisions/${revision}`)).data,
     /** Die Bestellung VOR ihrer Revision `number` (für das alte PDF). */
@@ -121,10 +134,15 @@ export const productionBomApi = {
 
     setQuoteNumber: async (purchaseOrderId: string, quoteNumber: string): Promise<{ bom: Bom | null }> =>
         (await apiClient.put(`/production/bom/purchases/${enc(purchaseOrderId)}/quote-number`, { quoteNumber })).data,
-    uploadQuote: async (purchaseOrderId: string, file: File): Promise<{ bom: Bom | null }> => {
+    /** `lean`: die Antwort trägt nur die Datei, nicht die ganze BOM (29.09.2026 — ~0,5 s schneller). */
+    uploadQuote: async (
+        purchaseOrderId: string,
+        file: File,
+        options: { lean?: boolean } = {},
+    ): Promise<{ bom: Bom | null; quoteFile?: { name: string; type: string; size: number } }> => {
         const form = new FormData();
         form.append('file', file, file.name);
-        return (await apiClient.post(`/production/bom/purchases/${enc(purchaseOrderId)}/quote-file`, form)).data;
+        return (await apiClient.post(`/production/bom/purchases/${enc(purchaseOrderId)}/quote-file`, form, options.lean ? { params: { lean: 1 } } : undefined)).data;
     },
     quoteFile: async (purchaseOrderId: string): Promise<Blob> =>
         (await apiClient.get(`/production/bom/purchases/${enc(purchaseOrderId)}/quote-file`, { responseType: 'blob' })).data,

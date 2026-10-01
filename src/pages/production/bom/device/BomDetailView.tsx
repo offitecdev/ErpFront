@@ -12,7 +12,6 @@ import {
     PackageMinus,
     RotateCcw,
     Save,
-    ShoppingCart,
     Trash2,
     Undo2,
     X,
@@ -22,6 +21,7 @@ import { toast } from 'sonner';
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBom';
+import { useAuthStore } from '@/store/authStore';
 import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
 import type { Bom, BomLine, BomProcurementKind, BomProduct, BomTemplate, BomUnit } from '@/types/productionBom';
 
@@ -33,12 +33,12 @@ import { ProductSearch } from '../ProductSearch';
 import { addProduct, insertTemplateLines, type DraftLine } from '../templates/templateDraft';
 import { AddSubBomDialog, InsertTemplateDialog } from './BomDialogs';
 import { diffDraft, draftOfRevisionLine } from './bomRevision';
-import { DiscardRevisionDialog, RevisionApproveDialog, StartRevisionDialog } from './BomRevisionDialogs';
+import { DiscardRevisionDialog, RevisionApproveDialog, RevisionRejectDialog, StartRevisionDialog } from './BomRevisionDialogs';
 import { BomRevisionNotice } from './BomRevisionNotice';
 import { BomTabs, type BomTab } from './BomTabs';
 import { BomUnsavedDialog } from './BomUnsavedDialog';
 import { BomProcessButton } from './BomProcessButton';
-import { BomGoodsInSection, BomProcurementSection } from './BomProcurementPanels';
+import { BomActivityPanel } from './BomActivityPanel';
 import { pendingLineIds } from './bomProcess';
 import { ProcurementRequestDialog } from './ProcurementRequestDialog';
 import { entryOf } from './bomViews';
@@ -114,7 +114,7 @@ const payloadValid = (lines: DraftLine[]): boolean => lines.every((line) => {
     return Number.isFinite(value) && value > 0;
 });
 
-type Ask = 'delete' | 'consume' | 'reviseStart' | 'reviseApprove' | 'reviseDiscard' | null;
+type Ask = 'delete' | 'consume' | 'reviseStart' | 'reviseApprove' | 'reviseDiscard' | 'reviseReject' | null;
 
 /* Die drei Reiter einer BOM (28.09.2026, Samet: «malzemeler, satın alma talepleri,
    gelen mallar alt alta — en üstte tabler şeklinde olsun, macOS SwiftUI»). Der
@@ -149,6 +149,11 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
        dann die Arbeitskopie; die BOM gilt unverändert weiter, bis sie freigegeben ist. */
     const draftRevision = consumed ? null : bom.revisionDraft;
     const revising = Boolean(draftRevision);
+    /* «BOM revize edilmeden önce onay gerektirsin, admin'e onay düşsün» (30.09.2026):
+       freigeben darf nur die Administratorrolle; alle anderen reichen ein. */
+    const isAdmin = useAuthStore((state) => state.isSystemAdmin);
+    const revisionApproval = draftRevision?.approval ?? null;
+    const revisionPending = revisionApproval?.state === 'SUBMITTED';
     const editable = canEdit && (isDraft || revising);
 
     /* KEIN automatisches Speichern (Samet 27.09.2026: «BOM listede otomatik
@@ -164,7 +169,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
     /* «Bom'da sadece sipariş ve fiyat talep istekleri oluşsun» (27.09.2026 abends):
        die BOM stellt einen Talep an den Einkauf — ohne Lieferant, ohne Preis. */
     const [requesting, setRequesting] = useState<BomProcurementKind | null>(null);
-    const [requestKind, setRequestKind] = useState<BomProcurementKind>('ORDER');
+    const [requestKind, setRequestKind] = useState<BomProcurementKind>('PRICE');
     const [requestBusy, setRequestBusy] = useState(false);
     const openRequest = (kind: BomProcurementKind) => {
         setRequestKind(kind);
@@ -261,17 +266,18 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
     // In der Revision: an jeder Zeile, was sie gegenüber der geltenden Fassung ändert (auch ungespeichert).
     const diff = useMemo(() => (revising ? diffDraft(bom.lines, lines) : null), [revising, bom.lines, lines]);
     // «Mal kabul gelse … bomda yazsa, sadece sayısal»: was bei Eingängen an jede Zeile ging.
-    const receivedByLine = new Map<string, number>();
-    for (const entry of bom.goodsIn ?? []) {
+    const receivedByLine = new Map<string, number>(Object.entries(bom.activity?.received ?? {}));
+    for (const entry of bom.activity ? [] : bom.goodsIn ?? []) {
         if (entry.lineId) receivedByLine.set(entry.lineId, (receivedByLine.get(entry.lineId) ?? 0) + entry.quantity);
     }
     const rows = isDraft || revising
         ? lines.map((line) => ({ ...draftRow(line), change: diff?.marks.get(line.key) ?? null }))
         : bom.lines.map((line) => ({ ...rowOf(line), received: receivedByLine.get(line.id) ?? 0 }));
-    const missingLines = bom.counts.missing;
-    // Was fehlt und noch in keinem offenen Sipariş talebi steht.
-    const orderPending = pendingLineIds(bom, 'ORDER');
-    const requestableMissing = bom.lines.filter((line) => line.coverage.missing > 1e-9 && !orderPending.has(line.id)).length;
+    /* «Bomda artık sipariş talebi yok, sadece fiyat talebi var» (30.09.2026): auch die
+       freigegebene BOM fragt Preise an — jede Zeile genau einmal. Bestellt wird aus dem
+       Vergleich der Angebote (Satın alma). */
+    const priceRequested = pendingLineIds(bom, 'PRICE');
+    const requestablePrice = bom.lines.filter((line) => !priceRequested.has(line.id)).length;
     const subs = isMain ? data.subs.map((sub) => context.bomOf(sub.id) ?? sub) : [];
     const parent = !isMain && bom.parentBomId ? context.bomOf(bom.parentBomId) : null;
     const delivery = data.project.deliveryDate;
@@ -293,8 +299,8 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
     const container = isMain && bom.lines.length === 0;
     const tabs: Array<BomTab<BomTabKey>> = [
         { key: 'lines', label: t('productionBom.detail.tab.lines'), count: rows.length },
-        { key: 'requests', label: t('productionBom.detail.tab.requests'), count: bom.procurement?.length ?? 0 },
-        { key: 'goods', label: t('productionBom.detail.tab.goods'), count: bom.goodsIn?.length ?? 0 },
+        { key: 'requests', label: t('productionBom.detail.tab.requests'), count: bom.activity?.requestsCount ?? bom.procurement?.length ?? 0 },
+        { key: 'goods', label: t('productionBom.detail.tab.goods'), count: bom.activity?.goodsCount ?? bom.goodsIn?.length ?? 0 },
     ];
     const notes = (
         <>
@@ -402,19 +408,8 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                                 <Trash2 />
                                             </button>
                                         )}
-                                        {/* FİYAT TALEBİ — nur VOR der Freigabe (Samet, 27.09.2026: «bom
-                                            onaylandıktan sonra fiyat talebi alınamaz»); danach wird bestellt.
-                                            Gefragt wird, was gespeichert ist. */}
-                                        <button
-                                            type="button"
-                                            className="ofi-bom-btn ofi-nosize"
-                                            disabled={!bom.lines.length || busy !== null || dirty || saving}
-                                            title={dirty ? t('productionBom.detail.saveFirst') : t('productionBom.procurement.priceButtonTitle')}
-                                            onClick={() => openRequest('PRICE')}
-                                        >
-                                            <FileText />
-                                            {t('productionBom.procurement.priceButton')}
-                                        </button>
+                                        {/* Kein «Fiyat talebi» im Entwurf (30.09.2026, Samet: «BOM liste
+                                            onaylanmadan fiyat talep edilemesin») — erst freigeben (mit ERP-Codes). */}
                                         <button
                                             type="button"
                                             className={`ofi-bom-btn ofi-nosize${dirty ? '' : ' is-primary'}`}
@@ -434,26 +429,35 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                             <X />
                                             {t('productionBom.revision.discard')}
                                         </button>
-                                        {/* Auch in der Revision: neue Karten brauchen einen Preis, bevor sie gelten. */}
+                                        {/* Die Freigabe: eingereicht wartet sie auf die Administratorrolle (30.09.2026). */}
+                                        {revisionApproval && (
+                                            <span
+                                                className={`ofi-bom-revstate is-${revisionApproval.state.toLowerCase()}`}
+                                                title={revisionApproval.note ?? undefined}
+                                            >
+                                                {t(revisionPending ? 'productionBom.revision.pendingChip' : 'productionBom.revision.rejectedChip', {
+                                                    name: revisionApproval.byName ?? '',
+                                                    when: shortDate(revisionApproval.at),
+                                                })}
+                                            </span>
+                                        )}
+                                        {isAdmin && revisionPending && (
+                                            <button type="button" className="ofi-bom-btn is-danger ofi-nosize" disabled={busy !== null || saving} onClick={() => setAsk('reviseReject')}>
+                                                <X />
+                                                {t('productionBom.revision.rejectButton')}
+                                            </button>
+                                        )}
                                         <button
                                             type="button"
-                                            className="ofi-bom-btn ofi-nosize"
-                                            disabled={!lines.length || busy !== null || dirty || saving}
-                                            title={dirty ? t('productionBom.detail.saveFirst') : t('productionBom.revision.requestTitle')}
-                                            onClick={() => openRequest('PRICE')}
-                                        >
-                                            <FileText />
-                                            {t('productionBom.procurement.priceButton')}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`ofi-bom-btn ofi-nosize${dirty ? '' : ' is-primary'}`}
-                                            disabled={busy !== null || dirty || saving || !lines.length}
-                                            title={dirty ? t('productionBom.detail.saveFirst') : undefined}
+                                            className={`ofi-bom-btn ofi-nosize${dirty || (!isAdmin && revisionPending) ? '' : ' is-primary'}`}
+                                            disabled={busy !== null || dirty || saving || !lines.length || (!isAdmin && revisionPending)}
+                                            title={dirty ? t('productionBom.detail.saveFirst') : (!isAdmin ? t('productionBom.revision.submitHint') : undefined)}
                                             onClick={() => setAsk('reviseApprove')}
                                         >
                                             <CheckCircle2 />
-                                            {t('productionBom.revision.approveButton', { revision: draftRevision.revision })}
+                                            {isAdmin
+                                                ? t('productionBom.revision.approveButton', { revision: draftRevision.revision })
+                                                : t(revisionPending ? 'productionBom.revision.pendingButton' : 'productionBom.revision.submitButton', { revision: draftRevision.revision })}
                                         </button>
                                     </>
                                 )}
@@ -468,15 +472,15 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                         )}
                                         <button
                                             type="button"
-                                            className={`ofi-bom-btn ofi-nosize${requestableMissing > 0 ? ' is-primary' : ''}`}
-                                            disabled={requestableMissing === 0}
-                                            title={requestableMissing === 0
-                                                ? t(missingLines > 0 ? 'productionBom.procurement.allRequested' : 'productionBom.wizard.allOrdered')
-                                                : t('productionBom.procurement.orderButtonTitle')}
-                                            onClick={() => openRequest('ORDER')}
+                                            className={`ofi-bom-btn ofi-nosize${requestablePrice > 0 ? ' is-primary' : ''}`}
+                                            disabled={requestablePrice === 0}
+                                            title={requestablePrice === 0
+                                                ? t('productionBom.procurement.allPriceRequested')
+                                                : t('productionBom.procurement.priceButtonTitle')}
+                                            onClick={() => openRequest('PRICE')}
                                         >
-                                            <ShoppingCart />
-                                            {t('productionBom.procurement.orderButton')}
+                                            <FileText />
+                                            {t('productionBom.procurement.priceButton')}
                                         </button>
                                         <button
                                             type="button"
@@ -602,14 +606,14 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                         <div className="ofi-bom-links">
                                             {bom.status === 'APPROVED' && !consumed && (
                                                 <NavLinkRow
-                                                    icon={<ShoppingCart />}
-                                                    label={t('productionBom.procurement.orderButton')}
-                                                    detail={requestableMissing > 0
-                                                        ? t('productionBom.device.cardMissing', { count: requestableMissing })
-                                                        : missingLines > 0 ? t('productionBom.procurement.allRequested') : t('productionBom.wizard.allOrdered')}
-                                                    tone={requestableMissing > 0 ? 'warn' : 'ok'}
-                                                    disabled={requestableMissing === 0 || !canEdit}
-                                                    onClick={() => openRequest('ORDER')}
+                                                    icon={<FileText />}
+                                                    label={t('productionBom.procurement.priceButton')}
+                                                    detail={requestablePrice > 0
+                                                        ? t('productionBom.procurement.priceOpenLines', { count: requestablePrice })
+                                                        : t('productionBom.procurement.allPriceRequested')}
+                                                    tone={requestablePrice > 0 ? 'warn' : 'ok'}
+                                                    disabled={requestablePrice === 0 || !canEdit}
+                                                    onClick={() => openRequest('PRICE')}
                                                 />
                                             )}
                                             {showRevision && (
@@ -623,7 +627,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                                             lastRevision.approvedByName,
                                                         ].filter(Boolean).join(' · ')
                                                         : undefined}
-                                                    count={bom.revisions.length}
+                                                    count={bom.activity ? bom.revision + 1 : bom.revisions.length}
                                                     onClick={() => context.open({ kind: 'revisions', bomId: bom.id })}
                                                 />
                                             )}
@@ -712,8 +716,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                         )}
 
                         {/* Was beim Einkauf liegt und was schon ankam — nur der Weg, ohne Lieferant und Preis. */}
-                        {tab === 'requests' && <BomProcurementSection bom={bom} canEdit={canEdit} onChanged={(next) => context.applyBom(next)} />}
-                        {tab === 'goods' && <BomGoodsInSection bom={bom} />}
+                        {tab !== 'lines' && <BomActivityPanel bom={bom} section={tab} canEdit={canEdit} onChanged={context.applyBom} />}
                     </div>
                 )}
 
@@ -737,7 +740,6 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
             <InsertTemplateDialog
                 open={inserting}
                 bom={bom}
-                templates={data.templates}
                 factor={factor}
                 onClose={() => setInserting(false)}
                 onInsert={insertTemplate}
@@ -764,7 +766,16 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                 onStarted={(next) => afterRevision(next)}
             />
             {ask === 'reviseApprove' && (
-                <RevisionApproveDialog open bom={bom} onClose={() => setAsk(null)} onApproved={(next) => afterRevision(next, true)} />
+                <RevisionApproveDialog
+                    open
+                    bom={bom}
+                    mode={isAdmin ? 'approve' : 'submit'}
+                    onClose={() => setAsk(null)}
+                    onApproved={(next) => afterRevision(next, isAdmin)}
+                />
+            )}
+            {ask === 'reviseReject' && (
+                <RevisionRejectDialog open bom={bom} onClose={() => setAsk(null)} onRejected={(next) => afterRevision(next)} />
             )}
             <DiscardRevisionDialog
                 open={ask === 'reviseDiscard'}

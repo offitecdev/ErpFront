@@ -1,10 +1,7 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { lazy, Suspense, useState } from 'react';
-import { MacLoading } from '@/components/ui-shared/MacLoading';
-import { purchaseOrdersApi } from '@/lib/api/inventory';
-import '@/styles/modules/purchasing.css';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { t } from '@/i18n/translate';
+import { canPickRequestSuppliers } from '@/lib/access';
 import { useAuthStore } from '@/store/authStore';
 import type { PurchaseOrderStatus } from '@/types/inventory';
 import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
@@ -15,13 +12,11 @@ import { fmtDateTime, fmtMoneyIn } from './utils/format';
 import { ORDER_STATUS_META, statusesOfKind, type PurchaseKind } from './utils/orderStatus';
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 import { PurchaseCode } from '@/components/ui-shared/PurchaseCode';
+import { purchaseCommissionOf, purchaseProjectOf } from '@/utils/purchaseProject';
 import '@/styles/modules/orderWorkspace.css';
-import '@/styles/orderWorkspaceSurface.css';
 
 /* Der Filter neben der Suche trägt das hausweite Mass (styles/controls.css). */
 const TOOLBAR_CONTROL_CLASS = 'ofi-filter';
-const loadWorkspace = () => import('./OrderWorkspacePage');
-const Workspace = lazy(() => loadWorkspace().then((module) => ({ default: module.OrderWorkspacePage })));
 
 /**
  * ══ ZWEI LISTEN, EIN FENSTER (Vorgabe Samet, 22.09.2026) ═══════════════════
@@ -38,6 +33,7 @@ const Workspace = lazy(() => loadWorkspace().then((module) => ({ default: module
 const ORDER_LIST_COLUMN_WIDTHS = {
     reference: 144,
     quote: 144,
+    project: 128,
     supplier: 192,
     itemCount: 96,
     total: 128,
@@ -45,6 +41,9 @@ const ORDER_LIST_COLUMN_WIDTHS = {
     status: 192,
 };
 type OrderListColumn = keyof typeof ORDER_LIST_COLUMN_WIDTHS;
+/** Die Spalten hinter der Kommission — ohne Einkaufsrolle ohne Lieferanten (29.09.2026). */
+const TAIL_COLUMNS: readonly OrderListColumn[] = ['supplier', 'itemCount', 'total', 'date', 'status'];
+const TAIL_COLUMNS_NO_SUPPLIER: readonly OrderListColumn[] = ['itemCount', 'total', 'date', 'status'];
 
 const readKind = (value: string | null): PurchaseKind =>
     (value === 'request' || value === 'PRICE_REQUEST' ? 'PRICE_REQUEST' : 'ORDER');
@@ -53,12 +52,18 @@ export const OrdersPage = () => {
     useLanguageTick();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const kind = readKind(searchParams.get('kind'));
+    /* SİPARİŞLER SATIN ALMANINDIR (29.09.2026, Samet: «Purser veya admin
+       dışında siparişler tabını kimse görmeyecek … kullanıcı tedarikçiden
+       haberi olmayacak»): die übrigen Rollen sehen NUR die Preisanfragen — ohne
+       Umschalter und ohne Lieferantenspalte. Der Server liefert ihnen auch nur
+       diese, ohne Lieferanten. */
+    const user = useAuthStore((state) => state.user);
+    const isSystemAdmin = useAuthStore((state) => state.isSystemAdmin);
+    const purchaser = canPickRequestSuppliers(user, isSystemAdmin);
+    const kind: PurchaseKind = purchaser ? readKind(searchParams.get('kind')) : 'PRICE_REQUEST';
     const permissions = useAuthStore((state) => state.permissions);
     const canManage = permissions.includes('inventory.transfer');
     const list = useOrdersList(kind);
-    const [documentId, setDocumentId] = useState<string | null>(null);
-    const closeDocument = () => { setDocumentId(null); list.reload(); };
     const grid = useColumnWidths<OrderListColumn>({
         storageKey: 'offitec:inv-orders:col-widths:v1',
         defaults: ORDER_LIST_COLUMN_WIDTHS,
@@ -96,10 +101,9 @@ export const OrdersPage = () => {
 
     return (
         <div className="flex w-full flex-col gap-4">
-            <div hidden={Boolean(documentId)} className="ofi-orders-list-content">
             <InventoryListHeader
                 title={t(isRequest ? 'inv.orders.kind.request' : 'inv.orders.kind.order')}
-                center={segmented}
+                center={purchaser ? segmented : undefined}
                 action={canManage ? (
                     <button
                         type="button"
@@ -112,13 +116,14 @@ export const OrdersPage = () => {
             />
 
             {/* Auf schmalen Schirmen fehlt die Mitte der Kopfzeile. */}
-            <div className="lg:hidden">{segmented}</div>
+            {purchaser && <div className="lg:hidden">{segmented}</div>}
 
             <FilterBar>
                 <SearchBox
                     value={list.search}
                     onChange={list.setSearch}
-                    placeholder={t('inv.orders.searchPlaceholder')}
+                    // Ohne Einkaufsrolle sucht niemand nach Lieferanten (der Server sucht dort auch nicht).
+                    placeholder={t(purchaser ? 'inv.orders.searchPlaceholder' : 'inv.orders.searchPlaceholderRequests')}
                 />
                 <select
                     value={list.status}
@@ -138,21 +143,26 @@ export const OrdersPage = () => {
                 <MacDatePicker value={list.dateTo} onChange={(nextDate) => list.setDateTo(nextDate)} ariaLabel={t('inv.movements.dateTo')} className="is-toolbar" />
             </FilterBar>
 
-            <SectionCard title={t('inv.orders.sectionTitle', { count: list.total })}>
+            {/* Die Anfrageliste heisst auch so — nicht «Siparişler» (29.09.2026). */}
+            <SectionCard title={t(isRequest ? 'inv.orders.sectionTitleRequests' : 'inv.orders.sectionTitle', { count: list.total })}>
                 <div className="overflow-x-auto">
-                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full min-w-[960px]">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full min-w-[1080px]">
                         <colgroup>
-                            <ResizableCols keys={['reference', 'quote'] as const} grid={grid} />
-                            {/* Proje sütunu: genişliği yok, kalan yeri emer. */}
+                            {/* TALEP LİSTESİ (30.09.2026, Samet): teklif no ve komisyon yok —
+                                yerine talebin kimden geldiği; o sütun kalan yeri emer. */}
+                            <ResizableCols keys={isRequest ? (['reference', 'project'] as const) : (['reference', 'quote', 'project'] as const)} grid={grid} />
+                            {/* Komisyon (talepte: talep eden) sütunu: genişliği yok, kalan yeri emer. */}
                             <col />
-                            <ResizableCols keys={['supplier', 'itemCount', 'total', 'date', 'status'] as const} grid={grid} />
+                            {/* Tedarikçi sütunu yalnız satın almada (29.09.2026). */}
+                            <ResizableCols keys={purchaser ? TAIL_COLUMNS : TAIL_COLUMNS_NO_SUPPLIER} grid={grid} />
                         </colgroup>
                         <thead>
                             <tr>
                                 <th className="relative text-left">
-                                    {t('inv.orders.columns.reference')}
+                                    {t(isRequest ? 'inv.orders.columns.priceRequestReference' : 'inv.orders.columns.reference')}
                                     <ColResizeHandle {...grid.resizeProps('reference')} />
                                 </th>
+                                {!isRequest && (
                                 <th className="relative text-left">
                                     {/* In der Bestellliste steht hier, aus WELCHER Anfrage
                                         die Bestellung kopiert wurde — die Spur zwischen den
@@ -161,11 +171,21 @@ export const OrdersPage = () => {
                                     {t(isRequest ? 'inv.orders.columns.quoteNumber' : 'inv.orders.columns.fromRequest')}
                                     <ColResizeHandle {...grid.resizeProps('quote')} />
                                 </th>
-                                <th className="text-left">{t('inv.orders.columns.project')}</th>
+                                )}
+                                {/* PROJE KODU VE KOMİSYON AYRI (29.09.2026, Samet: «proje kodu ayrı
+                                    yerde, komisyonu ayrı yerde»): kod projenin atamasından gelir,
+                                    komisyon belgenin serbest metni — yalnız proje adı. */}
                                 <th className="relative text-left">
-                                    {t('inv.columns.supplier')}
-                                    <ColResizeHandle {...grid.resizeProps('supplier')} />
+                                    {t('inv.orders.columns.project')}
+                                    <ColResizeHandle {...grid.resizeProps('project')} />
                                 </th>
+                                <th className="text-left">{t(isRequest ? 'inv.orders.requestInfo.requestedBy' : 'inv.orders.columns.commission')}</th>
+                                {purchaser && (
+                                    <th className="relative text-left">
+                                        {t('inv.columns.supplier')}
+                                        <ColResizeHandle {...grid.resizeProps('supplier')} />
+                                    </th>
+                                )}
                                 <th className="relative text-right">
                                     {t('inv.orders.columns.itemCount')}
                                     <ColResizeHandle {...grid.resizeProps('itemCount')} />
@@ -189,34 +209,41 @@ export const OrdersPage = () => {
                                     <input
                                         value={list.filters.reference}
                                         onChange={(event) => list.setFilters({ ...list.filters, reference: event.target.value })}
-                                        placeholder={t('inv.orders.filters.reference')}
+                                        placeholder={t(isRequest ? 'inv.orders.filters.requestReference' : 'inv.orders.filters.reference')}
                                         className={FILTER_INPUT_CLASS}
                                     />
                                 </th>
-                                <th className="pb-1.5">
-                                    <input
-                                        value={list.filters.quote}
-                                        onChange={(event) => list.setFilters({ ...list.filters, quote: event.target.value })}
-                                        placeholder={t('inv.orders.filters.quote')}
-                                        className={FILTER_INPUT_CLASS}
-                                    />
-                                </th>
-                                <th className="pb-1.5">
-                                    <input
-                                        value={list.filters.project}
-                                        onChange={(event) => list.setFilters({ ...list.filters, project: event.target.value })}
-                                        placeholder={t('inv.orders.filters.project')}
-                                        className={FILTER_INPUT_CLASS}
-                                    />
-                                </th>
-                                <th className="pb-1.5">
-                                    <input
-                                        value={list.filters.supplier}
-                                        onChange={(event) => list.setFilters({ ...list.filters, supplier: event.target.value })}
-                                        placeholder={t('inv.orders.filters.supplier')}
-                                        className={FILTER_INPUT_CLASS}
-                                    />
-                                </th>
+                                {!isRequest && (
+                                    <th className="pb-1.5">
+                                        <input
+                                            value={list.filters.quote}
+                                            onChange={(event) => list.setFilters({ ...list.filters, quote: event.target.value })}
+                                            placeholder={t('inv.orders.filters.quote')}
+                                            className={FILTER_INPUT_CLASS}
+                                        />
+                                    </th>
+                                )}
+                                <th />
+                                {isRequest ? <th /> : (
+                                    <th className="pb-1.5">
+                                        <input
+                                            value={list.filters.project}
+                                            onChange={(event) => list.setFilters({ ...list.filters, project: event.target.value })}
+                                            placeholder={t('inv.orders.filters.commission')}
+                                            className={FILTER_INPUT_CLASS}
+                                        />
+                                    </th>
+                                )}
+                                {purchaser && (
+                                    <th className="pb-1.5">
+                                        <input
+                                            value={list.filters.supplier}
+                                            onChange={(event) => list.setFilters({ ...list.filters, supplier: event.target.value })}
+                                            placeholder={t('inv.orders.filters.supplier')}
+                                            className={FILTER_INPUT_CLASS}
+                                        />
+                                    </th>
+                                )}
                                 <th />
                                 <th />
                                 <th />
@@ -225,7 +252,7 @@ export const OrdersPage = () => {
                         </thead>
                         <tbody>
                             {(list.loading || list.items.length === 0) && (
-                                <TableStateRow colSpan={8} loading={list.loading} emptyText={list.error || t(isRequest ? 'inv.orders.emptyRequests' : 'inv.orders.empty')} />
+                                <TableStateRow colSpan={(purchaser ? 9 : 8) - (isRequest ? 1 : 0)} loading={list.loading} emptyText={list.error || t(isRequest ? 'inv.orders.emptyRequests' : 'inv.orders.empty')} />
                             )}
                             {!list.loading && list.items.map((order) => {
                                 const meta = ORDER_STATUS_META[order.status] ?? ORDER_STATUS_META.ORDER_DRAFT;
@@ -238,43 +265,62 @@ export const OrdersPage = () => {
                                     ? order.priceRequestNumber
                                     : null;
                                 const second = isRequest ? order.quoteNumber : (fromRequest || order.quoteNumber);
+                                const project = purchaseProjectOf(order);
+                                const commission = purchaseCommissionOf(order, project);
                                 return (
                                     <tr
                                         key={order.id}
-                                        onClick={() => setDocumentId(order.id)}
-                                        tabIndex={0}
-                                        onKeyDown={(event) => { if (event.key === 'Enter') setDocumentId(order.id); }}
-                                        onPointerEnter={() => { void loadWorkspace().catch(() => undefined); void purchaseOrdersApi.get(order.id).catch(() => undefined); }}
+                                        onClick={() => navigate(`/inventory/orders/${order.id}${isRequest ? '?kind=request' : ''}`)}
                                         className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
                                     >
                                         <td className="font-mono text-[13px] text-slate-700 dark:text-white/80"><PurchaseCode value={order.referenceNumber} /></td>
-                                        <td className="font-mono text-[13px] text-slate-500 dark:text-white/60">
-                                            {second ? <PurchaseCode value={second} /> : '—'}
-                                        </td>
-                                        <td className="max-w-0 truncate text-slate-800 dark:text-white" title={order.projectName || undefined}>
-                                            {order.projectName || '—'}
-                                        </td>
+                                        {!isRequest && (
+                                            <td className="font-mono text-[13px] text-slate-500 dark:text-white/60">
+                                                {second ? <PurchaseCode value={second} /> : '—'}
+                                            </td>
+                                        )}
+                                        <td className="font-mono text-[13px] text-slate-500 dark:text-white/60">{project?.number || '—'}</td>
+                                        {isRequest ? (
+                                            <td className="max-w-0 truncate text-slate-800 dark:text-white" title={order.requestedBy?.name || undefined}>
+                                                {order.requestedBy?.name || '—'}
+                                            </td>
+                                        ) : (
+                                            <td className="max-w-0 truncate text-slate-800 dark:text-white" title={commission || undefined}>
+                                                {commission || '—'}
+                                            </td>
+                                        )}
                                         {/* Çok tedarikçili fiyat talebi: ilki + kalanların sayısı. */}
-                                        <td
-                                            className="max-w-0 truncate text-slate-500 dark:text-white/60"
-                                            title={(order.requestSuppliers?.length ?? 0) > 1
-                                                ? order.requestSuppliers!.map((entry) => entry.supplierName).join(', ')
-                                                : order.supplierName}
-                                        >
-                                            {order.supplierName}
-                                            {(order.requestSuppliers?.length ?? 0) > 1 && (
-                                                <span className="ml-1 font-semibold text-slate-400 dark:text-white/45">+{order.requestSuppliers!.length - 1}</span>
-                                            )}
-                                        </td>
+                                        {purchaser && (
+                                            <td
+                                                className="max-w-0 truncate text-slate-500 dark:text-white/60"
+                                                title={(order.requestSuppliers?.length ?? 0) > 1
+                                                    ? order.requestSuppliers!.map((entry) => entry.supplierName).join(', ')
+                                                    : order.supplierName}
+                                            >
+                                                {order.supplierName}
+                                                {(order.requestSuppliers?.length ?? 0) > 1 && (
+                                                    <span className="ml-1 font-semibold text-slate-400 dark:text-white/45">+{order.requestSuppliers!.length - 1}</span>
+                                                )}
+                                            </td>
+                                        )}
                                         <td className="text-right font-mono text-[13px] text-slate-700 dark:text-white/80">{order.itemCount}</td>
                                         <td className="text-right font-mono text-[13px] text-slate-700 dark:text-white/80">
                                             {fmtMoneyIn(order.totalNet, order.currency)}
                                         </td>
                                         <td className="font-mono text-[12.5px] text-slate-500 dark:text-white/60">{fmtDateTime(order.createdAt)}</td>
-                                        <td>
+                                        <td className="whitespace-nowrap">
                                             <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.className}`}>
                                                 {t(meta.labelKey)}
                                             </span>
+                                            {/* SATIN ALMAYA İLETİLDİ (29.09.2026): taslak talep Purser'a gönderildi. */}
+                                            {order.forwarding && order.status === 'DRAFT' && (
+                                                <span
+                                                    className="ml-1.5 inline-block whitespace-nowrap rounded-full bg-[#0a7aff]/10 px-2 py-0.5 text-[11px] font-semibold text-[#0a7aff] dark:bg-[#3b8dff]/20 dark:text-[#5c9fff]"
+                                                    title={[order.forwarding.byName, fmtDateTime(order.forwarding.at)].filter(Boolean).join(' · ')}
+                                                >
+                                                    {t('inv.orders.forward.forwardedChip')}
+                                                </span>
+                                            )}
                                         </td>
                                     </tr>
                                 );
@@ -292,12 +338,6 @@ export const OrdersPage = () => {
                     />
                 </div>
             </SectionCard>
-            </div>
-            {documentId && <div>
-                <Suspense fallback={<MacLoading label={t('common.loadingData')} />}>
-                    <Workspace key={documentId} workspaceId={documentId} onBack={closeDocument} onOpenDocument={setDocumentId} />
-                </Suspense>
-            </div>}
         </div>
     );
 };

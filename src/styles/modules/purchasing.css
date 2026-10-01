@@ -11,6 +11,7 @@
     --buy-border: rgba(0, 0, 0, 0.1);
     --buy-hair: rgba(0, 0, 0, 0.07);
     --buy-head: #fbfbfc;
+    --buy-zebra: #f6f6f8;
     --buy-hover: #f3f7ff;
     --buy-fill: rgba(0, 0, 0, 0.045);
     --buy-accent: #0a7aff;
@@ -32,7 +33,7 @@
     --buy-dot-red: #ff3b30;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
     width: 100%;
     max-width: 1680px;
     min-width: 0;
@@ -49,6 +50,7 @@
     --buy-border: rgba(255, 255, 255, 0.1);
     --buy-hair: rgba(255, 255, 255, 0.07);
     --buy-head: rgba(255, 255, 255, 0.03);
+    --buy-zebra: rgba(255, 255, 255, 0.035);
     --buy-hover: rgba(59, 141, 255, 0.12);
     --buy-fill: rgba(255, 255, 255, 0.07);
     --buy-accent: #3b8dff;
@@ -207,7 +209,6 @@
 .ofi-buy-boxfoot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 52px; padding: 10px 14px; border-top: 1px solid var(--buy-hair); }
 /* Links steht, was die Tafel sagt (Gruppen, Hinweis) — es schiebt die Knöpfe nach rechts. */
 .ofi-buy-boxfoot > :first-child { flex: 1 1 auto; min-width: 0; }
-.ofi-buy-boxfoot > .ofi-buy-total { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ofi-buy-note { margin: 0; padding: 14px; font-size: 12.5px; color: var(--buy-sec); }
 .ofi-buy-boxfoot .ofi-buy-note { padding: 0; }
 .ofi-buy-scroll { overflow-x: auto; }
@@ -403,17 +404,11 @@
 #root .ofi-buy button.ofi-buy-back:hover { background: var(--buy-accent-soft); }
 .ofi-buy-back > svg { width: 17px; height: 17px; }
 #root .ofi-buy .ofi-buy-nav h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
-.ofi-buy-kind { display: inline-flex; align-items: center; gap: 5px; color: var(--buy-sec); font-size: 12.5px; white-space: nowrap; }
-.ofi-buy-kind > svg { width: 14px; height: 14px; }
 .ofi-buy-nav .ofi-buy-stage { flex-direction: row; align-items: center; gap: 10px; }
-.ofi-buy-last { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; margin-left: auto; text-align: right; }
-.ofi-buy-last > small { color: var(--buy-sec); font-size: 11.5px; }
-.ofi-buy-last > small:first-child { font-size: 11px; font-weight: 600; }
-.ofi-buy-last > b { font-size: 12.5px; font-weight: 500; }
 
 .ofi-buy-facts {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     margin: 0;
     border: 1px solid var(--buy-border);
     border-radius: 12px;
@@ -459,10 +454,9 @@ body > :not(#root) .ofi-buy-menu .ofi-option-row.is-danger { color: #d70015; }
 
 /* Zeilen zum Bestellen. */
 .ofi-buy-lines,
-.ofi-buy-mini,
-.ofi-buy-matrix { width: 100%; border-collapse: collapse; }
+.ofi-buy-mini { width: 100%; border-collapse: collapse; }
 .ofi-buy-lines { table-layout: fixed; }
-#root .ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini, .ofi-buy-matrix) th {
+#root .ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini) th {
     height: 32px;
     padding: 0 10px;
     border-bottom: 1px solid var(--buy-hair);
@@ -473,16 +467,16 @@ body > :not(#root) .ofi-buy-menu .ofi-option-row.is-danger { color: #d70015; }
     text-align: left;
     white-space: nowrap;
 }
-#root .ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini, .ofi-buy-matrix) td {
+#root .ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini) td {
     height: 52px;
     padding: 6px 10px;
     border-bottom: 1px solid var(--buy-hair);
     background: transparent;
     vertical-align: middle;
 }
-#root .ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini, .ofi-buy-matrix) tbody tr:last-child td { border-bottom: 0; }
-#root .ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini, .ofi-buy-matrix) :is(th, td).is-num { text-align: right; font-variant-numeric: tabular-nums; }
-.ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini, .ofi-buy-matrix) td small { color: var(--buy-sec); font-size: 11.5px; }
+#root .ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini) tbody tr:last-child td { border-bottom: 0; }
+#root .ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini) :is(th, td).is-num { text-align: right; font-variant-numeric: tabular-nums; }
+.ofi-buy :is(.ofi-buy-lines, .ofi-buy-mini) td small { color: var(--buy-sec); font-size: 11.5px; }
 .ofi-buy-lines td.is-check { text-align: center; }
 .ofi-buy-lines tr.is-off td:not(.is-check) { opacity: 0.45; }
 .ofi-buy-lines tr.is-blocked td { color: var(--buy-muted); }
@@ -515,135 +509,12 @@ body > :not(#root) .ofi-buy-menu .ofi-option-row.is-danger { color: #d70015; }
 #root .ofi-buy input.ofi-buy-input.is-empty:not(:focus) { background: rgba(255, 149, 0, 0.06) !important; }
 #root .ofi-buy input.ofi-buy-input:disabled { opacity: 0.55; }
 #root .ofi-buy input.ofi-buy-check { width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--buy-accent); cursor: pointer; }
-#root .ofi-list-apple [data-production-select-scope] .ofi-buy select.ofi-buy-select:not([multiple]):not([size]) {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 100%;
-    height: 28px;
-    min-height: 28px;
-    margin: 0;
-    padding: 0 26px 0 9px;
-    border: 1px solid rgba(0, 0, 0, 0.14) !important;
-    border-radius: 6px !important;
-    background: #ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12' fill='none' stroke='%236e6e73' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 5 2l2.5 2.5M2.5 7.5 5 10l2.5-2.5'/%3E%3C/svg%3E") no-repeat right 8px center / 9px 11px !important;
-    box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06) !important;
-    color: var(--buy-text) !important;
-    font-size: 12.5px;
-    line-height: 26px;
-    cursor: default;
-}
-#root .ofi-list-apple [data-production-select-scope] .ofi-buy select.ofi-buy-select.is-invalid:not([multiple]):not([size]) { border-color: var(--buy-danger) !important; }
-.dark #root .ofi-list-apple [data-production-select-scope] .ofi-buy select.ofi-buy-select:not([multiple]):not([size]) {
-    border-color: rgba(255, 255, 255, 0.16) !important;
-    background-color: #2c2c2e !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12' fill='none' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 5 2l2.5 2.5M2.5 7.5 5 10l2.5-2.5'/%3E%3C/svg%3E") !important;
-    color: #f5f5f7 !important;
-}
-.ofi-buy-groups { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; font-size: 12.5px; font-weight: 500; }
-.ofi-buy-groups > span { display: inline-flex; align-items: center; gap: 5px; }
-.ofi-buy-groups > span > svg { width: 13px; height: 13px; color: var(--buy-ok); }
-.ofi-buy-groups small { color: var(--buy-sec); font-size: 11.5px; font-weight: 400; }
-.ofi-buy-pop { padding: 4px 0 8px; }
-
-/* Raster der Preisanfrage: Zeilen × Lieferanten. */
-.ofi-buy-matrix { min-width: 640px; }
-#root .ofi-buy .ofi-buy-matrix th.is-supplier { height: auto; padding: 10px; border-left: 1px solid var(--buy-hair); vertical-align: top; white-space: normal; }
-#root .ofi-buy .ofi-buy-matrix th.is-supplier > b { display: block; color: var(--buy-text); font-size: 13px; font-weight: 600; }
-#root .ofi-buy .ofi-buy-matrix th.is-supplier .ofi-buy-act,
-#root .ofi-buy .ofi-buy-matrix th.is-supplier .ofi-buy-btn { margin-top: 6px; }
-.ofi-buy-matrix__doc { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-weight: 500; }
-#root .ofi-buy .ofi-buy-matrix th.is-add { width: 120px; border-left: 1px solid var(--buy-hair); }
-#root .ofi-buy .ofi-buy-matrix td.is-cell { min-width: 160px; border-left: 1px solid var(--buy-hair); text-align: center; }
-#root .ofi-buy .ofi-buy-matrix td.is-none { color: var(--buy-muted); font-size: 12px; }
-#root .ofi-buy .ofi-buy-matrix td.is-price { padding: 4px 6px; text-align: left; }
-#root .ofi-buy .ofi-buy-matrix tfoot td { height: 44px; border-top: 1px solid var(--buy-hair); border-bottom: 0; color: var(--buy-sec); font-weight: 600; font-variant-numeric: tabular-nums; }
-#root .ofi-buy .ofi-buy-matrix tfoot td.is-cell { color: var(--buy-text); }
-#root .ofi-buy button.ofi-buy-pick {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    width: 100%;
-    min-height: 40px;
-    margin: 0;
-    padding: 4px 8px;
-    border: 0;
-    border-radius: 8px !important;
-    background: transparent;
-    box-shadow: none;
-    color: var(--buy-text);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-}
-#root .ofi-buy button.ofi-buy-pick:hover:not(:disabled) { background: var(--buy-hover); }
-#root .ofi-buy button.ofi-buy-pick:disabled { cursor: default; }
-.ofi-buy-pick > span:not(.ofi-buy-radio) { display: flex; flex-direction: column; }
-.ofi-buy-pick b { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.ofi-buy-pick small { color: var(--buy-sec); font-size: 11px; font-variant-numeric: tabular-nums; }
-.ofi-buy-pick em { margin-left: auto; color: var(--buy-ok); font-size: 10.5px; font-style: normal; font-weight: 600; white-space: nowrap; }
-.ofi-buy-radio { flex: none; width: 16px; height: 16px; border: 1px solid rgba(0, 0, 0, 0.25); border-radius: 50%; background: var(--buy-surface); }
-.dark .ofi-buy-radio { border-color: rgba(255, 255, 255, 0.3); }
-.is-on > .ofi-buy-pick .ofi-buy-radio { border: 0; background: var(--buy-accent); box-shadow: inset 0 0 0 4.5px var(--buy-accent), inset 0 0 0 10px #fff; }
-.is-on > .ofi-buy-pick b { font-weight: 600; }
-.is-best > .ofi-buy-pick b { color: var(--buy-ok); }
-.ofi-buy-asked { display: inline-flex; align-items: center; gap: 4px; color: var(--buy-sec); font-size: 11.5px; font-variant-numeric: tabular-nums; }
-.ofi-buy-asked > svg { width: 12px; height: 12px; color: var(--buy-ok); }
-
-/* Verlauf. */
-.ofi-buy-hist { margin: 0; padding: 4px 0; list-style: none; }
-.ofi-buy-hist > li { display: grid; grid-template-columns: 112px 14px minmax(0, 1fr); align-items: start; gap: 8px; padding: 9px 14px; font-size: 12.5px; }
-.ofi-buy-hist > li + li { border-top: 1px solid var(--buy-hair); }
-.ofi-buy-hist time { color: var(--buy-sec); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ofi-buy-hist b { font-weight: 500; }
-.ofi-buy-hist small { display: block; margin-top: 1px; color: var(--buy-sec); font-size: 11.5px; }
-.ofi-buy-hist__dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--buy-dot-grey); }
-.ofi-buy-hist__dot.is-ok { background: var(--buy-dot-green); }
-.ofi-buy-hist__dot.is-wait { background: var(--buy-accent); }
-.ofi-buy-hist__dot.is-info { background: var(--buy-dot-indigo); }
-.ofi-buy-hist__dot.is-off { background: var(--buy-dot-grey); }
 
 /* ── Die Fläche von rechts ── */
 .ofi-buy-sect { margin-top: 16px; }
 #root .ofi-buy .ofi-buy-sect > h4 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 2px 8px; color: var(--buy-sec); font-size: 12px; font-weight: 600; }
 .ofi-buy-sect .ofi-buy-mini { border: 1px solid var(--buy-border); border-radius: 10px; border-collapse: separate; border-spacing: 0; overflow: hidden; }
 #root .ofi-buy .ofi-buy-mini tfoot td { height: 40px; border-top: 1px solid var(--buy-hair); border-bottom: 0; font-weight: 600; }
-.ofi-buy-field { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 4px 12px; margin-top: 10px; font-size: 12.5px; }
-.ofi-buy-field > span { color: var(--buy-sec); }
-.ofi-buy-field > small { grid-column: 2; display: inline-flex; align-items: center; gap: 4px; color: var(--buy-sec); font-size: 11.5px; }
-.ofi-buy-field > small > svg,
-.ofi-buy-file small > svg { width: 12px; height: 12px; color: var(--buy-accent); }
-.ofi-buy-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
-.ofi-buy-hintline { margin: 8px 0 0 108px; color: var(--buy-sec); font-size: 11.5px; }
-.ofi-buy-file { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--buy-border); border-radius: 10px; }
-.ofi-buy-file > svg { flex: none; width: 22px; height: 22px; color: #e5484d; }
-.ofi-buy-file__name { display: flex; flex: 1; flex-direction: column; min-width: 0; }
-.ofi-buy-file b { overflow: hidden; font-size: 12.5px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.ofi-buy-file small { display: inline-flex; align-items: center; gap: 4px; color: var(--buy-sec); font-size: 11px; }
-#root .ofi-buy button.ofi-buy-drop {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    width: 100%;
-    min-height: 84px;
-    margin: 0;
-    padding: 12px;
-    border: 1.5px dashed rgba(0, 0, 0, 0.22);
-    border-radius: 10px !important;
-    background: var(--buy-head);
-    box-shadow: none;
-    color: var(--buy-sec);
-    font: inherit;
-    font-size: 12.5px;
-    cursor: pointer;
-}
-.dark #root .ofi-buy button.ofi-buy-drop { border-color: rgba(255, 255, 255, 0.2); }
-#root .ofi-buy button.ofi-buy-drop:hover,
-#root .ofi-buy button.ofi-buy-drop.is-over { border-color: var(--buy-accent); background: var(--buy-accent-soft); }
-.ofi-buy-drop > svg { width: 20px; height: 20px; color: var(--buy-accent); }
-.ofi-buy-drop b { color: var(--buy-accent-text); font-weight: 600; }
-.ofi-buy-drop small { font-size: 11px; color: var(--buy-muted); }
 .ofi-buy-notice { display: flex; align-items: flex-start; gap: 9px; margin: 16px 0 0; padding: 10px 12px; border: 1px solid var(--buy-border); border-radius: 10px; color: var(--buy-sec); font-size: 12px; line-height: 17px; }
 .ofi-buy-notice > svg { flex: none; width: 16px; height: 16px; margin-top: 1px; color: var(--buy-accent); }
 .ofi-buy-notice.is-quiet { border-style: dashed; }
@@ -679,28 +550,15 @@ body > :not(#root) .ofi-buy-menu .ofi-option-row.is-danger { color: #d70015; }
 .ofi-buy-workspace__body .ofi-buy-mini { min-width: 760px; border-width: 1px 0; border-radius: 0; }
 .ofi-buy-workspace__footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 18px 0 0; border-top: 1px solid var(--buy-hair); }
 .ofi-buy-workspace__footer > p { flex: 1; min-width: 200px; margin: 0; color: var(--buy-sec); font-size: 12px; line-height: 1.5; }
-.ofi-buy-surface .ofi-ows { padding: 0; }
 .ofi-buy-workspace .ofi-buy-empty { border: 0; border-radius: 0; background: transparent; }
-.ofi-buy-box > .ofi-workspace-section { margin-top: 16px; }
 .ofi-buy-lines { min-width: 880px; }
 .ofi-buy-mini .ofi-buy-l1, .ofi-buy-lines .ofi-buy-l1 { white-space: normal; overflow-wrap: anywhere; }
 #root .ofi-buy .ofi-buy-mini tbody tr:nth-child(even) td { background: var(--buy-head); }
-#root .ofi-buy select.ofi-buy-select { width: 100%; min-height: 32px; padding: 4px 28px 4px 9px; border: 1px solid var(--buy-field-border); border-radius: 7px; background-color: var(--buy-field); color: var(--buy-text); font-size: 13px; }
-#root .ofi-buy select.ofi-buy-select.is-invalid { border-color: var(--buy-danger); }
-#root .ofi-buy textarea.ofi-buy-message { width: 100%; min-height: 140px; padding: 12px; border: 1px solid var(--buy-field-border); border-radius: 8px; background: var(--buy-field); color: var(--buy-text); font: inherit; font-size: 13px; line-height: 1.6; resize: vertical; }
-.ofi-buy-mail-error { color: var(--buy-danger); font-size: 12px; }
-.ofi-buy-mail-options { padding: 0 18px 18px; border-top: 1px solid var(--buy-hair); }
-.ofi-buy-file .ofi-mac-loading { justify-content: flex-start; padding: 8px 0 0; }
-.ofi-buy-file .ofi-mac-loading__wheel { flex: none; width: 24px; height: 24px; }
-.ofi-buy-file .ofi-mac-loading b { font-size: 12px; }
 @media (max-width: 760px) {
     .ofi-buy-workspace__head { padding-bottom: 18px; }
     .ofi-buy-workspace__body { gap: 22px; padding-top: 20px; }
     .ofi-buy-workspace__actions { flex-wrap: wrap; }
     .ofi-buy-workspace__footer > p { flex-basis: 100%; }
-    .ofi-buy-field { grid-template-columns: minmax(0, 1fr); }
-    .ofi-buy-field > small { grid-column: 1; }
-    .ofi-buy-hintline { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .ofi-buy-spinner { animation: none; } }
 
@@ -710,7 +568,6 @@ body > :not(#root) .ofi-buy-menu .ofi-option-row.is-danger { color: #d70015; }
     .ofi-buy-facts > div:nth-child(n + 4) { border-top: 1px solid var(--buy-hair); }
     .ofi-buy-docs > li { grid-template-columns: auto minmax(0, 1fr) auto; }
     .ofi-buy-docs__meta, .ofi-buy-docs__state { display: none; }
-    .ofi-buy-last { display: none; }
 }
 @media (max-width: 640px) {
     .ofi-buy-search { width: 100%; margin-left: 0; }
@@ -719,3 +576,683 @@ body > :not(#root) .ofi-buy-menu .ofi-option-row.is-danger { color: #d70015; }
     .ofi-buy-pager { grid-template-columns: minmax(0, 1fr) auto; }
     .ofi-buy-pager__per { display: none; }
 }
+
+/* ══ 29.09.2026 — Fiyat talepleri, Fiyat karşılaştırması, tek tedarikçi ══════
+   Samet: «proje/cihaz satırı, altındaki fiyat karşılaştırma … biraz daha
+   aralıklı olsun … karşılaştırma yeni bir sayfa: Apple modalleri, dropdown,
+   SwiftUI tarzı butonlar, açık gri beyaz satırlar; temiz, profesyonel; en
+   uygunlar işaretlenecek.» */
+
+/* Ein Talep: mehr Luft zwischen Kopf, Belegen und Vergleichen. */
+.ofi-buy.is-request { gap: 30px; }
+.ofi-buy.is-request > .ofi-buy-facts { margin-top: -16px; }
+.ofi-buy.is-compare { gap: 22px; }
+.ofi-buy-document { width: 100%; min-width: 0; }
+#root .ofi-buy .ofi-buy-btn.ofi-buy-more { margin-left: auto; }
+.ofi-buy-lines { min-width: 640px; }
+
+/* Die Art des Talep: Fiyat talebi violett, Satın alma talebi grün. */
+.ofi-buy-kindpill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: fit-content;
+    height: 20px;
+    padding: 0 8px 0 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+}
+.ofi-buy-kindpill > svg { flex: none; width: 12px; height: 12px; }
+.ofi-buy-kindpill.is-price { background: rgba(94, 92, 230, 0.12); color: #4b49c8; }
+.ofi-buy-kindpill.is-order { background: rgba(52, 199, 89, 0.14); color: #1b7a34; }
+.dark .ofi-buy-kindpill.is-price { background: rgba(94, 92, 230, 0.26); color: #c4c3ff; }
+.dark .ofi-buy-kindpill.is-order { background: rgba(48, 209, 88, 0.2); color: #7ee29a; }
+.ofi-buy-table .ofi-buy-kindpill { margin-top: 4px; }
+
+/* Das SwiftUI-Segment (Reiter der Produktion) in dieser Seite. */
+.ofi-buy-seg { display: inline-flex; min-width: 0; max-width: 100%; }
+.ofi-buy-head .ofi-buy-seg { margin-left: 6px; }
+
+/* Ein Knopf einer Zeile, der der nächste Schritt ist. */
+#root .ofi-buy .ofi-buy-act.is-primary { border-color: var(--buy-accent); background: var(--buy-accent); color: #fff; }
+#root .ofi-buy .ofi-buy-act.is-primary:hover:not(:disabled) { border-color: var(--buy-accent-hover); background: var(--buy-accent-hover); }
+
+/* Fiyat talepleri: je Lieferant eine Zeile, das Angebot als PDF daneben. */
+.ofi-buy-asklist > li { grid-template-columns: auto minmax(140px, 240px) minmax(0, 1fr) auto auto; min-height: 56px; }
+.ofi-buy-docs__hint { color: var(--buy-muted); font-size: 12px; }
+/* Ein Angebots-PDF, das über die Zeile gezogen wird. */
+.ofi-buy-asklist > li.is-drop { background: var(--buy-accent-soft); box-shadow: inset 0 0 0 2px var(--buy-accent); }
+#root .ofi-buy button.ofi-buy-offer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    height: 26px;
+    min-height: 0;
+    margin: 0;
+    padding: 0 9px 0 7px;
+    border: 1px solid var(--buy-border);
+    border-radius: 7px !important;
+    background: var(--buy-head);
+    box-shadow: none;
+    color: var(--buy-text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+#root .ofi-buy button.ofi-buy-offer:hover { border-color: var(--buy-accent); background: var(--buy-accent-soft); }
+.ofi-buy-offer > svg { flex: none; width: 14px; height: 14px; color: #e5484d; }
+.ofi-buy-offer > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Die gespeicherten Vergleiche. */
+.ofi-buy-cmplist { margin: 0; padding: 0; list-style: none; }
+.ofi-buy-cmplist > li + li { border-top: 1px solid var(--buy-hair); }
+#root .ofi-buy button.ofi-buy-cmprow {
+    display: grid;
+    grid-template-columns: 34px minmax(130px, 190px) minmax(0, 1fr) 16px;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 64px;
+    margin: 0;
+    padding: 10px 14px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--buy-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+#root .ofi-buy button.ofi-buy-cmprow:hover { background: var(--buy-hover); }
+.ofi-buy-cmprow__icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--buy-accent-soft); color: var(--buy-accent); }
+.ofi-buy-cmprow__icon > svg { width: 17px; height: 17px; }
+.ofi-buy-cmprow__when { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-buy-cmprow__when b { font-size: 13px; font-weight: 600; }
+.ofi-buy-cmprow__when small { overflow: hidden; color: var(--buy-sec); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-buy-cmprow__suppliers { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ofi-buy-cmpchip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 26px; padding: 0 9px; border: 1px solid var(--buy-border); border-radius: 7px; background: var(--buy-head); font-size: 12px; white-space: nowrap; }
+.ofi-buy-cmpchip b { max-width: 180px; overflow: hidden; font-weight: 500; text-overflow: ellipsis; }
+.ofi-buy-cmpchip small { color: var(--buy-sec); font-variant-numeric: tabular-nums; }
+.ofi-buy-cmpchip > svg { flex: none; width: 13px; height: 13px; color: var(--buy-ok); }
+.ofi-buy-cmpchip.is-best { border-color: rgba(52, 199, 89, 0.45); background: rgba(52, 199, 89, 0.1); }
+
+/* Das Fenster «Yeni karşılaştırma» (Portal — ohne die Farben von .ofi-buy). */
+.ofi-buy-cmppick { display: flex; flex-direction: column; gap: 6px; }
+.ofi-buy-cmpopt {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) minmax(0, 230px);
+    align-items: center;
+    gap: 12px;
+    min-height: 54px;
+    padding: 8px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+.ofi-buy-cmpopt:hover { border-color: rgba(10, 122, 255, 0.45); }
+.ofi-buy-cmpopt.is-on { border-color: #0a7aff; background: rgba(10, 122, 255, 0.06); }
+.ofi-buy-cmpopt.is-off { cursor: default; opacity: 0.62; }
+.ofi-buy-cmpopt.is-off:hover { border-color: rgba(0, 0, 0, 0.1); }
+.ofi-buy-cmpopt input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: #0a7aff; }
+.ofi-buy-cmpopt__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-buy-cmpopt__text b { overflow: hidden; color: #1d1d1f; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-buy-cmpopt__text small { color: #6e6e73; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ofi-buy-cmpopt__file { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; color: #1d1d1f; font-size: 12px; }
+.ofi-buy-cmpopt__file > svg { flex: none; width: 16px; height: 16px; color: #e5484d; }
+.ofi-buy-cmpopt__file > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-buy-cmpopt__file.is-missing { color: #a1a1a6; }
+.ofi-buy-cmpopt__file.is-missing > svg { color: #c7c7cc; }
+.ofi-buy-cmprun { display: grid; place-items: center; min-height: 220px; }
+:root.dark .ofi-buy-cmpopt,
+.dark .ofi-buy-cmpopt { border-color: rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); }
+:root.dark .ofi-buy-cmpopt.is-on,
+.dark .ofi-buy-cmpopt.is-on { border-color: #3b8dff; background: rgba(59, 141, 255, 0.14); }
+:root.dark .ofi-buy-cmpopt__text b,
+.dark .ofi-buy-cmpopt__text b,
+:root.dark .ofi-buy-cmpopt__file,
+.dark .ofi-buy-cmpopt__file { color: #f5f5f7; }
+:root.dark .ofi-buy-cmpopt__text small,
+.dark .ofi-buy-cmpopt__text small { color: #a1a1a6; }
+
+/* «Sipariş oluştur»: EIN Lieferant für alle Zeilen. */
+.ofi-buy-supplierbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 12px 14px; border-bottom: 1px solid var(--buy-hair); background: var(--buy-head); }
+.ofi-buy-supplierbar__label { min-width: 72px; color: var(--buy-sec); font-size: 12px; font-weight: 600; }
+.ofi-buy-supplierbar__empty { color: var(--buy-muted); font-size: 13px; }
+.ofi-buy-supplierbar__hint { margin-left: auto; color: var(--buy-sec); font-size: 11.5px; }
+.ofi-buy-supplierchip { display: inline-flex; align-items: center; gap: 7px; min-width: 0; height: 30px; padding: 0 4px 0 10px; border: 1px solid var(--buy-border); border-radius: 8px; background: var(--buy-surface); font-size: 13px; }
+.ofi-buy-supplierchip > svg { flex: none; width: 15px; height: 15px; color: var(--buy-accent); }
+.ofi-buy-supplierchip b { max-width: 320px; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+#root .ofi-buy .ofi-buy-supplierchip > button { display: grid; place-items: center; width: 22px; height: 22px; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 6px !important; background: transparent; box-shadow: none; color: var(--buy-sec); cursor: pointer; }
+#root .ofi-buy .ofi-buy-supplierchip > button:hover { background: var(--buy-fill); }
+.ofi-buy-supplierchip > button > svg { width: 13px; height: 13px; }
+
+/* ── Die Seite eines Vergleichs ── */
+.ofi-buy-cmphead { justify-content: space-between; }
+.ofi-buy-cmphead__pick { display: inline-flex; width: min(440px, 100%); min-width: 0; margin-left: auto; }
+.ofi-buy-cmphead__pick > * { width: 100%; }
+#root .ofi-buy .ofi-buy-cmpselect { width: 100%; min-width: 0; height: 32px; min-height: 0; font-size: 13px; }
+.ofi-buy-cmptitle { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-top: -12px; }
+#root .ofi-buy .ofi-buy-cmptitle h1 { margin: 0; color: var(--buy-text); font-size: 24px; font-weight: 650; letter-spacing: -0.022em; }
+.ofi-buy-cmptitle p { margin: 5px 0 0; color: var(--buy-sec); font-size: 13px; }
+.ofi-buy-cmptitle .ofi-buy-kindpill { margin-top: 6px; }
+
+.ofi-buy-cmpcards { display: grid; gap: 14px; }
+.ofi-buy-cmpcards.is-1 { grid-template-columns: minmax(0, 440px); }
+.ofi-buy-cmpcards.is-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ofi-buy-cmpcards.is-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ofi-buy-cmpcards.is-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ofi-buy-cmpcard {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--buy-border);
+    border-radius: 14px;
+    background: var(--buy-surface);
+    box-shadow: var(--buy-shadow);
+}
+.ofi-buy-cmpcard.is-best { border-color: rgba(52, 199, 89, 0.6); box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.14); }
+.ofi-buy-cmpcard > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; min-width: 0; }
+.ofi-buy-cmpcard > header > b { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-buy-bestbadge { display: inline-flex; flex: none; align-items: center; gap: 4px; height: 22px; padding: 0 9px; border-radius: 11px; background: var(--buy-ok); color: #fff; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.dark .ofi-buy-bestbadge { color: #04210d; }
+.ofi-buy-bestbadge > svg { width: 12px; height: 12px; }
+.ofi-buy-cmpcard__codes { color: var(--buy-sec); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ofi-buy-cmpcard__total { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.ofi-buy-cmpcard__cover { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--buy-warn); font-size: 12px; font-weight: 500; }
+.ofi-buy-cmpcard__cover.is-ok { color: var(--buy-sec); }
+.ofi-buy-cmpcard__cover em { color: var(--buy-ok); font-style: normal; font-weight: 600; }
+.ofi-buy-cmpcard__facts { display: flex; flex-direction: column; margin: 2px 0 0; border-top: 1px solid var(--buy-hair); }
+.ofi-buy-cmpcard__facts > div { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--buy-hair); font-size: 12px; }
+.ofi-buy-cmpcard__facts dt { color: var(--buy-sec); }
+.ofi-buy-cmpcard__facts dd { margin: 0; overflow-wrap: anywhere; }
+.ofi-buy-cmpcard__note { margin: 0; color: var(--buy-sec); font-size: 12px; line-height: 1.45; }
+#root .ofi-buy .ofi-buy-cmpcard > .ofi-buy-btn { align-self: flex-start; margin-top: auto; }
+#root .ofi-buy .ofi-buy-cmpcard > .ofi-buy-btn > svg { color: #e5484d; }
+
+.ofi-buy-aibox { display: flex; gap: 12px; padding: 14px 16px; border: 1px solid rgba(94, 92, 230, 0.22); border-radius: 14px; background: linear-gradient(180deg, rgba(94, 92, 230, 0.07), rgba(10, 122, 255, 0.035)); }
+.dark .ofi-buy-aibox { border-color: rgba(140, 138, 255, 0.28); background: linear-gradient(180deg, rgba(94, 92, 230, 0.16), rgba(59, 141, 255, 0.06)); }
+.ofi-buy-aibox__icon { display: grid; flex: none; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(94, 92, 230, 0.14); color: #5e5ce6; }
+.dark .ofi-buy-aibox__icon { color: #b4b3ff; }
+.ofi-buy-aibox__icon > svg { width: 16px; height: 16px; }
+.ofi-buy-aibox b { font-size: 13px; font-weight: 600; }
+.ofi-buy-aibox p { margin: 4px 0 0; color: var(--buy-text); font-size: 13px; line-height: 1.55; white-space: pre-line; }
+
+.ofi-buy-cmptable .ofi-buy-boxhead__meta { display: inline-flex; align-items: center; }
+.ofi-buy-cmpgrid { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+#root .ofi-buy .ofi-buy-cmpgrid th {
+    height: 46px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--buy-hair);
+    background: var(--buy-head);
+    color: var(--buy-sec);
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+}
+#root .ofi-buy .ofi-buy-cmpgrid th.is-supplier { border-left: 1px solid var(--buy-hair); white-space: normal; }
+#root .ofi-buy .ofi-buy-cmpgrid th.is-supplier > b { display: block; overflow: hidden; color: var(--buy-text); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+#root .ofi-buy .ofi-buy-cmpgrid th.is-supplier > small { color: var(--buy-muted); font-size: 10.5px; font-weight: 500; }
+#root .ofi-buy .ofi-buy-cmpgrid th.is-supplier.is-best { box-shadow: inset 0 -2px 0 var(--buy-ok); }
+#root .ofi-buy .ofi-buy-cmpgrid td {
+    height: 60px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--buy-hair);
+    background: var(--buy-surface);
+    vertical-align: middle;
+}
+#root .ofi-buy .ofi-buy-cmpgrid tbody tr:nth-child(even) td { background: var(--buy-zebra); }
+#root .ofi-buy .ofi-buy-cmpgrid :is(th, td).is-num { text-align: right; font-variant-numeric: tabular-nums; }
+#root .ofi-buy .ofi-buy-cmpgrid td.is-index { color: var(--buy-muted); font-size: 12px; }
+#root .ofi-buy .ofi-buy-cmpgrid td small { color: var(--buy-sec); font-size: 11.5px; }
+#root .ofi-buy .ofi-buy-cmpgrid td.is-offer { border-left: 1px solid var(--buy-hair); }
+#root .ofi-buy .ofi-buy-cmpgrid td.is-offer.is-none { color: var(--buy-muted); font-size: 12px; }
+#root .ofi-buy .ofi-buy-cmpgrid tbody td.is-offer.is-best { background: rgba(52, 199, 89, 0.1); box-shadow: inset 3px 0 0 var(--buy-ok); }
+.dark #root .ofi-buy .ofi-buy-cmpgrid tbody td.is-offer.is-best { background: rgba(48, 209, 88, 0.14); }
+#root .ofi-buy .ofi-buy-cmpgrid tfoot td { height: 58px; border-top: 1px solid var(--buy-border); border-bottom: 0; background: var(--buy-head); font-weight: 600; }
+#root .ofi-buy .ofi-buy-cmpgrid tfoot td.is-offer.is-best { background: rgba(52, 199, 89, 0.12); }
+.ofi-buy-offercell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-buy-offercell > b { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-buy-offercell > b > sup { margin-left: 3px; color: var(--buy-muted); font-size: 10px; }
+.ofi-buy-offercell > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-buy-bestmark { display: inline-flex; align-items: center; gap: 3px; width: fit-content; margin-top: 2px; color: var(--buy-ok); font-size: 10.5px; font-style: normal; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
+.ofi-buy-bestmark > svg { width: 12px; height: 12px; }
+.ofi-buy-cmpfoot { justify-content: space-between; }
+.ofi-buy-cmpfoot > .ofi-buy-cmplegend { flex: 1 1 320px; }
+.ofi-buy-cmplegend { display: inline-flex; align-items: center; gap: 6px; color: var(--buy-sec); font-size: 12px; }
+.ofi-buy-cmplegend > svg { flex: none; width: 14px; height: 14px; color: var(--buy-accent); }
+.ofi-buy-cmpmix { display: inline-flex; align-items: baseline; gap: 8px; }
+.ofi-buy-cmpmix small { color: var(--buy-sec); font-size: 12px; }
+.ofi-buy-cmpmix b { color: var(--buy-ok); font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.ofi-buy-cmpmodel { margin: -12px 2px 0; color: var(--buy-muted); font-size: 11px; text-align: right; }
+
+@media (max-width: 1100px) {
+    .ofi-buy-cmpcards.is-3,
+    .ofi-buy-cmpcards.is-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ofi-buy-asklist > li { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .ofi-buy-asklist .ofi-buy-docs__state { display: none; }
+    .ofi-buy-asklist .ofi-buy-docs__meta { display: block; grid-column: 1 / -1; order: 5; }
+}
+@media (max-width: 640px) {
+    .ofi-buy-cmpcards { grid-template-columns: minmax(0, 1fr) !important; }
+    #root .ofi-buy button.ofi-buy-cmprow { grid-template-columns: 34px minmax(0, 1fr) 16px; }
+    .ofi-buy-cmprow__suppliers { grid-column: 2 / -1; }
+    .ofi-buy-supplierbar__hint { flex-basis: 100%; margin-left: 0; }
+    .ofi-buy-cmpopt { grid-template-columns: 18px minmax(0, 1fr); }
+    .ofi-buy-cmpopt__file { grid-column: 2; justify-content: flex-start; }
+    .ofi-buy-head .ofi-buy-seg { order: 5; flex-basis: 100%; margin-left: 0; }
+    .ofi-buy-cmphead__pick { width: 100%; margin-left: 0; }
+}
+
+/* ══ DIE AUTOMATIK (30.09.2026) ══════════════════════════════════════════════
+   Anfragen mit ihrem Mailstand, Bestellungen mit «gesendet am» und dem Weg
+   zurück zur Anfrage, die Auswahl im Vergleich und die Leiste «Sipariş oluştur». */
+
+/* Eine Preisanfrage: wer · wohin/wann · Angebot · Stand · Handgriffe. */
+.ofi-buy-asklist > li.ofi-buy-askrow { grid-template-columns: auto minmax(180px, 300px) minmax(0, 1fr) auto auto; align-items: center; }
+.ofi-buy-askrow__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-buy-askrow__who > b { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-buy-askmail { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; color: var(--buy-muted); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-buy-askmail > svg { flex: none; width: 13px; height: 13px; }
+.ofi-buy-askmail.is-ok { color: var(--buy-sec); }
+.ofi-buy-askmail.is-ok > svg { color: var(--buy-ok); }
+.ofi-buy-askmail.is-warn { color: var(--buy-warn); }
+.ofi-buy-askmail.is-busy { color: var(--buy-accent-text); }
+.ofi-buy-askmail.is-busy > svg { animation: ofi-buy-fly 1100ms ease-in-out infinite; }
+@keyframes ofi-buy-fly {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(2px, -2px); }
+}
+.ofi-buy-askrow__offer { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.ofi-buy-askreply { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--buy-sec); font-size: 11.5px; }
+#root .ofi-buy .ofi-buy-askreply > button {
+    height: 20px;
+    min-height: 0;
+    padding: 0 7px;
+    border: 0;
+    border-radius: 5px !important;
+    background: var(--buy-fill);
+    box-shadow: none;
+    color: var(--buy-accent-text);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Bestellungen: Lieferant mit «gesendet am» darunter, das Schild zur Anfrage. */
+.ofi-buy-docs__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-buy-docs__who > small { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--buy-muted); font-size: 11.5px; }
+#root .ofi-buy button.ofi-buy-srclink {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 20px;
+    min-height: 0;
+    padding: 0 7px 0 5px;
+    border: 0;
+    border-radius: 10px !important;
+    background: rgba(94, 92, 230, 0.12);
+    box-shadow: none;
+    color: #4b49c8;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+#root .ofi-buy button.ofi-buy-srclink > svg { width: 11px; height: 11px; }
+.dark #root .ofi-buy button.ofi-buy-srclink { background: rgba(94, 92, 230, 0.26); color: #c4c3ff; }
+
+/* Vergleich: die Zelle ist ein Knopf; gewählt = blauer Rahmen + Punkt. */
+.ofi-buy-cmppickhint { display: flex; align-items: center; gap: 7px; margin: 0; padding: 9px 14px; border-bottom: 1px solid var(--buy-hair); color: var(--buy-sec); font-size: 12px; }
+.ofi-buy-cmppickhint > svg { flex: none; width: 14px; height: 14px; color: var(--buy-accent); }
+#root .ofi-buy .ofi-buy-cmpgrid td.is-offer.is-pickable { padding: 0; }
+#root .ofi-buy button.ofi-buy-offerpick {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    min-height: 60px;
+    margin: 0;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease, box-shadow 160ms ease;
+}
+#root .ofi-buy button.ofi-buy-offerpick:hover:not(:disabled) { background: var(--buy-hover); }
+#root .ofi-buy button.ofi-buy-offerpick:disabled { cursor: default; }
+.ofi-buy-offerpick__dot { display: inline-grid; flex: none; place-items: center; width: 20px; height: 20px; color: var(--buy-muted); transition: color 160ms ease, transform 220ms cubic-bezier(0.2, 0.9, 0.25, 1.15); }
+.ofi-buy-offerpick__dot > svg { width: 18px; height: 18px; }
+#root .ofi-buy .ofi-buy-cmpgrid td.is-offer.is-chosen { box-shadow: inset 0 0 0 2px var(--buy-accent); }
+#root .ofi-buy .ofi-buy-cmpgrid td.is-offer.is-chosen .ofi-buy-offerpick__dot { color: var(--buy-accent); transform: scale(1.08); }
+#root .ofi-buy .ofi-buy-cmpgrid td.is-offer.is-unasked { background: repeating-linear-gradient(135deg, transparent 0 6px, var(--buy-fill) 6px 7px); color: var(--buy-muted); font-size: 11.5px; font-style: italic; }
+#root .ofi-buy .ofi-buy-cmpgrid tbody tr.is-unpicked td:not(.is-offer) { color: var(--buy-muted); }
+
+/* Die Leiste unter dem Vergleich: «n kalem · m tedarikçi» + «Sipariş oluştur». */
+.ofi-buy-orderbar {
+    position: sticky;
+    bottom: 12px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px 12px 18px;
+    border: 1px solid var(--buy-border);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--buy-surface) 86%, transparent);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    backdrop-filter: saturate(180%) blur(18px);
+    animation: ofi-buy-rise 360ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+}
+.ofi-buy-orderbar.is-empty { box-shadow: var(--buy-shadow); }
+.ofi-buy-orderbar__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-buy-orderbar__text > b { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-buy-orderbar__text > small { color: var(--buy-sec); font-size: 12px; font-variant-numeric: tabular-nums; }
+@keyframes ofi-buy-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ofi-buy-orderbar, .ofi-buy-askmail.is-busy > svg { animation: none; }
+}
+@media (max-width: 1100px) {
+    .ofi-buy-asklist > li.ofi-buy-askrow { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .ofi-buy-asklist > li.ofi-buy-askrow .ofi-buy-askrow__offer { grid-column: 2 / -1; }
+}
+
+/* Das Fenster «Siparişleri oluştur» ist ein Portal — Klassen ohne #root, Farben aus `--ofi-cal-*`. */
+.ofi-buy-orderreview { display: flex; flex-direction: column; margin: 0 0 12px; padding: 0; border: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.08)); border-radius: 12px; list-style: none; overflow: hidden; }
+.ofi-buy-orderreview > li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; }
+.ofi-buy-orderreview > li + li { border-top: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.08)); }
+.ofi-buy-orderreview__icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(10, 122, 255, 0.1); color: var(--ofi-cal-accent, #0a7aff); }
+.ofi-buy-orderreview__icon > svg { width: 16px; height: 16px; }
+.ofi-buy-orderreview__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-buy-orderreview__text > b { overflow: hidden; color: var(--ofi-cal-text, #1d1d1f); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-buy-orderreview__text > small { overflow: hidden; color: var(--ofi-cal-muted, #6e6e73); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-buy-orderreview__sum { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.ofi-buy-orderreview__sum > b { color: var(--ofi-cal-text, #1d1d1f); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-buy-orderreview__sum > small { color: var(--ofi-cal-muted, #6e6e73); font-size: 11.5px; }
+
+/* Die Adresse, die einer Preisanfrage fehlt (30.09.2026): Feld + «Kaydet ve gönder» in der Zeile. */
+.ofi-buy-askemail { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; width: 100%; min-width: 0; }
+.ofi-buy-askemail__field {
+    display: inline-flex;
+    flex: 1 1 220px;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 340px;
+    height: 30px;
+    padding: 0 9px;
+    border: 1px solid var(--buy-field-border);
+    border-radius: 7px;
+    background: var(--buy-field);
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.ofi-buy-askemail__field:focus-within { border-color: var(--buy-accent); box-shadow: 0 0 0 3px var(--buy-ring); }
+.ofi-buy-askemail__field.is-invalid { border-color: var(--buy-danger); }
+.ofi-buy-askemail__field > svg { flex: none; width: 14px; height: 14px; color: var(--buy-warn); }
+#root .ofi-buy .ofi-buy-askemail__field > input {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--buy-text);
+    font: inherit;
+    font-size: 12.5px;
+    outline: none;
+}
+.ofi-buy-askemail__err { flex-basis: 100%; color: var(--buy-danger); font-size: 11.5px; }
+
+/* Vergleich einer BOM im Entwurf (30.09.2026): bestellt wird erst nach der Freigabe — die Leiste sagt es vorher. */
+.ofi-buy-orderbar.is-locked { justify-content: flex-start; background: var(--buy-surface); }
+.ofi-buy-orderbar.is-locked .ofi-buy-orderbar__text { flex: 1 1 auto; }
+.ofi-buy-orderbar.is-locked .ofi-buy-orderbar__text > small { white-space: normal; line-height: 1.45; }
+.ofi-buy-orderbar__lock { display: grid; flex: none; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(255, 149, 0, 0.14); color: #b25000; }
+.ofi-buy-orderbar__lock > svg { width: 17px; height: 17px; }
+.dark .ofi-buy-orderbar__lock { background: rgba(255, 159, 10, 0.2); color: #ffb340; }
+@media (max-width: 760px) {
+    .ofi-buy-orderbar.is-locked { flex-wrap: wrap; }
+    .ofi-buy-orderbar.is-locked .ofi-buy-orderbar__text { flex-basis: calc(100% - 50px); }
+}
+
+/* Vergleich: Zeilen, die nicht bestellt würden — und die Bestellmenge, wenn sie von der Anfrage abweicht (30.09.2026). */
+.ofi-buy-cmpskip { display: inline-flex; align-items: center; width: fit-content; margin-top: 3px; padding: 1px 7px; border-radius: 9px; background: var(--buy-fill); color: var(--buy-sec); font-size: 11px; font-style: normal; font-weight: 600; }
+.ofi-buy-cmpskip.is-in_stock { background: rgba(52, 199, 89, 0.12); color: #1b7a34; }
+.ofi-buy-cmpskip.is-open_order { background: rgba(10, 122, 255, 0.1); color: var(--buy-accent-text); }
+.ofi-buy-cmpskip.is-no_product { background: rgba(255, 149, 0, 0.14); color: #b25000; }
+.dark .ofi-buy-cmpskip.is-in_stock { background: rgba(48, 209, 88, 0.18); color: #7ee29a; }
+.dark .ofi-buy-cmpskip.is-no_product { background: rgba(255, 159, 10, 0.2); color: #ffb340; }
+.ofi-buy-cmporderqty { display: block; margin-top: 2px; color: var(--buy-accent-text); font-size: 11px; font-weight: 600; }
+
+/* ══ BESTELLUNGEN ALS LISTE (30.09.2026 abends) ═══════════════════════════════
+   Wie die Preisanfragen: je Bestellung Angebotsnummer, Angebots-PDF, die Sendung
+   mit ihren PDF (auch Revisionen) und der eine Handgriff. */
+.ofi-buy-orderlist > li.ofi-buy-orderrow { grid-template-columns: auto minmax(190px, 300px) minmax(0, 1fr) auto auto; align-items: center; min-height: 64px; }
+.ofi-buy-orderlist > li.ofi-buy-orderrow.is-drop { background: var(--buy-accent-soft); box-shadow: inset 0 0 0 2px var(--buy-accent); }
+.ofi-buy-orderrow__meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--buy-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ofi-buy-orderrow__work { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+.ofi-buy-quotefield {
+    display: inline-flex;
+    flex: 0 1 210px;
+    align-items: center;
+    gap: 6px;
+    min-width: 150px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--buy-field-border);
+    border-radius: 7px;
+    background: var(--buy-field);
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.ofi-buy-quotefield:focus-within { border-color: var(--buy-accent); box-shadow: 0 0 0 3px var(--buy-ring); }
+.ofi-buy-quotefield.is-missing { border-color: color-mix(in srgb, var(--buy-warn) 55%, transparent); background: color-mix(in srgb, var(--buy-warn) 7%, var(--buy-field)); }
+.ofi-buy-quotefield > svg { flex: none; width: 13px; height: 13px; color: var(--buy-muted); }
+.ofi-buy-quotefield.is-missing > svg { color: var(--buy-warn); }
+.ofi-buy-quotefield > svg.is-ok { color: var(--buy-ok); }
+#root .ofi-buy .ofi-buy-quotefield > input {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--buy-text);
+    font: inherit;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+}
+.ofi-buy-revpdfs { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+#root .ofi-buy button.ofi-buy-pdfchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 20px;
+    min-height: 0;
+    margin-left: 4px;
+    padding: 0 7px 0 5px;
+    border: 0;
+    border-radius: 6px !important;
+    background: var(--buy-fill);
+    box-shadow: none;
+    color: var(--buy-text);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+#root .ofi-buy button.ofi-buy-pdfchip > svg { width: 12px; height: 12px; color: #e5484d; }
+#root .ofi-buy .ofi-buy-act.is-confirm { border-color: color-mix(in srgb, #ff9500 55%, transparent); color: #b25000; }
+#root .ofi-buy .ofi-buy-act.is-confirm:hover:not(:disabled) { border-color: #ff9500; background: #ff9500; color: #fff; }
+.dark #root .ofi-buy .ofi-buy-act.is-confirm { color: #ffb340; }
+@media (max-width: 1100px) {
+    .ofi-buy-orderlist > li.ofi-buy-orderrow { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .ofi-buy-orderlist > li.ofi-buy-orderrow .ofi-buy-orderrow__work { grid-column: 2 / -1; }
+    .ofi-buy-orderlist > li.ofi-buy-orderrow .ofi-buy-docs__state { display: none; }
+}
+
+/* Das Fenster «Siparişleri oluştur»: die Angebotsnummer je Lieferant (Portal — ohne #root). */
+.ofi-buy-orderreview__quote { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; }
+.ofi-buy-orderreview__quote > span { color: var(--ofi-cal-muted, #6e6e73); font-size: 11.5px; white-space: nowrap; }
+.ofi-buy-orderreview__quote > input {
+    width: 200px;
+    max-width: 100%;
+    height: 28px;
+    min-height: 0;
+    padding: 0 9px;
+    border: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.12));
+    border-radius: 7px;
+    background: var(--ofi-cal-surface, #fff);
+    color: var(--ofi-cal-text, #1d1d1f);
+    font: inherit;
+    font-size: 12.5px;
+}
+.ofi-buy-orderreview__quote.is-missing > input { border-color: rgba(255, 149, 0, 0.7); }
+
+/* ══ HANDGRIFFE ALS FARBIGE SYMBOLE (30.09.2026, Vorgabe Samet) ══════════════
+   «Bütün butonlar ikon şeklinde, farklı renkte, üstüne gelince sola doğru
+   açılsın — çok temiz.» Runder Knopf; das Wort gleitet beim Zeigen links heraus. */
+.ofi-buy-headacts { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.ofi-buy-addanchor { display: inline-flex; }
+#root .ofi-buy .ofi-buy-boxhead__meta + .ofi-buy-headacts { margin-left: 8px; }
+#root .ofi-buy .ofi-buy-docs__act { gap: 5px; }
+#root .ofi-iact {
+    --iact: #0a7aff;
+    --iact-soft: rgba(10, 122, 255, 0.1);
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    height: 30px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 15px !important;
+    background: var(--iact-soft);
+    box-shadow: none;
+    color: var(--iact);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 180ms ease, color 180ms ease;
+}
+#root .ofi-iact.is-blue { --iact: #0a7aff; --iact-soft: rgba(10, 122, 255, 0.1); }
+#root .ofi-iact.is-indigo { --iact: #5856d6; --iact-soft: rgba(88, 86, 214, 0.1); }
+#root .ofi-iact.is-teal { --iact: #0d8f8a; --iact-soft: rgba(48, 176, 199, 0.12); }
+#root .ofi-iact.is-orange { --iact: #c96a00; --iact-soft: rgba(255, 149, 0, 0.13); }
+#root .ofi-iact.is-green { --iact: #1f8a3b; --iact-soft: rgba(52, 199, 89, 0.13); }
+#root .ofi-iact.is-gray { --iact: #6e6e73; --iact-soft: rgba(0, 0, 0, 0.05); }
+#root .ofi-iact.is-red { --iact: #d70015; --iact-soft: rgba(255, 59, 48, 0.1); }
+#root .ofi-iact.is-purple { --iact: #9b3fd6; --iact-soft: rgba(175, 82, 222, 0.11); }
+.dark #root .ofi-iact.is-blue { --iact: #5ea8ff; --iact-soft: rgba(59, 141, 255, 0.18); }
+.dark #root .ofi-iact.is-indigo { --iact: #9d9bff; --iact-soft: rgba(94, 92, 230, 0.22); }
+.dark #root .ofi-iact.is-teal { --iact: #5ad1cc; --iact-soft: rgba(64, 200, 224, 0.16); }
+.dark #root .ofi-iact.is-orange { --iact: #ffb340; --iact-soft: rgba(255, 159, 10, 0.18); }
+.dark #root .ofi-iact.is-green { --iact: #5fd87c; --iact-soft: rgba(48, 209, 88, 0.18); }
+.dark #root .ofi-iact.is-gray { --iact: #aeaeb2; --iact-soft: rgba(255, 255, 255, 0.08); }
+.dark #root .ofi-iact.is-red { --iact: #ff6961; --iact-soft: rgba(255, 69, 58, 0.18); }
+.dark #root .ofi-iact.is-purple { --iact: #d49bff; --iact-soft: rgba(191, 90, 242, 0.2); }
+#root .ofi-iact .ofi-iact__label {
+    display: inline-block;
+    max-width: 0;
+    overflow: hidden;
+    padding-left: 0;
+    opacity: 0;
+    transition: max-width 260ms cubic-bezier(0.32, 0.72, 0, 1), opacity 180ms ease, padding 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+#root .ofi-iact:hover:not(:disabled) .ofi-iact__label,
+#root .ofi-iact:focus-visible .ofi-iact__label { max-width: 220px; padding-left: 12px; opacity: 1; }
+#root .ofi-iact:hover:not(:disabled) { background: var(--iact); color: #fff; box-shadow: none; }
+#root .ofi-iact:focus-visible { outline: 2px solid color-mix(in srgb, var(--iact) 45%, transparent); outline-offset: 2px; }
+#root .ofi-iact:disabled { cursor: default; opacity: 0.38; }
+.ofi-iact__icon { position: relative; display: inline-grid; flex: none; place-items: center; width: 30px; height: 30px; }
+.ofi-iact__icon > svg { width: 15px; height: 15px; }
+.ofi-iact__spin { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ofi-buy-spin 700ms linear infinite; }
+.ofi-iact__badge {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    display: grid;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--iact);
+    color: #fff;
+    font-size: 9.5px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 1;
+}
+#root .ofi-iact:hover:not(:disabled) .ofi-iact__badge { background: #fff; color: var(--iact); }
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-iact .ofi-iact__label { transition: none; }
+}
+
+/* Das Schild der Preisanfrage einer Bestellung: ein Symbol, ein Klick öffnet es nach rechts. */
+#root .ofi-buy button.ofi-buy-srctag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    height: 20px;
+    min-height: 0;
+    padding: 0 5px;
+    border: 0;
+    border-radius: 10px !important;
+    background: rgba(94, 92, 230, 0.12);
+    box-shadow: none;
+    color: #4b49c8;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: gap 240ms ease, padding 240ms ease;
+}
+#root .ofi-buy button.ofi-buy-srctag > svg { flex: none; width: 12px; height: 12px; }
+.ofi-buy-srctag__code,
+#root .ofi-buy .ofi-buy-srctag .ofi-buy-srctag__go { max-width: 0; overflow: hidden; opacity: 0; transition: max-width 260ms cubic-bezier(0.32, 0.72, 0, 1), opacity 180ms ease; }
+#root .ofi-buy button.ofi-buy-srctag.is-open { gap: 4px; padding: 0 7px 0 6px; }
+#root .ofi-buy button.ofi-buy-srctag.is-open .ofi-buy-srctag__code { max-width: 120px; opacity: 1; }
+#root .ofi-buy button.ofi-buy-srctag.is-open .ofi-buy-srctag__go { max-width: 14px; opacity: 1; }
+.dark #root .ofi-buy button.ofi-buy-srctag { background: rgba(94, 92, 230, 0.26); color: #c4c3ff; }
+.ofi-buy-askreply > svg { width: 12px; height: 12px; flex: none; }
+
+/* Keine Schatten, kein Leuchten an den Symbol-Knöpfen (30.09.2026: «arkada gölge, parlama olmasın»). */
+#root .ofi-iact,
+#root .ofi-iact:hover,
+#root .ofi-iact:active,
+#root .ofi-iact:focus { box-shadow: none !important; filter: none !important; text-shadow: none !important; }
+#root .ofi-iact::before,
+#root .ofi-iact::after { content: none !important; display: none !important; }

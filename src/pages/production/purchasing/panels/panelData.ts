@@ -21,10 +21,3 @@ export const usePurchase = (requestId: string, purchaseOrderId: string, reload =
     }, [requestId, purchaseOrderId, reload]);
     return { detail: state?.detail ?? null, purchase: state?.purchase ?? null, error };
 };
-
-/** Die Preise, die ein Beleg schon trägt — als Text für die Eingabefelder. */
-export const pricesOf = (purchase: BomPurchase): Record<number, string> =>
-    Object.fromEntries(purchase.lines.map((line) => {
-        const price = line.grossPrice || line.netPrice;
-        return [line.index, price > 0 ? String(price) : ''];
-    }));

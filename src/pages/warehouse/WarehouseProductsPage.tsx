@@ -414,7 +414,10 @@ export const WarehouseProductsPage = () => {
                                     onClick={() => { setSelected(index); open(product); }}
                                 >
                                     <td>{product.erpCode ? <span className="ofi-wh-code">{product.erpCode}</span> : <Empty />}</td>
-                                    <td className="is-name" title={product.name}>{product.name}</td>
+                                    <td className="is-name" title={product.name}>
+                                        {product.name}
+                                        {product.isDraft && <span className="ofi-wh-draftmark" title={t('warehouse.products.draftFilterHint')}>{t('warehouse.product.draftChip')}</span>}
+                                    </td>
                                     <td title={product.brand ?? undefined}>{product.brand ?? <Empty />}</td>
                                     <td title={product.modelNumber ?? undefined}>{product.modelNumber ?? <Empty />}</td>
                                     <td title={product.suppliers.map((entry) => entry.name).join(', ') || undefined}>

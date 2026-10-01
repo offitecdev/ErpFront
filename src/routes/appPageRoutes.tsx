@@ -104,6 +104,7 @@ const ProductionTemplatesTasksPage = lazyNamed(() => import('../pages/production
 const ProductionTemplatesBomPage = lazyNamed(() => import('../pages/production/hub/ProductionHubs'), 'ProductionTemplatesBomPage');
 const ProductionSettingsGeneralPage = lazyNamed(() => import('../pages/production/hub/ProductionHubs'), 'ProductionSettingsGeneralPage');
 const ProductionSettingsAccessPage = lazyNamed(() => import('../pages/production/hub/ProductionHubs'), 'ProductionSettingsAccessPage');
+const ProductionSettingsMailPage = lazyNamed(() => import('../pages/production/hub/ProductionHubs'), 'ProductionSettingsMailPage');
 const ProductionPurchasingPage = lazyNamed(() => import('../pages/production/purchasing/ProductionPurchasingPage'), 'ProductionPurchasingPage');
 const ProductionCostingPage = lazyNamed(() => import('../pages/production/costing/ProductionCostingPage'), 'ProductionCostingPage');
 // Depo (26.09.2026, Vorgabe Samet): das eigene Lager der Produktionsfirma —
@@ -404,6 +405,7 @@ export const renderAppPageRoutes = () => (
         <Route path="/production/bom-templates" element={<KeepQueryRedirect to="/production/templates/bom" />} />
         <Route path="/production/settings" element={productionPage(ProductionSettingsGeneralPage)} />
         <Route path="/production/settings/access" element={productionPage(ProductionSettingsAccessPage)} />
+        <Route path="/production/settings/mail" element={productionPage(ProductionSettingsMailPage)} />
         {/* Satın alma (27.09.2026 abends): die Talepler der BOMs — Buchhaltung und Administratorrolle. */}
         <Route path="/production/purchasing" element={productionPage(ProductionPurchasingPage)} />
         {/* Kalkülasyon (27.09.2026 abends): geplante gegen tatsächliche Materialkosten aus der BOM. */}

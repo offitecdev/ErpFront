@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { MacLoading } from '@/components/ui-shared/MacLoading';
-import { CheckCircle2, ListChecks, PackageCheck, Paperclip, Send, ShoppingCart, TriangleAlert } from 'lucide-react';
+import { ArrowRight, Hourglass, ListChecks, PackageCheck, Send, ShoppingCart, Tag, TriangleAlert, Upload } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
+import type { BomProcurementKind } from '@/types/productionBom';
 import type { ProcurementDocState, ProcurementNextAction, ProcurementStage } from '@/types/purchasing';
+import { BomTabs, type BomTab } from '../bom/device/BomTabs';
 
 import { actionLabel, docDotClass, docStateLabel, stageDetail, stageLabel, stageTone } from './purchasingModel';
 
@@ -12,16 +14,47 @@ import { actionLabel, docDotClass, docStateLabel, stageDetail, stageLabel, stage
 const ActionIcon = ({ action }: { action: ProcurementNextAction }) => {
     switch (action) {
         case 'ORDER': return <ShoppingCart aria-hidden />;
-        case 'CONFIRM': return <CheckCircle2 aria-hidden />;
-        case 'RESEND':
-        case 'ASK': return <Send aria-hidden />;
+        case 'ASK':
+        case 'SEND':
+        case 'RESEND': return <Send aria-hidden />;
+        case 'AWAIT': return <Hourglass aria-hidden />;
         case 'RECEIVE': return <PackageCheck aria-hidden />;
         case 'COMPARE': return <ListChecks aria-hidden />;
-        default: return <Paperclip aria-hidden />;
+        case 'REPLY': return <Upload aria-hidden />;
+        default: return <ArrowRight aria-hidden />;
     }
 };
 
-/** Der eine nächste Schritt als Knopf: Zeichen + Wort («Teklif ekle», «Mal kabul» …). */
+/**
+ * «Fiyat talebi hangisi, satın alma hangisi» (29.09.2026): die Art eines Talep
+ * als farbiges Schild — Fiyat talebi violett, Satın alma talebi grün. Ein
+ * Fiyat talebi, aus dem bestellt wurde, trägt das Schild der Bestellung
+ * («direkt labelı o oluyor», 30.09.2026).
+ */
+export const KindPill = ({ kind, ordered = false }: { kind: BomProcurementKind; ordered?: boolean }) => {
+    const order = kind === 'ORDER' || ordered;
+    return (
+        <span className={`ofi-buy-kindpill is-${order ? 'order' : 'price'}`}>
+            {order ? <ShoppingCart aria-hidden /> : <Tag aria-hidden />}
+            {t(ordered && kind === 'PRICE' ? 'productionBom.procurement.kind.ORDERED' : `productionBom.procurement.kind.${kind}`)}
+        </span>
+    );
+};
+
+/** Das Segment von SwiftUI (die Reiter der Produktion) — graue Kapsel, die weisse Plakette gleitet. */
+export const Segmented = <K extends string,>({ tabs, value, onChange, label, idPrefix }: {
+    tabs: Array<BomTab<K>>;
+    value: K;
+    onChange: (key: K) => void;
+    label: string;
+    idPrefix: string;
+}) => (
+    <div className="ofi-bom ofi-buy-seg">
+        <BomTabs tabs={tabs} value={value} onChange={onChange} label={label} idPrefix={idPrefix} />
+    </div>
+);
+
+/** Der eine nächste Schritt als Knopf: Zeichen + Wort («Siparişe git», «Mal kabul» …). */
 export const NextButton = ({ action, onClick }: { action: ProcurementNextAction; onClick: () => void }) => (
     <button
         type="button"

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Check, ChevronRight, Info, Printer, ScanLine, Trash2, TriangleAlert } from 'lucide-react';
+import { Info, Trash2, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
@@ -10,149 +10,24 @@ import { cachedWarehouseSettings, readWarehouseCatalog, readWarehouseProduct, wa
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
 import { useAuthStore } from '@/store/authStore';
-import { CURRENCY_CODES } from '@/utils/currency';
-import type {
-    WarehouseCatalog,
-    WarehouseGroupRef,
-    WarehouseProduct,
-    WarehouseProductDetail,
-    WarehouseProductInput,
-    WarehouseSerial,
-} from '@/types/warehouse';
+import type { WarehouseCatalog, WarehouseMissingField, WarehouseProduct, WarehouseProductDetail, WarehouseSerial } from '@/types/warehouse';
 import '@/styles/modules/warehouse.css';
 
-import { BarcodeInput } from './components/BarcodeInput';
-import { Ean13Barcode } from './components/Ean13Barcode';
-import { MaterialGroupSelect } from './components/MaterialGroupSelect';
 import { SerialNumbersPanel, type SerialRowModel } from './components/SerialNumbersPanel';
-import { SupplierBarcodePicker } from './components/SupplierBarcodePicker';
 import { SupplierListEditor } from './components/SupplierListEditor';
 import { cleanScan } from './hooks/scanRules';
-import { rowWithBarcode, sameSupplierRows, supplierInputOf, supplierRowsOf, type SupplierRow } from './supplierRows';
-import { numberToInput, parseInputNumber, priceToInput } from './warehouseFormat';
+import { BarcodesSection } from './product/BarcodesSection';
+import { Group, Row } from './product/formParts';
+import { IdentitySection, type ErpCodeState } from './product/IdentitySection';
+import { DraftNotice, ProductHeader } from './product/ProductHeader';
+import { buildInput, EMPTY_FORM, fieldOfMissing, formOf, missingOf, sameForm, type FieldError, type FormState } from './product/productForm';
+import { SerialSection } from './product/SerialSection';
+import { StockSection } from './product/StockSection';
+import { rowWithBarcode, supplierRowsOf } from './supplierRows';
+import { numberToInput } from './warehouseFormat';
 
 type Tab = 'details' | 'serials';
-
-/** Was die Felder zeigen — Texte, wie getippt. ERP-Code und Barcode vergibt der Server. */
-interface FormState {
-    materialGroup: WarehouseGroupRef | null;
-    name: string;
-    brand: string;
-    modelNumber: string;
-    /**
-     * Die Lieferanten, jeder mit seinem Barcode des Produkts (dritter und
-     * vierter Durchgang) — dazu höchstens eine Zeile mit Barcode, aber ohne
-     * Lieferant (der Herstellerbarcode der Karte), und am Ende die leere Zeile.
-     */
-    suppliers: SupplierRow[];
-    description: string;
-    quantity: string;
-    purchasePrice: string;
-    /** Mindestbestellmenge (BOM: «bu minimum alışın altında sipariş verilemez»). */
-    minimumOrderQuantity: string;
-    currency: string;
-    serialRequired: boolean;
-}
-
-const EMPTY_FORM: FormState = {
-    materialGroup: null,
-    name: '',
-    brand: '',
-    modelNumber: '',
-    suppliers: supplierRowsOf(null),
-    description: '',
-    quantity: '0',
-    purchasePrice: '',
-    minimumOrderQuantity: '',
-    currency: 'CHF',
-    serialRequired: false,
-};
-
-const formOf = (product: WarehouseProduct): FormState => ({
-    materialGroup: product.materialGroup ? { ...product.materialGroup } : null,
-    name: product.name,
-    brand: product.brand ?? '',
-    modelNumber: product.modelNumber ?? '',
-    suppliers: supplierRowsOf(product),
-    description: product.description ?? '',
-    quantity: numberToInput(product.quantity),
-    purchasePrice: priceToInput(product.purchasePrice),
-    minimumOrderQuantity: numberToInput(product.minimumOrderQuantity),
-    currency: product.currency ?? 'CHF',
-    serialRequired: product.serialRequired,
-});
-
-const sameForm = (a: FormState, b: FormState): boolean =>
-    (a.materialGroup?.id ?? null) === (b.materialGroup?.id ?? null)
-    && a.name === b.name
-    && a.brand === b.brand
-    && a.modelNumber === b.modelNumber
-    && sameSupplierRows(a.suppliers, b.suppliers)
-    && a.description === b.description
-    && (a.serialRequired || a.quantity === b.quantity)
-    && a.purchasePrice === b.purchasePrice
-    && a.minimumOrderQuantity === b.minimumOrderQuantity
-    && (a.purchasePrice.trim() === '' || a.currency === b.currency)
-    && a.serialRequired === b.serialRequired;
-
-/** Ein Fehler an einem Feld — bei den Lieferanten auch an einer Zeile. */
-interface FieldError {
-    field: keyof FormState;
-    text: string;
-    rowKey?: string | null;
-}
-
-type Built = { input: WarehouseProductInput } | (FieldError & { error: string });
-
-/** Die Felder als Eingabe des Servers; `base` = nur, was sich geändert hat. */
-const buildInput = (form: FormState, base: FormState | null): Built => {
-    const name = form.name.trim();
-    if (!name) return { error: t('warehouse.fields.nameMissing'), text: t('warehouse.fields.nameMissing'), field: 'name' };
-    const quantity = parseInputNumber(form.quantity);
-    if (!form.serialRequired && quantity !== null && (Number.isNaN(quantity) || quantity < 0)) {
-        return { error: t('warehouse.err.QUANTITY_INVALID'), text: t('warehouse.err.QUANTITY_INVALID'), field: 'quantity' };
-    }
-    const price = parseInputNumber(form.purchasePrice);
-    if (price !== null && (Number.isNaN(price) || price < 0)) {
-        return { error: t('warehouse.err.PRICE_INVALID'), text: t('warehouse.err.PRICE_INVALID'), field: 'purchasePrice' };
-    }
-    const minimum = parseInputNumber(form.minimumOrderQuantity);
-    if (minimum !== null && (Number.isNaN(minimum) || minimum < 0)) {
-        return { error: t('warehouse.err.MIN_ORDER_INVALID'), text: t('warehouse.err.MIN_ORDER_INVALID'), field: 'minimumOrderQuantity' };
-    }
-    const suppliers = supplierInputOf(form.suppliers);
-    if ('errorKey' in suppliers) {
-        const error = t('warehouse.supplier.barcodeWithoutSupplier', { code: suppliers.code });
-        return { error, text: error, field: 'suppliers', rowKey: suppliers.errorKey };
-    }
-    const text = (value: string) => value.trim() || null;
-    const full: WarehouseProductInput = {
-        materialGroupId: form.materialGroup?.id ?? null,
-        name,
-        brand: text(form.brand),
-        modelNumber: text(form.modelNumber),
-        suppliers: suppliers.suppliers,
-        description: form.description.trim() ? form.description : null,
-        purchasePrice: price,
-        minimumOrderQuantity: minimum ? minimum : null,
-        currency: price === null ? null : form.currency,
-        manufacturerBarcode: suppliers.manufacturerBarcode,
-        serialRequired: form.serialRequired,
-        ...(form.serialRequired ? {} : { quantity: quantity ?? 0 }),
-    };
-    if (!base) return { input: full };
-
-    const before = buildInput(base, null);
-    if (!('input' in before)) return { input: full };
-    const diff: WarehouseProductInput = {};
-    const keys = Object.keys(full) as Array<keyof WarehouseProductInput>;
-    for (const key of keys) {
-        if (JSON.stringify(full[key]) !== JSON.stringify(before.input[key])) {
-            (diff as Record<string, unknown>)[key] = full[key];
-        }
-    }
-    return { input: diff };
-};
+type SaveMode = 'draft' | 'final';
 
 const rowOf = (serial: WarehouseSerial): SerialRowModel => ({
     key: serial.id,
@@ -167,66 +42,20 @@ const rowOf = (serial: WarehouseSerial): SerialRowModel => ({
     createdAt: serial.createdAt,
 });
 
-/* ── Bausteine der gruppierten Tafeln (Systemeinstellungen) ─────────────── */
-
-const Group = ({ title, children }: { title: string; children: ReactNode }) => (
-    <section className="ofi-wh-group">
-        <h2 className="ofi-wh-group__title">{title}</h2>
-        <div className="ofi-wh-group__box">{children}</div>
-    </section>
-);
-
-const Row = ({
-    label,
-    htmlFor,
-    required,
-    hint,
-    error,
-    top,
-    children,
-}: {
-    label?: string;
-    htmlFor?: string;
-    required?: boolean;
-    hint?: string;
-    error?: string | null;
-    top?: boolean;
-    children: ReactNode;
-}) => (
-    <div className={`ofi-wh-row ${top ? 'is-top' : ''} ${label ? '' : 'is-block'}`}>
-        {label && (
-            <label className="ofi-wh-row__label" htmlFor={htmlFor}>
-                {label}
-                {required && <b aria-label={t('warehouse.fields.required')}>*</b>}
-            </label>
-        )}
-        <div className="ofi-wh-row__control">
-            {children}
-            {error ? <span className="ofi-wh-row__hint is-error" role="alert">{error}</span> : hint ? <span className="ofi-wh-row__hint">{hint}</span> : null}
-        </div>
-    </div>
-);
-
 /**
  * ── DEPO · ÜRÜN KARTI (26.09.2026, Vorgabe Samet) ───────────────────────────
  *
- * «Erp kodu (başlangıçta boş), malzeme grubu (başlangıçta boş), ürün adı
- *  (zorunlu), ürün markası, model numarası, tedarikçi adı, tedarikçi numarası,
- *  ürün açıklaması, miktar, alış fiyatı, barkod, üretici barkodu … seri
- *  numarası gereklidir kutusu … üstte tek bir tab: Ürün Detayları; seri
- *  numaraları gerekli ise yanında Seri Numaraları tab'ı.»
- *
  * Dieselbe Seite legt an (`/warehouse/products/new`, auch mit `?barcode=` aus
- * «Ürün ekle») und ändert (`/:id`). Die Felder stehen in der Reihenfolge der
- * Vorgabe, Spalte für Spalte, in den gruppierten Tafeln der macOS-
- * Systemeinstellungen. Gespeichert wird ausdrücklich (Knopf oder ⌘/Strg+S);
- * wer mit ungespeicherten Änderungen gehen will, wird gefragt — nie aber,
- * weil sich die Kamera nach einem Scan schliesst («barkod okuttuktan sonra
- * kaydedilmemiş değişiklikler pop-up'ı … asla», lib/backDismiss.ts).
+ * «Ürün ekle») und ändert (`/:id`). Die Felder stehen in den gruppierten
+ * Tafeln der macOS-Systemeinstellungen (Abschnitte in `product/`). Gespeichert
+ * wird ausdrücklich (Knopf oder ⌘/Strg+S); wer mit ungespeicherten Änderungen
+ * gehen will, wird gefragt — nie aber, weil sich die Kamera nach einem Scan
+ * schliesst («barkod okuttuktan sonra kaydedilmemiş değişiklikler pop-up'ı …
+ * asla», lib/backDismiss.ts).
  *
- * Vierter Durchgang: neben jedem Lieferanten SEIN Barcode des Produkts (Feld
- * mit Kamera), am Ende immer eine leere Zeile; in «Barkodlar» wählt man den
- * Lieferanten und sieht dessen Barcode (SupplierBarcodePicker).
+ * 30.09.2026: «Ürün kodu», «Üretici kodu» (statt Model numarası), Einheit,
+ * E-Mail je Lieferant — und die Pflicht einer fertigen Karte (Name, Einheit,
+ * ein Lieferant, eine E-Mail); ohne sie nur «Taslak olarak kaydet».
  */
 export const WarehouseProductPage = () => {
     useLanguageTick();
@@ -254,8 +83,10 @@ export const WarehouseProductPage = () => {
     // Der Fehler gehört zu EINER Karte — beim Wechsel der Adresse gilt er nicht mehr.
     const [loadFailure, setLoadFailure] = useState<{ id: string; notFound: boolean; text: string } | null>(null);
     const loadError = loadFailure && loadFailure.id === id ? loadFailure : null;
-    const [saving, setSaving] = useState(false);
+    const [saving, setSaving] = useState<SaveMode | null>(null);
     const [fieldError, setFieldError] = useState<FieldError | null>(null);
+    /** Ein «Kaydet» fand Lücken — der Hinweis bleibt, bis sie geschlossen sind. */
+    const [attempted, setAttempted] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const nameRef = useRef<HTMLInputElement>(null);
@@ -299,7 +130,9 @@ export const WarehouseProductPage = () => {
     const dirty = isNew
         ? !sameForm(form, baseline) || pendingSerials.length > 0
         : Boolean(detail) && (!sameForm(form, baseline) || (form.serialRequired && pendingSerials.length > 0));
-    const guard = useUnsavedChangesGuard(canManage && dirty && !saving && !deleting);
+    const guard = useUnsavedChangesGuard(canManage && dirty && saving === null && !deleting);
+    const savedDraft = Boolean(detail?.product.isDraft);
+    const missing: WarehouseMissingField[] = useMemo(() => missingOf(form), [form]);
 
     const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
         setForm((current) => ({ ...current, [key]: value }));
@@ -307,7 +140,7 @@ export const WarehouseProductPage = () => {
     };
 
     /* ── Speichern ─────────────────────────────────────────────────────── */
-    const save = useCallback(async (): Promise<boolean> => {
+    const save = useCallback(async (mode: SaveMode): Promise<boolean> => {
         if (saving || !canManage) return false;
         const built = buildInput(form, isNew ? null : baseline);
         if (!('input' in built)) {
@@ -317,15 +150,29 @@ export const WarehouseProductPage = () => {
             toast.error(built.error);
             return false;
         }
+        // «Kaydet» nur mit allem, was eine fertige Karte braucht — sonst bleibt «Taslak olarak kaydet».
+        if (mode === 'final') {
+            const gaps = missingOf(form);
+            if (gaps.length) {
+                const first = gaps[0]!;
+                setAttempted(true);
+                setFieldError({ field: fieldOfMissing(first), text: t(`warehouse.missing.${first}Hint`) });
+                if (tab !== 'details') setTab('details');
+                toast.error(t('warehouse.product.incompleteToast'));
+                return false;
+            }
+        }
+        const isDraft = mode === 'draft';
         const heldSerials = form.serialRequired && pendingSerials.length
             ? { serials: pendingSerials.map((row) => ({ serialNumber: row.serialNumber })) }
             : {};
-        if (!isNew && !Object.keys(built.input).length && !pendingSerials.length) return true;
+        const draftChanged = !isNew && Boolean(detail?.product.isDraft) !== isDraft;
+        if (!isNew && !Object.keys(built.input).length && !pendingSerials.length && !draftChanged) return true;
 
-        setSaving(true);
+        setSaving(mode);
         try {
             if (isNew) {
-                const created = await warehouseApi.create({ ...built.input, ...heldSerials });
+                const created = await warehouseApi.create({ ...built.input, ...heldSerials, isDraft });
                 const next = formOf(created.product);
                 setDetail(created);
                 setForm(next);
@@ -334,19 +181,20 @@ export const WarehouseProductPage = () => {
                 pendingRef.current = [];
                 // Die neue Karte liegt sofort im Speicher — kein zweites Laden.
                 void cachedQuery(`warehouse:product:${created.product.id}`, () => Promise.resolve(created), { freshMs: 15_000, staleMs: 600_000, tags: ['warehouse'] });
-                toast.success(t('warehouse.product.created'));
+                toast.success(t(isDraft ? 'warehouse.product.createdDraft' : 'warehouse.product.created'));
                 navigate(`/warehouse/products/${created.product.id}${tab === 'serials' ? '?tab=serials' : ''}`, { replace: true });
             } else {
-                const updated = await warehouseApi.update(id!, { ...built.input, ...heldSerials });
+                const updated = await warehouseApi.update(id!, { ...built.input, ...heldSerials, isDraft });
                 const next = formOf(updated.product);
                 setDetail(updated);
                 setForm(next);
                 setBaseline(next);
                 setPendingSerials([]);
                 pendingRef.current = [];
-                toast.success(t('warehouse.product.saved'));
+                toast.success(t(isDraft ? 'warehouse.product.savedDraft' : 'warehouse.product.saved'));
             }
             setFieldError(null);
+            setAttempted(false);
             return true;
         } catch (error) {
             const info = warehouseErrorOf(error);
@@ -355,9 +203,11 @@ export const WarehouseProductPage = () => {
             const barcodeTaken = info.code === 'BARCODE_TAKEN' || info.code === 'MANUFACTURER_BARCODE_TAKEN';
             const field: keyof FormState | null = info.code === 'NAME_REQUIRED'
                 ? 'name'
-                : info.code === 'GROUP_CODE_MISSING' || info.code === 'GROUP_NOT_FOUND'
-                    ? 'materialGroup'
-                    : barcodeTaken || info.code?.startsWith('SUPPLIER_') || info.code === 'TOO_MANY_SUPPLIERS' ? 'suppliers' : null;
+                : info.code === 'UNIT_INVALID'
+                    ? 'unit'
+                    : info.code === 'GROUP_CODE_MISSING' || info.code === 'GROUP_NOT_FOUND'
+                        ? 'materialGroup'
+                        : barcodeTaken || info.code?.startsWith('SUPPLIER_') || info.code === 'TOO_MANY_SUPPLIERS' || info.code === 'PRODUCT_INCOMPLETE' ? 'suppliers' : null;
             if (field) {
                 const rowKey = barcodeTaken || info.code === 'SUPPLIER_NAME_REQUIRED'
                     ? rowWithBarcode(form.suppliers, info.params?.code)?.key ?? null
@@ -368,22 +218,22 @@ export const WarehouseProductPage = () => {
             toast.error(text);
             return false;
         } finally {
-            setSaving(false);
+            setSaving(null);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [saving, canManage, form, baseline, isNew, id, pendingSerials, tab]);
+    }, [saving, canManage, form, baseline, isNew, id, pendingSerials, tab, detail]);
 
-    // ⌘S / Strg+S speichert.
+    // ⌘S / Strg+S speichert — fertig, wenn alles da ist, sonst als Taslak.
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
                 event.preventDefault();
-                if (dirty || isNew) void save();
+                if (dirty || isNew) void save(missingOf(form).length ? 'draft' : 'final');
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [save, dirty, isNew]);
+    }, [save, dirty, isNew, form]);
 
     const discard = () => {
         if (isNew) {
@@ -394,6 +244,7 @@ export const WarehouseProductPage = () => {
         setPendingSerials([]);
         pendingRef.current = [];
         setFieldError(null);
+        setAttempted(false);
     };
 
     const remove = async () => {
@@ -538,7 +389,7 @@ export const WarehouseProductPage = () => {
     const nextPrefix = form.materialGroup?.code && form.materialGroup.category?.code
         ? `${form.materialGroup.category.code}-${form.materialGroup.code}-`
         : null;
-    const codeState: { value: string | null; pending: string | null; hint: string } = (() => {
+    const codeState: ErpCodeState = (() => {
         if (isNew || !savedCode) {
             if (nextPrefix) return { value: null, pending: `${nextPrefix}•••••`, hint: t('warehouse.fields.erpCodePending') };
             return { value: null, pending: null, hint: t('warehouse.fields.erpCodeHint') };
@@ -550,43 +401,20 @@ export const WarehouseProductPage = () => {
 
     return (
         <div className="ofi-wh is-detail">
-            <header className="ofi-wh-head">
-                <h1 className="ofi-wh-head__title" title={title}>{title}</h1>
-                {meta.length > 0 && (
-                    <span className="ofi-wh-head__meta">
-                        {meta.map((part, index) => (
-                            <span key={index} style={{ display: 'contents' }}>
-                                {index > 0 && <span className="ofi-wh-dot">·</span>}
-                                <span className={index === 0 && savedCode ? 'ofi-wh-code is-dim' : ''}>{part}</span>
-                            </span>
-                        ))}
-                    </span>
-                )}
-                <div className="ofi-wh-head__actions">
-                    {dirty && canManage && <span className="ofi-wh-dirty">{t('warehouse.product.unsaved')}</span>}
-                    {!isNew && canManage && (
-                        <button type="button" className="ofi-wh-btn is-danger is-quiet ofi-nosize" onClick={() => setConfirmDelete(true)}>
-                            <Trash2 />
-                            {t('warehouse.actions.delete')}
-                        </button>
-                    )}
-                    {canManage && (isNew || dirty) && (
-                        <button type="button" className="ofi-wh-btn ofi-nosize" onClick={discard} disabled={saving}>
-                            {isNew ? t('warehouse.actions.cancel') : t('warehouse.actions.discard')}
-                        </button>
-                    )}
-                    {canManage && (
-                        <button
-                            type="button"
-                            className="ofi-wh-btn is-primary ofi-nosize"
-                            disabled={saving || (!isNew && !dirty)}
-                            onClick={() => void save()}
-                        >
-                            {saving ? t('warehouse.actions.saving') : isNew ? t('warehouse.actions.create') : t('warehouse.actions.save')}
-                        </button>
-                    )}
-                </div>
-            </header>
+            <ProductHeader
+                title={title}
+                meta={meta}
+                savedCode={savedCode}
+                draft={savedDraft}
+                dirty={dirty}
+                canManage={canManage}
+                isNew={isNew}
+                saving={saving}
+                onDelete={() => setConfirmDelete(true)}
+                onDiscard={discard}
+                onSaveDraft={() => void save('draft')}
+                onSave={() => void save('final')}
+            />
 
             <nav className="ofi-wh-tabs" role="tablist" aria-label={title}>
                 <button
@@ -620,56 +448,22 @@ export const WarehouseProductPage = () => {
                     {t('warehouse.product.readOnly')}
                 </div>
             )}
+            {canManage && tab === 'details' && (savedDraft || attempted) && <DraftNotice missing={missing} draft={savedDraft} />}
 
             {tab === 'details' && (
                 <div className="ofi-wh-form" role="tabpanel" aria-labelledby="ofi-wh-tab-details">
                     <div className="ofi-wh-form__col">
-                        <Group title={t('warehouse.section.identity')}>
-                            <Row label={t('warehouse.fields.erpCode')} hint={codeState.hint || undefined}>
-                                <div className="ofi-wh-erp" aria-live="polite">
-                                    {codeState.value && (
-                                        <span className={`ofi-wh-erp__code ${codeState.pending || (groupChanged && !form.materialGroup) ? 'is-old' : ''}`}>
-                                            {codeState.value}
-                                        </span>
-                                    )}
-                                    {codeState.pending && (
-                                        <span className="ofi-wh-erp__next">
-                                            {codeState.value && <span aria-hidden>→</span>}
-                                            {codeState.pending}
-                                        </span>
-                                    )}
-                                    {!codeState.value && !codeState.pending && <span className="ofi-wh-erp__empty">—</span>}
-                                </div>
-                            </Row>
-                            <Row label={t('warehouse.fields.materialGroup')} error={errorFor('materialGroup')}>
-                                <MaterialGroupSelect
-                                    value={form.materialGroup}
-                                    catalog={catalog}
-                                    onChange={(next) => update('materialGroup', next)}
-                                    disabled={readOnly}
-                                    invalid={Boolean(errorFor('materialGroup'))}
-                                />
-                            </Row>
-                            <Row label={t('warehouse.fields.name')} htmlFor="wh-name" required error={errorFor('name')}>
-                                <input
-                                    id="wh-name"
-                                    ref={nameRef}
-                                    className={`ofi-wh-input ${errorFor('name') ? 'is-invalid' : ''}`}
-                                    value={form.name}
-                                    maxLength={255}
-                                    autoFocus={isNew}
-                                    aria-required
-                                    disabled={readOnly}
-                                    onChange={(event) => update('name', event.target.value)}
-                                />
-                            </Row>
-                            <Row label={t('warehouse.fields.brand')} htmlFor="wh-brand">
-                                <input id="wh-brand" className="ofi-wh-input" value={form.brand} maxLength={120} disabled={readOnly} onChange={(event) => update('brand', event.target.value)} />
-                            </Row>
-                            <Row label={t('warehouse.fields.modelNumber')} htmlFor="wh-model">
-                                <input id="wh-model" className="ofi-wh-input" value={form.modelNumber} maxLength={120} spellCheck={false} disabled={readOnly} onChange={(event) => update('modelNumber', event.target.value)} />
-                            </Row>
-                        </Group>
+                        <IdentitySection
+                            form={form}
+                            update={update}
+                            errorFor={errorFor}
+                            readOnly={readOnly}
+                            isNew={isNew}
+                            catalog={catalog}
+                            codeState={codeState}
+                            groupCleared={groupChanged && !form.materialGroup}
+                            nameRef={nameRef}
+                        />
 
                         <Group title={t('warehouse.section.supplier')}>
                             <Row error={errorFor('suppliers')}>
@@ -698,153 +492,27 @@ export const WarehouseProductPage = () => {
                     </div>
 
                     <div className="ofi-wh-form__col">
-                        <Group title={t('warehouse.section.stock')}>
-                            <Row
-                                label={t('warehouse.fields.quantity')}
-                                htmlFor="wh-qty"
-                                hint={form.serialRequired ? t('warehouse.fields.quantityFromSerials') : undefined}
-                                error={errorFor('quantity')}
-                            >
-                                <input
-                                    id="wh-qty"
-                                    className={`ofi-wh-input is-num ${errorFor('quantity') ? 'is-invalid' : ''}`}
-                                    inputMode="decimal"
-                                    value={form.serialRequired ? String(serialCount) : form.quantity}
-                                    readOnly={form.serialRequired}
-                                    disabled={readOnly}
-                                    onChange={(event) => update('quantity', event.target.value)}
-                                />
-                            </Row>
-                            <Row label={t('warehouse.fields.purchasePrice')} htmlFor="wh-price" error={errorFor('purchasePrice')}>
-                                <div className="ofi-wh-money">
-                                    <input
-                                        id="wh-price"
-                                        className={`ofi-wh-input is-num ${errorFor('purchasePrice') ? 'is-invalid' : ''}`}
-                                        inputMode="decimal"
-                                        value={form.purchasePrice}
-                                        placeholder="0.00"
-                                        disabled={readOnly}
-                                        onChange={(event) => update('purchasePrice', event.target.value)}
-                                    />
-                                    <select
-                                        className="ofi-wh-input"
-                                        aria-label={t('warehouse.fields.currency')}
-                                        value={form.currency}
-                                        disabled={readOnly}
-                                        onChange={(event) => update('currency', event.target.value)}
-                                    >
-                                        {CURRENCY_CODES.map((code) => <option key={code} value={code}>{code}</option>)}
-                                    </select>
-                                </div>
-                            </Row>
-                            <Row
-                                label={t('warehouse.fields.minimumOrderQuantity')}
-                                htmlFor="wh-moq"
-                                hint={t('warehouse.fields.minimumOrderQuantityHint')}
-                                error={errorFor('minimumOrderQuantity')}
-                            >
-                                <input
-                                    id="wh-moq"
-                                    className={`ofi-wh-input is-num ${errorFor('minimumOrderQuantity') ? 'is-invalid' : ''}`}
-                                    inputMode="decimal"
-                                    value={form.minimumOrderQuantity}
-                                    placeholder="—"
-                                    disabled={readOnly}
-                                    onChange={(event) => update('minimumOrderQuantity', event.target.value)}
-                                />
-                            </Row>
-                        </Group>
-
-                        <Group title={t('warehouse.section.barcodes')}>
-                            <Row label={t('warehouse.fields.barcode')} top={Boolean(savedBarcode)} hint={savedBarcode ? undefined : t('warehouse.fields.barcodeHint')}>
-                                {savedBarcode ? (
-                                    <div className="ofi-wh-gs1">
-                                        <Ean13Barcode code={savedBarcode} caption={savedCode} className="ofi-wh-gs1__svg" />
-                                        <div className="ofi-wh-gs1__side">
-                                            <span className="ofi-wh-code">{savedBarcode}</span>
-                                            <span className="ofi-wh-row__hint">{t('warehouse.fields.barcodeGs1')}</span>
-                                            <button
-                                                type="button"
-                                                className="ofi-wh-btn is-small ofi-nosize"
-                                                disabled={!savedCode || printing}
-                                                title={savedCode ? undefined : t('warehouse.fields.printNeedsCode')}
-                                                onClick={() => void printLabel()}
-                                            >
-                                                <Printer />
-                                                {printing ? t('warehouse.pdf.preparing') : t('warehouse.fields.printLabel')}
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <span className="ofi-wh-erp__empty">—</span>
-                                )}
-                            </Row>
-                            {/* «Barkod alanlarına göre tedarikçi seçim yeri olacak — eklenen
-                                tedarikçileri seçtikçe barkodlar değişecek.» */}
-                            <Row label={t('warehouse.fields.manufacturerBarcode')} top>
-                                <SupplierBarcodePicker
-                                    rows={form.suppliers}
-                                    onChange={(next) => update('suppliers', next)}
-                                    disabled={readOnly}
-                                    invalidKey={invalidSupplierRow}
-                                />
-                            </Row>
-                        </Group>
-
-                        <Group title={t('warehouse.section.serial')}>
-                            <Row>
-                                <label className="ofi-wh-check">
-                                    <input
-                                        type="checkbox"
-                                        checked={form.serialRequired}
-                                        disabled={readOnly}
-                                        onChange={(event) => update('serialRequired', event.target.checked)}
-                                    />
-                                    <span className="ofi-wh-check__box" aria-hidden><Check /></span>
-                                    <span className="ofi-wh-check__text">
-                                        <b>{t('warehouse.fields.serialRequired')}</b>
-                                        <small>{t('warehouse.fields.serialRequiredHint')}</small>
-                                    </span>
-                                </label>
-                            </Row>
-                            {/* «Seri numarası gereklidir tıklayınca direkt altında input çıkmalı … okutuldukça
-                                bir sayı olarak yazsın sadece, tıklayınca seri numaraları bölümü açılsın.» */}
-                            {form.serialRequired && (
-                                <Row>
-                                    <div className="ofi-wh-serialinline">
-                                        {!readOnly && (
-                                            <BarcodeInput
-                                                value={serialInput}
-                                                onChange={setSerialInput}
-                                                onEnter={(value) => {
-                                                    // Sofort leer: der nächste Scan landet nie auf einer
-                                                    // abgewiesenen Nummer (die Meldung nennt sie).
-                                                    setSerialInput('');
-                                                    return addSerial(value);
-                                                }}
-                                                continuous
-                                                scanStatus={t('warehouse.serials.count', { count: serialCount })}
-                                                lead={<ScanLine className="ofi-wh-field__lead" />}
-                                                ariaLabel={t('warehouse.serials.inputPlaceholder')}
-                                                placeholder={t('warehouse.serials.inputPlaceholder')}
-                                                scanTitle={t('warehouse.serials.scanTitle')}
-                                            />
-                                        )}
-                                        <button
-                                            type="button"
-                                            key={serialCount}
-                                            className="ofi-wh-serialcount ofi-nosize"
-                                            title={t('warehouse.serials.openList')}
-                                            onClick={() => setTab('serials')}
-                                        >
-                                            <b>{serialCount}</b>
-                                            <span>{t('warehouse.serials.countLabel', { count: serialCount })}</span>
-                                            <ChevronRight />
-                                        </button>
-                                    </div>
-                                </Row>
-                            )}
-                        </Group>
+                        <StockSection form={form} update={update} errorFor={errorFor} readOnly={readOnly} serialCount={serialCount} />
+                        <BarcodesSection
+                            savedBarcode={savedBarcode}
+                            savedCode={savedCode}
+                            printing={printing}
+                            onPrint={() => void printLabel()}
+                            rows={form.suppliers}
+                            onRows={(next) => update('suppliers', next)}
+                            readOnly={readOnly}
+                            invalidKey={invalidSupplierRow}
+                        />
+                        <SerialSection
+                            serialRequired={form.serialRequired}
+                            onSerialRequired={(next) => update('serialRequired', next)}
+                            readOnly={readOnly}
+                            serialInput={serialInput}
+                            onSerialInput={setSerialInput}
+                            addSerial={addSerial}
+                            serialCount={serialCount}
+                            onOpenList={() => setTab('serials')}
+                        />
                     </div>
                 </div>
             )}
@@ -892,8 +560,9 @@ export const WarehouseProductPage = () => {
                         <PopupButton variant="danger" onClick={guard.proceed}>{t('warehouse.actions.discard')}</PopupButton>
                         <PopupButton
                             variant="primary"
-                            loading={saving}
-                            onClick={() => { void save().then((ok) => { if (ok) guard.proceed(); }); }}
+                            loading={saving !== null}
+                            // Beim Gehen wird gesichert, was da ist — mit Lücken als Taslak.
+                            onClick={() => { void save(missingOf(form).length ? 'draft' : 'final').then((ok) => { if (ok) guard.proceed(); }); }}
                         >
                             {t('warehouse.actions.save')}
                         </PopupButton>

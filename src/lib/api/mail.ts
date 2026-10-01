@@ -7,6 +7,8 @@ import { apiClient, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
 export interface MailParty { name: string | null; address: string; }
 
 export interface InboxStatusDto {
+    /** true = das persönliche Postfach der angemeldeten Person, false = das der Firma. */
+    personal?: boolean;
     /** Versand */
     smtpConfigured: boolean;
     smtpHost: string | null;

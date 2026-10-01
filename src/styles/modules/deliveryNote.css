@@ -76,7 +76,8 @@ body > :not(#root) .ofi-ls-btn:disabled {
     text-overflow: ellipsis;
 }
 
-.ofi-ls-addr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* Eine Anschrift (29.09.2026): die, für die der Auftrag erstellt wurde. */
+.ofi-ls-addr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-width: 480px; }
 .ofi-ls-addr__box {
     min-width: 0;
     border: 1px solid var(--ofi-cal-border-soft);
@@ -96,31 +97,6 @@ body > :not(#root) .ofi-ls-btn:disabled {
     color: var(--ofi-cal-muted);
 }
 .ofi-ls-hint { margin-top: 6px; font-size: 11px; color: var(--ofi-cal-muted); white-space: normal; }
-
-/* Projekt- ODER Lieferadresse — nur wenn beide an der Offerte hängen. */
-.ofi-ls-seg {
-    display: inline-flex;
-    gap: 2px;
-    margin-bottom: 6px;
-    border-radius: 7px;
-    padding: 2px;
-    background: var(--ofi-cal-hover);
-    white-space: normal;
-}
-.ofi-ls-seg__item {
-    height: 24px;
-    border-radius: 5px;
-    padding: 0 10px;
-    font-size: 11.5px;
-    font-weight: 500;
-    color: var(--ofi-cal-muted);
-    transition: background-color 140ms ease, color 140ms ease;
-}
-.ofi-ls-seg__item.is-active {
-    background: var(--ofi-cal-surface);
-    color: var(--ofi-cal-text);
-    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.18);
-}
 
 /* ── Tabellen (Liste und Erfassung) ─────────────────────────────────────── */
 .ofi-ls-tablewrap {
@@ -185,6 +161,9 @@ body > :not(#root) .ofi-ls-btn:disabled {
 .ofi-ls-unit:focus { background: var(--ofi-cal-surface); border-color: var(--ofi-cal-accent); }
 /* Mehr als offen ist erlaubt (Nachlieferung, Ersatz) — aber sichtbar. */
 .ofi-ls-qty.is-over { color: #b45309; }
+/* Lagerbestand — nur in der Maske; rot, wenn weniger da ist als geliefert. */
+.ofi-ls-stock { color: var(--ofi-cal-muted); font-variant-numeric: tabular-nums; }
+.ofi-ls-stock.is-short { color: #d70015; font-weight: 600; }
 
 .ofi-ls-actions { width: 1%; white-space: nowrap; text-align: right; }
 .ofi-ls-iconbtn {

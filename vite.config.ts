@@ -186,6 +186,25 @@ const fontDevPreloadPlugin = () => ({
   },
 })
 
+// Grosse Bildschirme: index.html vergrössert über 2000 px Fensterbreite die
+// ganze Seite mit `zoom` auf <html> (Faktor in --ofi-zoom). Chrome multipliziert
+// dabei auch vh/vw — `height: 100vh` wäre 30–50 % höher als das Fenster. Darum
+// wird jede Viewport-Länge in JEDEM Stylesheet (eigene Dateien, Tailwind-Ausgabe,
+// Pakete) durch den Faktor geteilt; ohne Zoom ist er 1 und nichts ändert sich.
+// Inline-Stile im TSX schreiben dasselbe `calc(…vh / var(--ofi-zoom, 1))` selbst.
+const VIEWPORT_LENGTH = /(^|[^\w.-])(-?(?:\d+\.?\d*|\.\d+))([dsl]?v(?:h|w|min|max|i|b))\b/g
+const viewportZoomFix = () => ({
+  postcssPlugin: 'offitec:viewport-zoom',
+  Declaration(decl: { value: string }) {
+    const { value } = decl
+    if (value.includes('--ofi-zoom') || value.includes('url(') || !/\d[dsl]?v(?:h|w|min|max|i|b)\b/.test(value)) return
+    decl.value = value.replace(
+      VIEWPORT_LENGTH,
+      (_match, before: string, amount: string, unit: string) => `${before}calc(${amount}${unit} / var(--ofi-zoom, 1))`,
+    )
+  },
+})
+
 export default defineConfig(({ mode }) => ({
   // Web (nginx) needs an absolute base so assets resolve to /assets/... on
   // deep routes after a refresh. Electron loads via file:// and needs a
@@ -205,6 +224,9 @@ export default defineConfig(({ mode }) => ({
     fontDevPreloadPlugin(),
     quoteRoutePreloadPlugin(),
   ],
+  css: {
+    postcss: { plugins: [viewportZoomFix()] },
+  },
   server: {
     // Hot Module Replacement is on by default so the dev server (`npm run dev`)
     // live-updates the browser on every save. Set VITE_DISABLE_HMR=true to

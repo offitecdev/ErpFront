@@ -42,13 +42,14 @@
       "downloadTruncated": "Yalnızca ilk {{count}} kart indirildi.",
       "labelsReady": "{{count}} etiket hazır.",
       "labelsSkipped": "ERP kodu olmayan {{count}} kart atlandı.",
-      "listReady": "{{count}} kart indirildi."
+      "listReady": "{{count}} kart indirildi.",
+      "draftFilterHint": "Taslak kart"
     },
     "columns": {
       "erpCode": "ERP kodu",
       "name": "Ürün adı",
       "brand": "Marka",
-      "modelNumber": "Model numarası",
+      "modelNumber": "Üretici kodu",
       "supplier": "Tedarikçi",
       "description": "Açıklama",
       "quantity": "Miktar",
@@ -77,7 +78,8 @@
       "cancel": "Vazgeç",
       "discard": "Değişiklikleri geri al",
       "close": "Kapat",
-      "done": "Bitti"
+      "done": "Bitti",
+      "saveDraft": "Taslak olarak kaydet"
     },
     "product": {
       "newTitle": "Yeni ürün kartı",
@@ -96,7 +98,16 @@
       "tabs": {
         "details": "Ürün detayları",
         "serials": "Seri numaraları"
-      }
+      },
+      "draftChip": "Taslak",
+      "draftTitle": "Bu kart taslak",
+      "incompleteTitle": "Kart henüz tamamlanmadı",
+      "draftMissing": "Eksik: {{fields}}.",
+      "draftComplete": "Tüm zorunlu alanlar dolu — «Kaydet» ile kartı tamamlayın.",
+      "draftHint": "Zorunlu: ürün adı, birim, en az bir tedarikçi ve bir tedarikçi e-postası. Eksikken kart yalnızca taslak olarak kaydedilir; e-postası olmayan tedarikçiye fiyat talebi otomatik gitmez.",
+      "incompleteToast": "Zorunlu alanlar eksik — kartı taslak olarak kaydedebilirsiniz.",
+      "createdDraft": "Ürün kartı taslak olarak oluşturuldu.",
+      "savedDraft": "Taslak kaydedildi."
     },
     "section": {
       "identity": "Tanım",
@@ -112,7 +123,7 @@
       "name": "Ürün adı",
       "required": "Zorunlu",
       "brand": "Ürün markası",
-      "modelNumber": "Model numarası",
+      "modelNumber": "Üretici kodu",
       "supplierName": "Tedarikçi adı",
       "description": "Ürün açıklaması",
       "quantity": "Miktar",
@@ -133,7 +144,9 @@
       "barcodeHint": "ERP koduyla birlikte otomatik verilir (GS1 EAN-13).",
       "barcodeGs1": "GS1 EAN-13 · firmaya özel (04…)",
       "printLabel": "Etiket yazdır",
-      "printNeedsCode": "Etiket için ERP kodu gerekli."
+      "printNeedsCode": "Etiket için ERP kodu gerekli.",
+      "modelNumberHint": "Üreticinin parça numarası — PDF'e basılmaz.",
+      "unit": "Birim"
     },
     "supplier": {
       "pick": "Tedarikçi seçin",
@@ -145,7 +158,8 @@
       "change": "Tedarikçiyi değiştir",
       "columns": {
         "name": "Tedarikçi",
-        "barcode": "Ürün barkodu"
+        "barcode": "Ürün barkodu",
+        "email": "Tedarikçi e-postası"
       },
       "barcodePlaceholder": "Barkodu okutun veya yazın",
       "barcodeLabel": "{{index}}. satırın ürün barkodu",
@@ -158,7 +172,21 @@
       "noBarcode": "Henüz barkod yok",
       "pickerLabel": "Tedarikçiye göre üretici barkodu",
       "pickerHint": "Tedarikçi eklendiğinde, her tedarikçinin barkodu burada tedarikçi seçilerek görünür.",
-      "unassignedHint": "Bu barkodun tedarikçisi seçilmedi — Tedarikçiler bölümünde satırından tedarikçi seçin."
+      "unassignedHint": "Bu barkodun tedarikçisi seçilmedi — Tedarikçiler bölümünde satırından tedarikçi seçin.",
+      "emailPlaceholder": "teklif@tedarikci.com",
+      "emailOf": "{{name}} e-postası",
+      "emailLabel": "{{index}}. satırın e-postası",
+      "emailInvalid": "«{{email}}» geçerli bir e-posta değil ya da satırın tedarikçisi seçilmedi.",
+      "articleNumber": "Ürün tip no.",
+      "orderNumber": "Ürün sip. no.",
+      "articleNumberPlaceholder": "Tedarikçinin ürün tip numarası",
+      "orderNumberPlaceholder": "Tedarikçinin ürün sipariş numarası",
+      "articleNumberOf": "{{name}} ürün tip numarası",
+      "orderNumberOf": "{{name}} ürün sipariş numarası",
+      "articleNumberLabel": "{{index}}. satırın ürün tip numarası",
+      "orderNumberLabel": "{{index}}. satırın ürün sipariş numarası",
+      "numbersHint": "Bu tedarikçiye giden fiyat talebi ve siparişte yazar",
+      "numbersWithoutSupplier": "«{{code}}» numarası için önce satırın tedarikçisini seçin."
     },
     "scan": {
       "openCamera": "Kamerayla okut",
@@ -299,7 +327,10 @@
       "SUPPLIER_DUPLICATE": "«{{name}}» bu kartta zaten var.",
       "TOO_MANY_SUPPLIERS": "Bir kartta en fazla {{max}} tedarikçi olabilir.",
       "MANUFACTURER_BARCODE_TAKEN": "Üretici barkodu «{{code}}» zaten «{{name}}» kartında — bir üretici barkodu yalnızca bir ürüne ait olabilir.",
-      "RECEIPT_UNDO_INVALID": "Bu mal kabulü geri alınamaz — sipariş veya kayıt değişmiş."
+      "RECEIPT_UNDO_INVALID": "Bu mal kabulü geri alınamaz — sipariş veya kayıt değişmiş.",
+      "UNIT_INVALID": "Bu birim bilinmiyor.",
+      "SUPPLIER_EMAIL_INVALID": "«{{name}}» için e-posta geçersiz: {{email}}",
+      "PRODUCT_INCOMPLETE": "Zorunlu alanlar eksik — kart yalnızca taslak olarak kaydedilebilir."
     },
     "settings": {
       "title": "Depo ayarları",
@@ -461,14 +492,17 @@
         "category": "Ana kategori",
         "group": "Malzeme grubu",
         "brand": "Marka",
-        "modelNumber": "Model numarası",
+        "modelNumber": "Üretici kodu",
         "supplier": "Tedarikçiler",
         "makerBarcodes": "Üretici barkodları",
         "description": "Açıklama",
         "quantity": "Miktar",
         "purchasePrice": "Alış fiyatı",
         "currency": "Para birimi",
-        "serialRequired": "Seri numarası gerekli"
+        "serialRequired": "Seri numarası gerekli",
+        "supplierArticleNumbers": "Tedarikçi ürün tip no.",
+        "supplierOrderNumbers": "Tedarikçi ürün sip. no.",
+        "unit": "Birim"
       },
       "yes": "Evet",
       "no": "Hayır",
@@ -479,16 +513,20 @@
         "group": "Malzeme grubu",
         "name": "Ürün adı *",
         "brand": "Marka",
-        "modelNumber": "Model numarası",
+        "modelNumber": "Üretici kodu",
         "supplierName": "Tedarikçi adı",
         "description": "Açıklama",
         "quantity": "Miktar",
         "purchasePrice": "Alış fiyatı",
         "currency": "Para birimi",
         "manufacturerBarcode": "Üretici barkodu",
-        "serialRequired": "Seri numarası gerekli"
+        "serialRequired": "Seri numarası gerekli",
+        "supplierArticleNumber": "Tedarikçi ürün tip no.",
+        "supplierOrderNumber": "Tedarikçi ürün sip. no.",
+        "unit": "Birim",
+        "supplierEmail": "Tedarikçi e-postası"
       },
-      "help1": "Her satır bir ürün kartıdır. Yalnızca «Ürün adı» zorunludur. «Üretici barkodu», aynı satırdaki tedarikçinin ürün barkodudur.",
+      "help1": "Her satır bir ürün kartıdır. «Ürün adı» zorunludur; birim, tedarikçi ve tedarikçi e-postası eksik olan kartlar taslak olarak aktarılır. «Üretici barkodu», aynı satırdaki tedarikçinin ürün barkodudur. «Tedarikçi ürün tip no.» ve «Tedarikçi ürün sip. no.» da o tedarikçiye aittir; fiyat talebinde ve siparişte yazar.",
       "help2": "«Malzeme grubu» sütununda listeden seçin. ERP kodu (ör. ELK-PLC-00001) ve GS1 barkodu aktarımdan sonra otomatik verilir.",
       "help3": "Miktar ve alış fiyatı sayı olarak yazılır (ör. 12,50). Para birimi boşsa CHF sayılır.",
       "help4": "Seri numaralı ürünlerde «Seri numarası gerekli» = Evet seçin ve miktar yazmayın; parçalar seri numaralarıyla eklenir.",
@@ -505,6 +543,23 @@
       "page": "Sayfa {{page}} / {{pages}}",
       "listFile": "depo-urun-kartlari-{{date}}.pdf",
       "labelsFile": "depo-etiketler-{{date}}.pdf"
+    },
+    "units": {
+      "PCS": "Adet",
+      "M": "Metre",
+      "KG": "Kilogram",
+      "SET": "Set",
+      "PACK": "Paket"
+    },
+    "missing": {
+      "name": "ürün adı",
+      "unit": "birim",
+      "supplier": "tedarikçi",
+      "supplierEmail": "tedarikçi e-postası",
+      "nameHint": "Ürün adı zorunludur.",
+      "unitHint": "Bir birim seçin (adet, metre …).",
+      "supplierHint": "En az bir tedarikçi ekleyin.",
+      "supplierEmailHint": "En az bir tedarikçinin e-postasını girin — fiyat talebi oraya gider."
     }
   },
   "notify": {

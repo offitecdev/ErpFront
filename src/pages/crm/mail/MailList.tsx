@@ -83,8 +83,8 @@ const Row = ({
                 </span>
                 <span className="ofi-mail-row__subject" title={row.subject || ''}>
                     <span className="ofi-mail-row__subject-text">{row.subject || t('mail.page.noSubject')}</span>
-                    {row.bodyPreview && <span className="ofi-mail-row__preview"> – {row.bodyPreview}</span>}
                 </span>
+                {row.bodyPreview && <span className="ofi-mail-row__preview">{row.bodyPreview}</span>}
                 <span className="ofi-mail-row__tags">
                     {row.category && (
                         <span className="ofi-mail-tag is-category" style={{ ['--ofi-cat-color' as string]: row.category.color }} title={row.category.name}>

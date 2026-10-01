@@ -34,10 +34,19 @@ export interface BomProduct {
     erpCode: string | null;
     name: string;
     brand: string | null;
+    /** «Üretici kodu» (30.09.2026, früher «Model numarası»). */
     modelNumber: string | null;
+    /** «Ürün kodu» der Karte — steht im PDF des Lieferanten (30.09.2026). */
+    productCode?: string | null;
+    /** Die Einheit der Karte — eine neue Zeile übernimmt sie (30.09.2026). */
+    unit?: string | null;
+    /** Taslak-Karte (Einheit, Lieferant oder seine E-Mail fehlen). */
+    isDraft?: boolean;
+    materialGroupName?: string | null;
     description: string | null;
     supplierName: string | null;
-    suppliers: Array<{ id: string | null; name: string }>;
+    /** Nur für den Einkauf sichtbar; `hasEmail` = die Preisanfrage geht automatisch. */
+    suppliers: Array<{ id: string | null; name: string; hasEmail?: boolean }>;
     quantity: number;
     free: number;
     serialRequired: boolean;
@@ -253,6 +262,8 @@ export interface BomRevisionDraft {
     createdByName: string | null;
     updatedAt: string;
     lines: BomRevisionLine[];
+    /** Die Freigabe durch die Administratorrolle (30.09.2026): eingereicht (wartet) oder zurückgewiesen. */
+    approval?: { state: 'SUBMITTED' | 'REJECTED'; at: string; byName: string | null; note: string | null } | null;
 }
 
 export interface BomRevisionSummary {
@@ -345,6 +356,27 @@ export interface Bom {
     procurement: BomProcurementSummary[];
     /** Eingegangene Ware, die bei der Buchung an diese BOM ging (Gelen mallar). */
     goodsIn: BomGoodsIn[];
+    activity?: BomActivity;
+}
+
+export interface BomActivity {
+    requestsCount: number;
+    goodsCount: number;
+    priceRequests: Record<string, string>;
+    received: Record<string, number>;
+    orderCount: number;
+    confirmedOrders: number;
+    needing: number;
+    requestedNeeding: number;
+}
+
+export type BomSummary = Pick<Bom,
+    'id' | 'bomNumber' | 'kind' | 'parentBomId' | 'templateName' | 'area' | 'status'
+    | 'consumedAt' | 'revision' | 'updatedAt' | 'completion' | 'counts' | 'activity'>;
+
+export interface BomHistory {
+    revisions: BomRevisionSummary[];
+    draft: { revision: number; reason: string | null } | null;
 }
 
 export interface BomAreaView {
@@ -355,11 +387,9 @@ export interface BomAreaView {
     canEdit: boolean;
     counts: Record<BuiltInArea, number>;
     /** Die Haupt-BOM — `null` nur für Lesende, solange keine angelegt ist. */
-    main: Bom | null;
+    main: BomSummary | null;
     /** Die Alt-BOMs darunter. */
-    subs: Bom[];
-    /** Haupt- und Alt-BOMs zusammen. */
-    boms: Bom[];
+    subs: BomSummary[];
     /** Die Alt-BOM-Kodes des Bereichs (Einstellungen). */
     codes: BomCode[];
     /** Vorlagen des Bereichs — zum Einfügen ihrer Zeilen. */
