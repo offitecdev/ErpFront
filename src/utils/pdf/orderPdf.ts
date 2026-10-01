@@ -47,7 +47,7 @@ import {
 } from './supplierPdfKit';
 import { localizePurchaseCode } from '@/utils/purchaseCode';
 import { isProductionColumns, localizeProductionCells } from '@/utils/standardOrderColumns';
-import { purchaseCommissionOf, purchaseProjectOf } from '@/utils/purchaseProject';
+import { purchaseNotesReference, purchaseProjectCardRows } from '@/utils/purchaseProject';
 
 export type OrderPdfLang = 'tr' | 'de' | 'en';
 
@@ -60,9 +60,9 @@ interface OrderPdfStrings {
     project: string;
     /** Die Projektnummer — eine eigene Zeile neben der Kommission (29.09.2026). */
     projectNumber: string;
+    /** PROJE/SATIŞ ŞİRKETİ (01.10.2026): «Kommission» yerine proje adının etiketi. */
+    projectName: string;
     supplier: string;
-    /** Vor dem Namen des Empfängers in der Anschrift («z. Hd.»). */
-    attention: string;
     greeting: string;
     intro: string;
     /** HINWEISE unter der Tabelle (29.09.2026): Überschrift und Punkte; `{number}`
@@ -72,6 +72,8 @@ interface OrderPdfStrings {
     notesCommission: string;
     /** Statt der Kommission: die Projektnummer (29.09.2026) — `{p}`. */
     notesProject: string;
+    /** Proje/satış şirketinde, proje numarası yoksa: proje adı — `{c}`. */
+    notesProjectName: string;
     /** Der Gruss am Schluss («Freundliche Grüsse»). */
     regards: string;
     /** Überschrift des Informationsblocks links («Bestellangaben»). */
@@ -123,8 +125,8 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         quoteNumber: 'Teklif Numaranız',
         project: 'Komisyon',
         projectNumber: 'Proje No',
+        projectName: 'Proje',
         supplier: 'Tedarikçi',
-        attention: 'Dikkatine:',
         notesTitle: 'Bilgilendirme',
         notes: [
             'Lütfen bu siparişi bağlayıcı teslim tarihiyle birlikte yazılı olarak onaylayınız.',
@@ -134,6 +136,7 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         ],
         notesCommission: ' ve «{c}» komisyonunu',
         notesProject: ' ve {p} proje numaramızı',
+        notesProjectName: ' ve «{c}» projesini',
         regards: 'Saygılarımızla',
         infoCaption: 'Sipariş bilgileri',
         colPos: 'Poz.',
@@ -179,8 +182,8 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         quoteNumber: 'Ihre Offerte',
         project: 'Kommission',
         projectNumber: 'Projekt-Nr.',
+        projectName: 'Projekt',
         supplier: 'Lieferant',
-        attention: 'z. Hd.',
         notesTitle: 'Hinweise',
         notes: [
             'Bitte bestätigen Sie uns diese Bestellung schriftlich mit dem verbindlichen Liefertermin.',
@@ -190,6 +193,7 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         ],
         notesCommission: ' sowie die Kommission «{c}»',
         notesProject: ' sowie die Projektnummer {p}',
+        notesProjectName: ' sowie das Projekt «{c}»',
         regards: 'Freundliche Grüsse',
         infoCaption: 'Bestellangaben',
         colPos: 'Pos.',
@@ -231,8 +235,8 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         quoteNumber: 'Your quotation',
         project: 'Commission',
         projectNumber: 'Project no.',
+        projectName: 'Project',
         supplier: 'Supplier',
-        attention: 'Attn.',
         notesTitle: 'Notes',
         notes: [
             'Please confirm this order in writing together with the binding delivery date.',
@@ -242,6 +246,7 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         ],
         notesCommission: ' and the commission “{c}”',
         notesProject: ' and the project number {p}',
+        notesProjectName: ' and the project “{c}”',
         regards: 'Kind regards',
         infoCaption: 'Order details',
         colPos: 'Pos.',
@@ -1041,12 +1046,11 @@ const revisionKindOf = (line: OrderRevisionChange): RevisionChangeKind => {
    der Titel mit dem roten Strich (`supplierPdfKit`). */
 
 /** Die Anschrift des Lieferanten rechts; gibt die Unterkante zurück. */
-function drawRecipientOf(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySettings, L: OrderPdfStrings): number {
-    const attention = oneLine(order.recipientName || '');
+function drawRecipientOf(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySettings): number {
+    // Der Empfänger steht in der Belegkarte (01.10.2026), nicht unter der Anschrift.
     return drawOfferRecipient(doc, {
         sender: companySenderLine(s, ' · '),
         name: order.supplierName || '',
-        attention: attention ? `${L.attention} ${attention}` : '',
         address: order.supplierAddress,
     });
 }
@@ -1056,11 +1060,7 @@ function drawRecipientOf(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetti
    numarası olması gerekiyor»): auf Lieferschein, Rechnung und Offerte soll der Lieferant
    unsere Projektnummer angeben; ohne Projekt bleibt die Kommission (freier Text). */
 function orderNotes(order: PurchaseOrderRow, L: OrderPdfStrings): string[] {
-    const project = purchaseProjectOf(order);
-    const commission = purchaseCommissionOf(order, project);
-    const reference = project?.number
-        ? L.notesProject.replace('{p}', project.number)
-        : commission ? L.notesCommission.replace('{c}', commission) : '';
+    const reference = purchaseNotesReference(order, L);
     return L.notes.map((note) => note
         .replace('{number}', order.referenceNumber)
         .replace('{commission}', reference));
@@ -1095,19 +1095,18 @@ function drawCoverPage(
 ): number {
     /* Die Karte der Offerte. Wo es ein Projekt gibt, steht seine Nummer statt der
        Kommission (29.09.2026: «komisyon yazmasın, proje numarası yazsın»); ohne
-       Projekt die frei geschriebene Kommission. `utils/purchaseProject.ts`. */
-    const project = purchaseProjectOf(order);
+       Projekt die frei geschriebene Kommission. `utils/purchaseProject.ts`.
+       Proje/satış şirketinde (01.10.2026) proje adı «Projekt» satırında. */
     const cardBottom = drawOfferInfoCard(doc, [
         { label: L.orderNumber, value: order.referenceNumber, emphasize: true },
-        project?.number
-            ? { label: L.projectNumber, value: project.number }
-            : { label: L.project, value: purchaseCommissionOf(order, null) },
+        ...purchaseProjectCardRows(order, L),
+        { label: L.recipient, value: oneLine(order.recipientName || '') },
         { label: L.orderDate, value: fmtDocDate(order.createdAt) },
         { label: L.revision, value: revision ? [String(revision.number), fmtDocDate(revision.createdAt)].filter(Boolean).join(' · ') : '' },
         { label: L.quoteNumber, value: oneLine(order.quoteNumber || '') },
         { label: L.orderedBy, value: oneLine(order.orderedByName || '') },
     ]);
-    const addrBottom = drawRecipientOf(doc, order, s, L);
+    const addrBottom = drawRecipientOf(doc, order, s);
     const titleBase = Math.max(cardBottom, addrBottom) + 16;
     // «Bestellung BE-2026-008 (Rev. 1)» — die Nummer immer, die Revision in Klammern.
     drawOfferTitle(doc, titleBase, `${L.docTitle} ${order.referenceNumber}`, revision ? `(Rev. ${revision.number})` : null);

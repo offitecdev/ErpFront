@@ -6,9 +6,8 @@ import type { PurchaseOrderRow } from '@/types/inventory';
 import type { OrderPdfLang } from '@/utils/pdf/orderPdf';
 import { localizePurchaseCode } from '@/utils/purchaseCode';
 import { SectionCard } from '../components/primitives';
+import { DocLangSwitch } from './DocLangSwitch';
 import { internalRequestView, orderForSupplier, requestSuppliersOf, supplierPdfFileName } from '../utils/requestSuppliers';
-
-const PDF_LANGS: OrderPdfLang[] = ['de', 'tr', 'en'];
 
 /**
  * ── DAS BELEGBLATT, ERST WENN MAN ES ANSIEHT (22.09.2026) ──────────────────
@@ -19,9 +18,12 @@ const PDF_LANGS: OrderPdfLang[] = ['de', 'tr', 'en'];
  * Öffnen des Reiters eingehängt wird: solange niemand auf «PDF» klickt, läuft
  * hier kein Byte.
  */
-export const PdfPanel = ({ order, priceRequest, internalRequester = null }: {
+export const PdfPanel = ({ order, priceRequest, lang, onLangChange, internalRequester = null }: {
     order: PurchaseOrderRow;
     priceRequest: boolean;
+    /** Belge dili — Mail reiteriyle ORTAK (01.10.2026): burada seçilen dil mailde de gider. */
+    lang: OrderPdfLang;
+    onLangChange: (lang: OrderPdfLang) => void;
     /**
      * OHNE EINKAUFSROLLE (29.09.2026): das Blatt für den Einkauf — kein
      * Lieferant, im Anschriftfeld «Einkauf» und die anfragende Person.
@@ -29,7 +31,6 @@ export const PdfPanel = ({ order, priceRequest, internalRequester = null }: {
     internalRequester?: string | null;
 }) => {
     const settings = usePdfSettings();
-    const [lang, setLang] = useState<OrderPdfLang>('de');
     const internal = internalRequester !== null;
     /* Eine revidierte BOM-Bestellung ist seit dem 29.09.2026 wieder EIN Blatt:
        Revisionshinweis und Änderungstabelle stehen in der Bestellung selbst
@@ -137,23 +138,7 @@ export const PdfPanel = ({ order, priceRequest, internalRequester = null }: {
                             {t('inv.orders.requestSuppliers.downloadAll', { count: suppliers.length })}
                         </button>
                     )}
-                    <div className="ofi-lager-tabs flex items-center gap-1 rounded-md border border-slate-200 p-0.5 dark:border-white/15">
-                        {PDF_LANGS.map((entry) => (
-                            <button
-                                key={entry}
-                                type="button"
-                                onClick={() => setLang(entry)}
-                                aria-current={lang === entry ? 'page' : undefined}
-                                className={`rounded px-2.5 py-1 text-[11.5px] font-semibold uppercase transition-colors ${
-                                    lang === entry
-                                        ? 'bg-[#0a7aff]/10 text-[#0a7aff] dark:bg-[#3b8dff]/25 dark:text-[#5c9fff]'
-                                        : 'text-slate-500 hover:bg-[#0a7aff]/[0.06] hover:text-[#0066e0] dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white'
-                                }`}
-                            >
-                                {entry}
-                            </button>
-                        ))}
-                    </div>
+                    <DocLangSwitch value={lang} onChange={onLangChange} />
                 </div>
             )}
         >

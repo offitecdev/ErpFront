@@ -1305,7 +1305,8 @@ body > :not(#root) :is(.ofi-ord, .ofi-ord-plate, .ofi-poi) :is(input, textarea):
     resize: vertical;
     outline: none;
 }
-.ofi-mail-attach { padding: 0 16px 14px; }
+/* Anhang + Belegsprache (DE·TR·EN) in einer Zeile (01.10.2026). */
+.ofi-mail-attach { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 16px 14px; }
 .ofi-mail-file {
     display: inline-flex;
     align-items: center;
