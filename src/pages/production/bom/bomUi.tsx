@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Check, CircleDashed, Info, TriangleAlert } from 'lucide-react';
 
+import { MacLoading, MacWheel } from '@/components/ui-shared/MacLoading';
 import { t } from '@/i18n/translate';
 import type { BomCompletion, BomStatus, BomUnit } from '@/types/productionBom';
 
@@ -81,11 +82,15 @@ export const EmptyState = ({ icon, title, hint, children }: { icon?: ReactNode; 
     </div>
 );
 
-export const LoadingState = () => (
-    <div className="ofi-bom-state" aria-busy="true">
-        <span className="ofi-bom-spinner" />
-    </div>
-);
+/**
+ * Der Ladekreisel der BOM ist der von macOS — dasselbe Rad wie beim Laden einer
+ * Bestellung (Satın alma): zwölf Speichen, die reihum aufleuchten. Vorgabe
+ * Samet, 01.10.2026. `small` für Knöpfe und Suchfelder; die Farbe kommt aus
+ * der Umgebung, auf blauen Knöpfen ist das Rad also weiss.
+ */
+export const BomSpinner = ({ small }: { small?: boolean }) => <MacWheel small={small} />;
+
+export const LoadingState = () => <MacLoading label={t('common.loadingData')} />;
 
 /** Eine Zahl, die fehlt, ist ein ruhiger Strich — kein «0». */
 export const Dash = () => <span className="ofi-bom-dash">—</span>;

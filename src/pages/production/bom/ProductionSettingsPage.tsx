@@ -12,7 +12,7 @@ import type { BuiltInArea } from '@/types/productionTasks';
 import '@/styles/modules/productionBom.css';
 
 import { tempKey } from './bomFormat';
-import { LoadingState, Note } from './bomUi';
+import { BomSpinner, LoadingState, Note } from './bomUi';
 import { BomUnsavedDialog } from './device/BomUnsavedDialog';
 
 type Section = 'bom';
@@ -122,7 +122,7 @@ export const ProductionSettingsPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
                             </button>
                         )}
                         <button type="button" className="ofi-bom-btn is-primary ofi-nosize" disabled={!dirty || saving} onClick={() => void save()}>
-                            {saving ? <span className="ofi-bom-spinner is-small is-light" /> : <Save />}
+                            {saving ? <BomSpinner small /> : <Save />}
                             {t('productionBom.common.save')}
                         </button>
                     </span>

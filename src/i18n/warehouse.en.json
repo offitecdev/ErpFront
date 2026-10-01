@@ -340,7 +340,8 @@
       "RECEIPT_UNDO_INVALID": "This goods receipt can no longer be undone — the order or its record has changed.",
       "UNIT_INVALID": "This unit is unknown.",
       "SUPPLIER_EMAIL_INVALID": "Invalid e-mail for «{{name}}»: {{email}}",
-      "PRODUCT_INCOMPLETE": "Required fields are missing — the card can only be saved as a draft."
+      "PRODUCT_INCOMPLETE": "Required fields are missing — the card can only be saved as a draft.",
+      "CATEGORY_BOM_AREA_INVALID": "Unknown BOM area."
     },
     "settings": {
       "title": "Warehouse settings",
@@ -389,7 +390,24 @@
       "codesAssigned_one": "{{count}} card received an ERP code.",
       "codesAssigned_other": "{{count}} cards received an ERP code.",
       "groupCount_one": "{{count}} group",
-      "groupCount_other": "{{count}} groups"
+      "groupCount_other": "{{count}} groups",
+      "bomArea": {
+        "label": "BOM area",
+        "MECHANICAL": "Mechanical",
+        "ELECTRICAL": "Electrical",
+        "BOTH": "Both",
+        "inList": {
+          "MECHANICAL": "Mechanical BOM",
+          "ELECTRICAL": "Electrical BOM",
+          "BOTH": "Mechanical + electrical BOM"
+        },
+        "hint": {
+          "MECHANICAL": "{{code}} materials only show up in the search of mechanical BOMs.",
+          "ELECTRICAL": "{{code}} materials only show up in the search of electrical BOMs.",
+          "BOTH": "{{code}} materials show up in the search of mechanical and electrical BOMs."
+        },
+        "saved": "{{code}} → {{area}} saved."
+      }
     },
     "labels": {
       "size": "Label size",

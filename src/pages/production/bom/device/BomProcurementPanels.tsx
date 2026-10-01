@@ -9,7 +9,7 @@ import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBo
 import type { Bom, BomGoodsIn, BomProcurementSummary } from '@/types/productionBom';
 
 import { fmtQty, shortDate, unitLabel } from '../bomFormat';
-import { EmptyState } from '../bomUi';
+import { BomSpinner, EmptyState } from '../bomUi';
 import { ProgressRing } from './BomProcessButton';
 
 /**
@@ -109,7 +109,7 @@ export const BomProcurementSection = ({
                                     disabled={busy !== null}
                                     onClick={() => void withdraw(request)}
                                 >
-                                    {busy === request.id ? <span className="ofi-bom-spinner is-small" /> : <Undo2 />}
+                                    {busy === request.id ? <BomSpinner small /> : <Undo2 />}
                                     {t('productionBom.procurement.withdraw')}
                                 </button>
                             )}

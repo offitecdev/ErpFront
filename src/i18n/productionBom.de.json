@@ -126,7 +126,11 @@
       "searching": "Wird gesucht…",
       "short": "ERP-Code, Modell oder Name",
       "addActive": "Gewähltes Produkt hinzufügen",
-      "typeToSearch": "ERP-Code, Modell-Nr. oder Produktnamen eingeben — + fügt das gewählte Produkt hinzu"
+      "typeToSearch": "ERP-Code, Modell-Nr. oder Produktnamen eingeben — + fügt das gewählte Produkt hinzu",
+      "areaScope": {
+        "MECHANICAL": "Gesucht wird nur in Kod-Typen der mechanischen BOM (Depo-Einstellungen › Materialgruppen).",
+        "ELECTRICAL": "Gesucht wird nur in Kod-Typen der elektrischen BOM (Depo-Einstellungen › Materialgruppen)."
+      }
     },
     "quickCard": {
       "title": "Neue Produktkarte",
@@ -523,6 +527,7 @@
       "PRICE_MISSING": "{{code}} nennt für diese Zeile keinen Preis.",
       "COMPARE_COUNT": "Höchstens {{max}} Angebote wählen.",
       "COMPARE_PDF_REQUIRED": "{{supplier}} ({{code}}): kein Angebots-PDF — zuerst ein PDF hochladen.",
+      "COMPARE_PDF_MISSING": "{{supplier}} ({{code}}): die Datei des Angebots-PDF fehlt auf dem Server — das PDF neu hochladen.",
       "COMPARE_PDF_UNREADABLE": "{{supplier}}: das Angebots-PDF ist nicht lesbar.",
       "COMPARISON_NOT_FOUND": "Vergleich nicht gefunden.",
       "MAILBOX_INVALID": "Angaben des Postfachs fehlen oder sind falsch.",

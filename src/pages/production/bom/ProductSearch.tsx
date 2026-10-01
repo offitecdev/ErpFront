@@ -5,8 +5,10 @@ import { PackagePlus, Plus, Search, X } from 'lucide-react';
 import { t } from '@/i18n/translate';
 import { productionBomApi } from '@/lib/api/productionBom';
 import type { BomProduct } from '@/types/productionBom';
+import type { BuiltInArea } from '@/types/productionTasks';
 
 import { fmtQty } from './bomFormat';
+import { BomSpinner } from './bomUi';
 import { QuickProductCard } from './QuickProductCard';
 
 /**
@@ -56,6 +58,11 @@ const placePanel = (field: HTMLElement, panel: HTMLElement, alignRight: boolean)
  * ↑/↓ wählt, ↵ fügt die ganze Zeile hinzu. Findet sich nichts, steht dort
  * «Ürün kartı oluştur» — das kleine Fenster legt die Karte im Depo an und
  * fügt sie gleich hinzu.
+ *
+ * `area` (01.10.2026, Samet: «bomda mekanik olan sadece kendi MAK kodlarını
+ * görebilecek»): der Server zeigt nur Karten der Kod türleri, die die Depo-
+ * Einstellungen diesem Bereich (oder beiden) zuordnen; das kleine Fenster
+ * bietet nur deren Gruppen an.
  */
 export const ProductSearch = ({
     onPick,
@@ -65,6 +72,7 @@ export const ProductSearch = ({
     placeholder,
     inputRef,
     trailing,
+    area,
 }: {
     onPick: (product: BomProduct) => void;
     disabled?: boolean;
@@ -75,6 +83,8 @@ export const ProductSearch = ({
     inputRef?: RefObject<HTMLInputElement | null>;
     /** Am Ende des Feldes (die leere Zeile: «Şablondan ekle»). */
     trailing?: ReactNode;
+    /** Bereich der BOM — nur seine Kod türleri (ohne: alle Karten). */
+    area?: BuiltInArea;
 }) => {
     const listId = useId();
     const ownInputRef = useRef<HTMLInputElement>(null);
@@ -82,7 +92,7 @@ export const ProductSearch = ({
     const panelRef = useRef<HTMLDivElement>(null);
     const spacerRef = useRef<HTMLDivElement>(null);
     const [query, setQuery] = useState('');
-    const [results, setResults] = useState<{ query: string; items: BomProduct[] } | null>(null);
+    const [results, setResults] = useState<{ query: string; area?: BuiltInArea; items: BomProduct[] } | null>(null);
     const [active, setActive] = useState(0);
     const [open, setOpen] = useState(false);
     /* «+» ohne Suchtext: die Liste öffnet mit dem Hinweis, was einzugeben ist —
@@ -100,14 +110,14 @@ export const ProductSearch = ({
         if (!trimmed) return undefined;
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
-            productionBomApi.searchProducts(trimmed, controller.signal)
-                .then((items) => { setResults({ query: trimmed, items }); setActive(0); })
-                .catch(() => { if (!controller.signal.aborted) setResults({ query: trimmed, items: [] }); });
+            productionBomApi.searchProducts(trimmed, controller.signal, area)
+                .then((items) => { setResults({ query: trimmed, area, items }); setActive(0); })
+                .catch(() => { if (!controller.signal.aborted) setResults({ query: trimmed, area, items: [] }); });
         }, 180);
         return () => { window.clearTimeout(timer); controller.abort(); };
-    }, [trimmed]);
+    }, [trimmed, area]);
 
-    const current = results && results.query === trimmed ? results.items : null;
+    const current = results && results.query === trimmed && results.area === area ? results.items : null;
     const searching = Boolean(trimmed) && !current;
     const showPanel = open && (Boolean(trimmed) || hint);
 
@@ -209,7 +219,7 @@ export const ProductSearch = ({
                     onBlur={() => window.setTimeout(() => { setOpen(false); setHint(false); }, 140)}
                     onKeyDown={onKey}
                 />
-                {searching && <span className="ofi-bom-spinner is-small" aria-hidden />}
+                {searching && <BomSpinner small />}
                 {query && (
                     <button
                         type="button"
@@ -272,7 +282,10 @@ export const ProductSearch = ({
                         </button>
                     ))}
                     {current && !current.length && (
-                        <div className="ofi-bom-results__state">{t('productionBom.search.noResults', { query: trimmed })}</div>
+                        <div className="ofi-bom-results__state">
+                            {t('productionBom.search.noResults', { query: trimmed })}
+                            {area && <small>{t(`productionBom.search.areaScope.${area}`)}</small>}
+                        </div>
                     )}
                     {current && (
                         <button
@@ -293,6 +306,7 @@ export const ProductSearch = ({
             {creating !== null && (
                 <QuickProductCard
                     seed={creating}
+                    area={area}
                     onClose={() => setCreating(null)}
                     onCreated={(product) => { setCreating(null); pick(product); }}
                 />

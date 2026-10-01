@@ -5,7 +5,13 @@ import { toast } from 'sonner';
 
 import { t } from '@/i18n/translate';
 import { readWarehouseCatalog, refreshWarehouseCatalog, warehouseApi, warehouseErrorText } from '@/lib/api/warehouse';
-import type { WarehouseCatalog, WarehouseCategory, WarehouseGroup } from '@/types/warehouse';
+import {
+    WAREHOUSE_BOM_AREAS,
+    type WarehouseBomArea,
+    type WarehouseCatalog,
+    type WarehouseCategory,
+    type WarehouseGroup,
+} from '@/types/warehouse';
 
 import {
     ABBREVIATION_MAX,
@@ -123,6 +129,9 @@ const AddRow = ({
         </form>
     );
 };
+
+/** Ein älterer Server schickt keinen Bereich — dann gilt die Kategorie für beide. */
+const areaOf = (category: WarehouseCategory): WarehouseBomArea => category.bomArea ?? 'BOTH';
 
 /** Name + Kürzel bearbeiten (Kürzel gesperrt, sobald es Karten mit Code gibt). */
 const EditRow = ({
@@ -279,6 +288,40 @@ export const MaterialGroupsTab = ({ canManage }: { canManage: boolean }) => {
         }
     };
 
+    /* ── BOM-Bereich (01.10.2026) ────────────────────────────────────── */
+    /*
+     * «Bomda mekanik olan sadece kendi MAK kodlarını görebilecek … her kod
+     *  türü, bu kod türlerine de alan atama olacak: mekanik, elektrik ve ikisi
+     *  de.» Das Segment schaltet sofort um; gespeichert wird der Reihe nach
+     *  (schnelles Umklicken kommt in der geklickten Reihenfolge an), und erst
+     *  die letzte Antwort holt den Stand des Servers — auch in den Zwischen-
+     *  speicher, aus dem die BOM ihre Gruppen liest.
+     */
+    const areaQueue = useRef<Promise<unknown>>(Promise.resolve());
+    const areaTicket = useRef(0);
+    const saveBomArea = async (category: WarehouseCategory, bomArea: WarehouseBomArea) => {
+        if (areaOf(category) === bomArea) return;
+        const ticket = ++areaTicket.current;
+        setCatalog((current) => current && {
+            ...current,
+            categories: current.categories.map((entry) => (entry.id === category.id ? { ...entry, bomArea } : entry)),
+        });
+        const run = areaQueue.current.then(() => warehouseApi.updateCategory(category.id, { bomArea }));
+        areaQueue.current = run.catch(() => undefined);
+        try {
+            await run;
+            if (ticket === areaTicket.current) {
+                toast.success(t('warehouse.settings.bomArea.saved', {
+                    code: category.code,
+                    area: t(`warehouse.settings.bomArea.${bomArea}`),
+                }));
+            }
+        } catch (error) {
+            toast.error(warehouseErrorText(error));
+        }
+        if (ticket === areaTicket.current) await reload();
+    };
+
     /* ── Materialgruppen ─────────────────────────────────────────────── */
     const addGroup = async (name: string, code: string) => {
         if (!selected) return false;
@@ -363,7 +406,10 @@ export const MaterialGroupsTab = ({ canManage }: { canManage: boolean }) => {
                             onClick={() => select(category.id)}
                         >
                             <span className="ofi-wh-abbr">{category.code}</span>
-                            <span className="ofi-wh-catrow__name">{category.name}</span>
+                            <span className="ofi-wh-catrow__text">
+                                <span className="ofi-wh-catrow__name">{category.name}</span>
+                                <small className="ofi-wh-catrow__area">{t(`warehouse.settings.bomArea.inList.${areaOf(category)}`)}</small>
+                            </span>
                             <span className="ofi-wh-catrow__count">{t('warehouse.settings.groupCount', { count: category.groups.length })}</span>
                             <ChevronRight className="ofi-wh-catrow__chevron" />
                         </button>
@@ -433,6 +479,34 @@ export const MaterialGroupsTab = ({ canManage }: { canManage: boolean }) => {
                                     )}
                                 </>
                             )}
+                        </div>
+
+                        {/* «Her kod türü, bu kod türlerine de alan atama olacak» (01.10.2026):
+                            in welchen BOMs die Suche die Karten dieser Kategorie zeigt. */}
+                        <div className="ofi-wh-group__box ofi-wh-cat__area">
+                            <div className="ofi-wh-row">
+                                <span className="ofi-wh-row__label" id="ofi-wh-bomarea-label">{t('warehouse.settings.bomArea.label')}</span>
+                                <div className="ofi-wh-row__control">
+                                    <div className="ofi-wh-seg" role="radiogroup" aria-labelledby="ofi-wh-bomarea-label">
+                                        {WAREHOUSE_BOM_AREAS.map((area) => (
+                                            <button
+                                                key={area}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={areaOf(selected) === area}
+                                                className={`ofi-nosize ${areaOf(selected) === area ? 'is-on' : ''}`}
+                                                disabled={!canManage}
+                                                onClick={() => void saveBomArea(selected, area)}
+                                            >
+                                                {t(`warehouse.settings.bomArea.${area}`)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <span className="ofi-wh-row__hint">
+                                        {t(`warehouse.settings.bomArea.hint.${areaOf(selected)}`, { code: selected.code })}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
                         {/* «onu seçince de alt bir tab olması lazım: malzeme grupları» */}

@@ -27,7 +27,7 @@ import type { Bom, BomLine, BomProcurementKind, BomProduct, BomTemplate, BomUnit
 
 import { BomLinesTable, type BomTableMode, type BomTableRow } from '../BomLinesTable';
 import { fmtQty, parseQuantityText, quantityToText, shortDate, unitLabel } from '../bomFormat';
-import { CompletionChecks, Note, RevisionPill, StatusPill } from '../bomUi';
+import { BomSpinner, CompletionChecks, Note, RevisionPill, StatusPill } from '../bomUi';
 import { NavBar, NavLinkRow } from '../NavStack';
 import { ProductSearch } from '../ProductSearch';
 import { addProduct, insertTemplateLines, type DraftLine } from '../templates/templateDraft';
@@ -370,7 +370,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                     {t('productionBom.editor.revert')}
                                 </button>
                                 <button type="button" className="ofi-bom-btn is-primary ofi-nosize" disabled={saving || !valid} onClick={() => void save()}>
-                                    {saving ? <span className="ofi-bom-spinner is-small is-light" /> : <Save />}
+                                    {saving ? <BomSpinner small /> : <Save />}
                                     {t('productionBom.common.save')}
                                 </button>
                             </>
@@ -397,7 +397,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                         title={bom.completion.ready ? undefined : t('productionBom.detail.mainChecks', { done: bom.completion.subs.completed, total: bom.completion.subs.total })}
                                         onClick={() => void run('complete', 'productionBom.detail.completed')}
                                     >
-                                        {busy === 'complete' ? <span className="ofi-bom-spinner is-small" /> : <CheckCircle2 />}
+                                        {busy === 'complete' ? <BomSpinner small /> : <CheckCircle2 />}
                                         {t('productionBom.detail.complete')}
                                     </button>
                                 )}
@@ -417,7 +417,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                             title={dirty ? t('productionBom.detail.saveFirst') : undefined}
                                             onClick={() => void run('approve', 'productionBom.detail.approved')}
                                         >
-                                            {busy === 'approve' ? <span className="ofi-bom-spinner is-small is-light" /> : <CheckCircle2 />}
+                                            {busy === 'approve' ? <BomSpinner small /> : <CheckCircle2 />}
                                             {t('productionBom.detail.approve')}
                                         </button>
                                     </>
@@ -489,7 +489,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                             title={bom.completion.ready ? undefined : t('productionBom.err.NOT_READY')}
                                             onClick={() => void run('complete', 'productionBom.detail.completed')}
                                         >
-                                            {busy === 'complete' ? <span className="ofi-bom-spinner is-small" /> : <CheckCircle2 />}
+                                            {busy === 'complete' ? <BomSpinner small /> : <CheckCircle2 />}
                                             {t('productionBom.detail.complete')}
                                         </button>
                                     </>
@@ -643,7 +643,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                     {editable && (
                                         <div className="ofi-bom-linesbar is-tools">
                                             <div className="ofi-bom-linesbar__tools">
-                                                <ProductSearch onPick={pick} placeholder={t('productionBom.search.short')} />
+                                                <ProductSearch area={bom.area} onPick={pick} placeholder={t('productionBom.search.short')} />
                                                 <button type="button" className="ofi-bom-btn is-quiet ofi-nosize" onClick={() => setInserting(true)}>
                                                     <LayoutTemplate />
                                                     {t('productionBom.insert.button')}
@@ -667,6 +667,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                         footer={editable ? (
                                             <ProductSearch
                                                 variant="row"
+                                                area={bom.area}
                                                 onPick={pick}
                                                 placeholder={t('productionBom.detail.addRowPlaceholder')}
                                                 trailing={(

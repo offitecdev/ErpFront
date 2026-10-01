@@ -4,6 +4,8 @@
 .ofi-mac-loading__wheel { display: block; position: relative; flex: none; width: 30px; height: 30px; }
 .ofi-mac-loading__wheel i { position: absolute; inset: 0; animation: ofi-mac-loading-pulse 1s linear infinite; }
 .ofi-mac-loading__wheel i::before { content: ''; display: block; width: 3px; height: 8px; margin: 0 auto; border-radius: 2px; background: currentColor; }
+.ofi-mac-loading__wheel.is-small { width: 14px; height: 14px; }
+.ofi-mac-loading__wheel.is-small i::before { width: 1.5px; height: 4px; border-radius: 1px; }
 .ofi-mac-loading.is-compact { flex-direction: row; min-height: 56px; padding: 12px; gap: 12px; text-align: left; }
 .dark .ofi-mac-loading { color: #a1a1a6; }
 .dark .ofi-mac-loading b { color: #f5f5f7; }

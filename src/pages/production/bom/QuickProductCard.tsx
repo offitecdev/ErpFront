@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -6,6 +6,7 @@ import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/P
 import { t } from '@/i18n/translate';
 import { readWarehouseCatalog, warehouseApi, warehouseErrorText } from '@/lib/api/warehouse';
 import type { BomProduct } from '@/types/productionBom';
+import type { BuiltInArea } from '@/types/productionTasks';
 import type { WarehouseCatalog, WarehouseGroupRef } from '@/types/warehouse';
 import { MaterialGroupSelect } from '@/pages/warehouse/components/MaterialGroupSelect';
 import { SupplierSelect, type SupplierValue } from '@/pages/warehouse/components/SupplierSelect';
@@ -32,10 +33,13 @@ export const QuickProductCard = ({
     seed,
     onClose,
     onCreated,
+    area,
 }: {
     seed: string;
     onClose: () => void;
     onCreated: (product: BomProduct) => void;
+    /** Bereich der BOM (01.10.2026): nur Gruppen der Kod türleri dieses Bereichs oder beider. */
+    area?: BuiltInArea;
 }) => {
     const seedIsCode = looksLikeCode(seed);
     const [name, setName] = useState(seedIsCode ? '' : seed);
@@ -59,6 +63,11 @@ export const QuickProductCard = ({
         (value) => setCatalog(value),
         () => setCatalog({ categories: [], ungroupedCount: 0 }),
     ), []);
+    /* Eine Karte, die die Suche dieser BOM nie zeigen würde, soll hier gar nicht erst entstehen. */
+    const groupCatalog = useMemo<WarehouseCatalog | null>(() => (catalog && area ? {
+        ...catalog,
+        categories: catalog.categories.filter((category) => !category.bomArea || category.bomArea === 'BOTH' || category.bomArea === area),
+    } : catalog), [catalog, area]);
 
     const minimumValue = parseInputNumber(minimum);
     const minimumInvalid = minimum.trim() !== '' && (minimumValue === null || Number.isNaN(minimumValue) || minimumValue <= 0);
@@ -173,7 +182,7 @@ export const QuickProductCard = ({
                         <div className="ofi-wh-row">
                             <span className="ofi-wh-row__label">{t('productionBom.quickCard.group')}</span>
                             <div className="ofi-wh-row__control">
-                                <MaterialGroupSelect value={group} catalog={catalog} onChange={setGroup} />
+                                <MaterialGroupSelect value={group} catalog={groupCatalog} onChange={setGroup} />
                                 <span className="ofi-wh-row__hint">
                                     {group ? t('productionBom.quickCard.groupHint') : t('productionBom.quickCard.noGroupWarn')}
                                 </span>

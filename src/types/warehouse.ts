@@ -132,10 +132,19 @@ export interface WarehouseGroup {
     locked: boolean;
 }
 
+/**
+ * BOM-Bereich eines Kod türü (01.10.2026, Samet: «bomda mekanik olan sadece
+ * kendi MAK kodlarını görebilecek … mekanik, elektrik ve ikisi de»).
+ */
+export type WarehouseBomArea = 'MECHANICAL' | 'ELECTRICAL' | 'BOTH';
+export const WAREHOUSE_BOM_AREAS: WarehouseBomArea[] = ['MECHANICAL', 'ELECTRICAL', 'BOTH'];
+
 export interface WarehouseCategory {
     id: string;
     name: string;
     code: string;
+    /** In welchen BOMs ihre Karten in der Suche erscheinen (älterer Server: fehlt = beide). */
+    bomArea?: WarehouseBomArea;
     productCount: number;
     locked: boolean;
     groups: WarehouseGroup[];

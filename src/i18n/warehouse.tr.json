@@ -330,7 +330,8 @@
       "RECEIPT_UNDO_INVALID": "Bu mal kabulü geri alınamaz — sipariş veya kayıt değişmiş.",
       "UNIT_INVALID": "Bu birim bilinmiyor.",
       "SUPPLIER_EMAIL_INVALID": "«{{name}}» için e-posta geçersiz: {{email}}",
-      "PRODUCT_INCOMPLETE": "Zorunlu alanlar eksik — kart yalnızca taslak olarak kaydedilebilir."
+      "PRODUCT_INCOMPLETE": "Zorunlu alanlar eksik — kart yalnızca taslak olarak kaydedilebilir.",
+      "CATEGORY_BOM_AREA_INVALID": "Bilinmeyen BOM alanı."
     },
     "settings": {
       "title": "Depo ayarları",
@@ -377,7 +378,24 @@
       "assign": "Kod ver ({{count}})",
       "assignHint": "Bu gruptaki kodsuz kartlara, eklenme sırasıyla ERP kodu ve barkod verir.",
       "codesAssigned": "{{count}} karta ERP kodu verildi.",
-      "groupCount": "{{count}} grup"
+      "groupCount": "{{count}} grup",
+      "bomArea": {
+        "label": "BOM alanı",
+        "MECHANICAL": "Mekanik",
+        "ELECTRICAL": "Elektrik",
+        "BOTH": "İkisi de",
+        "inList": {
+          "MECHANICAL": "Mekanik BOM",
+          "ELECTRICAL": "Elektrik BOM",
+          "BOTH": "Mekanik + elektrik BOM"
+        },
+        "hint": {
+          "MECHANICAL": "{{code}} malzemeleri yalnızca mekanik BOM'larda aranır.",
+          "ELECTRICAL": "{{code}} malzemeleri yalnızca elektrik BOM'larında aranır.",
+          "BOTH": "{{code}} malzemeleri hem mekanik hem elektrik BOM'larında aranır."
+        },
+        "saved": "{{code}} → {{area}} kaydedildi."
+      }
     },
     "labels": {
       "size": "Etiket boyutu",

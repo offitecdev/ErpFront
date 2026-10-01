@@ -240,6 +240,8 @@ const PDF_MAX_EXTRA_COLUMNS = 6;
    brechen.
    ═════════════════════════════════════════════════════════════════════════ */
 const DESC_MIN_W = 28;
+/** So breit bleibt der Name mindestens, bevor eine grössere Schriftstufe gewählt wird (01.10.2026). */
+const DESC_FAIR_W = 48;
 /** Bis hierhin waechst die Beschreibung, BEVOR die Titel in eine Zeile kommen (Referenz: 60 mm). */
 const DESC_FLOOR_W = 60;
 
@@ -403,10 +405,14 @@ const buildTableLayout = (
        Name) — sonst die erste Stufe, in der wenigstens die Mindestmasse passen. */
     const descWantFor = (candidate: TableStep): number => Math.max(
         descMinFor(candidate),
-        Math.min(DESC_FLOOR_W, ...names.map((name) => fullWidth(doc, name, NAME_STYLE, nameSizeOf(candidate.fs)) * 1.03 + candidate.gap)),
+        Math.min(DESC_FLOOR_W, Math.max(0, ...names.map((name) => fullWidth(doc, name, NAME_STYLE, nameSizeOf(candidate.fs)) * 1.03 + candidate.gap))),
     );
+    /* Volle Breite für den Namen; sonst wenigstens `DESC_FAIR_W` (eine breite
+       Bestellung mit zehn Spalten) — erst dann die Mindestmasse. */
     const roomyStep = TABLE_STEPS.find((candidate) =>
-        minSumOf(measureAll(candidate)) + descWantFor(candidate) <= roomFor(candidate.gap));
+        minSumOf(measureAll(candidate)) + descWantFor(candidate) <= roomFor(candidate.gap))
+        ?? TABLE_STEPS.find((candidate) =>
+            minSumOf(measureAll(candidate)) + Math.min(descWantFor(candidate), Math.max(descMinFor(candidate), DESC_FAIR_W)) <= roomFor(candidate.gap));
     let step: TableStep = roomyStep ?? TABLE_STEPS[TABLE_STEPS.length - 1];
     if (!roomyStep) {
         for (const candidate of TABLE_STEPS) {
