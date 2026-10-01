@@ -37,6 +37,11 @@ export interface TaskSectionStage {
     key: TaskStage;
     /** Leer bei den festen Stufen — ihr Name kommt aus der Übersetzung. */
     name: string;
+    /**
+     * Gewicht der Stufe im Bereich, in Prozent (30.09.2026: «the weights of the task only should
+     * fill the weight of its stage») — die Stufen eines Bereichs ergeben 100 %.
+     */
+    weight: number;
 }
 
 export interface TaskSection {
@@ -152,12 +157,23 @@ export interface TaskPerson {
     active: boolean;
 }
 
+/** Eine Stufe (30.09.2026): ihr Gewicht und was ihre Aufgaben zusammen wiegen (in der Stufe). */
+export interface TaskStageCheck {
+    stage: TaskStage;
+    weight: number;
+    taskCount: number;
+    taskWeightSum: number;
+    ok: boolean;
+}
+
 export interface TaskAreaCheck {
     area: TaskArea;
     share: number;
     taskCount: number;
+    /** Die Gewichte der STUFEN zusammen (30.09.2026). */
     weightSum: number;
     ok: boolean;
+    stages: TaskStageCheck[];
 }
 
 export interface TaskTemplateCheck {
@@ -221,4 +237,141 @@ export interface DeviceTasks {
     plan: DeviceTaskPlan | null;
     tasks: ProductionTask[];
     people: TaskPerson[];
+}
+
+/**
+ * ── DER VERLAUF EINER STUFE (30.09.2026) ─────────────────────────────────────
+ * Spiegel von `ProductionTaskActivityDto` (ProductionDeviceTasksUseCase.ts):
+ * wer was wann tat. Kürzel und Namen stehen, wie sie IN DEM AUGENBLICK
+ * hiessen; `details` trägt, was ein Klick zeigt (je nach Art).
+ */
+export type TaskActivityKind =
+    | 'SUBTASK_STARTED'
+    | 'SUBTASK_STOPPED'
+    | 'SUBTASK_SUBMITTED'
+    | 'SUBTASK_DONE'
+    | 'SUBTASK_APPROVED'
+    | 'REVISION_REQUESTED'
+    | 'SUBTASK_UNLOCKED'
+    | 'CHECKLIST_ITEM_ADDED'
+    | 'FILE_UPLOADED'
+    | 'FILE_DELETED'
+    | 'SUBTASK_ASSIGNED'
+    | 'TASK_CREATED'
+    | 'TASK_UPDATED'
+    | 'TASK_DELETED'
+    | 'TASK_MOVED'
+    | 'TASK_STATUS'
+    | 'SUBTASK_CREATED'
+    | 'SUBTASK_UPDATED'
+    | 'SUBTASK_DELETED'
+    | 'STAGE_ADDED'
+    | 'UNLOCK_REQUESTED'
+    | 'REQUEST_SOLVED'
+    | 'PLAN_LOADED'
+    | 'PLAN_REMOVED';
+
+export interface TaskActivity {
+    id: string;
+    kind: TaskActivityKind;
+    /** Zeitpunkt (ISO). */
+    at: string;
+    actorId: string | null;
+    actorName: string | null;
+    /** null: das ganze Gerät (Vorlage geladen/entfernt). */
+    area: TaskArea | null;
+    stage: TaskStage | null;
+    taskId: string | null;
+    taskCode: string | null;
+    taskName: string | null;
+    subtaskId: string | null;
+    subtaskCode: string | null;
+    subtaskName: string | null;
+    details: Record<string, unknown> | null;
+}
+
+/** Eine Seite des Verlaufs (30.09.2026: Seiten und Zeitraum). */
+export interface TaskActivityPage {
+    items: TaskActivity[];
+    /** Wie viele Zeilen der Filter insgesamt trifft. */
+    total: number;
+    page: number;
+    pageSize: number;
+    /** Wer in dieser Stufe je etwas tat — für den Filter «Person». */
+    actors: Array<{ id: string; name: string }>;
+}
+
+/** Was vom Verlauf gezeigt wird: Seite, Arten, Person, Zeitraum (ISO, `to` ausschliesslich). */
+export interface TaskActivityQuery {
+    page: number;
+    pageSize?: number;
+    kinds?: readonly string[];
+    actorId?: string;
+    from?: string;
+    to?: string;
+}
+
+/**
+ * «Görevlerim» auf der Startseite (30.09.2026) — Spiegel von `MyProductionTasksDto`:
+ * je Projekt die Geräte, an denen die Person an Unteraufgaben steht, mit NUR diesen Aufgaben.
+ */
+export interface MyProductionTasks {
+    projects: Array<{
+        id: string;
+        projectNumber: string;
+        projectName: string;
+        devices: Array<{
+            device: DeviceTasks['device'];
+            plan: { templateName: string; sections: TaskSection[] };
+            tasks: ProductionTask[];
+        }>;
+    }>;
+    people: TaskPerson[];
+}
+
+/**
+ * Anfragen an die Verwaltung (30.09.2026) — Spiegel von `ProductionTaskRequestDto`:
+ * APPROVAL = zur Freigabe geschickt, UNLOCK = Bitte um das Aufheben der Sperre.
+ */
+export type TaskRequestKind = 'APPROVAL' | 'UNLOCK';
+export type TaskRequestResolution = 'MANUAL' | 'APPROVED' | 'REVISION' | 'UNLOCKED';
+
+export interface TaskRequest {
+    id: string;
+    kind: TaskRequestKind;
+    /** Bereich und Stufe — die Liste des ganzen Geräts nennt sie. */
+    area: TaskArea;
+    stage: TaskStage;
+    taskId: string;
+    taskCode: string;
+    taskName: string;
+    subtaskId: string;
+    subtaskCode: string;
+    subtaskName: string;
+    note: string | null;
+    requestedById: string | null;
+    requestedByName: string | null;
+    /** Zeitpunkte (ISO). */
+    createdAt: string;
+    solvedAt: string | null;
+    solvedByName: string | null;
+    resolution: TaskRequestResolution | null;
+}
+
+export interface TaskRequestList {
+    items: TaskRequest[];
+    /** Wie viele Anfragen der Stufe noch offen sind. */
+    openCount: number;
+}
+
+/** Projekte und Geräte mit Aufgaben (30.09.2026) — die Auswahl für Anfragen und Verlauf auf der Startseite. */
+export interface TaskDeviceDirectory {
+    projects: Array<{
+        id: string;
+        projectNumber: string;
+        projectName: string;
+        openRequests: number;
+        /** Die Einheiten mit Aufgaben: Vorlage, Zahl der Aufgaben, offene Anfragen. */
+        devices: Array<{ id: string; name: string; positionNumber: string | null; templateName: string; taskCount: number; openRequests: number }>;
+    }>;
 }

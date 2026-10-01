@@ -8,7 +8,7 @@ import {
     productionTasksApi,
     readDeviceTasks,
 } from '@/lib/api/productionTasks';
-import type { DeviceTasks, ProductionTask, TaskPerson, TaskStatus, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
+import type { DeviceTasks, ProductionTask, TaskPerson, TaskSection, TaskStatus, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
 
 import { openBlob } from '../bom/device/bomFiles';
 
@@ -36,6 +36,10 @@ export const useDeviceTasks = (deviceId: string) => {
     const [state, setState] = useState<State>({ deviceId: '', data: null, error: null });
     const [tick, setTick] = useState(0);
     const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
+    /* Zählt jede vom Server bestätigte Änderung (30.09.2026) — der Verlauf der Stufe lädt danach
+       nach. Der sichtbare Stand taugt dafür nicht: eine Zuweisung ist sofort zu sehen, die Zeile
+       des Verlaufs schreibt der Server erst, bevor er antwortet. */
+    const [revision, setRevision] = useState(0);
     const dataRef = useRef<DeviceTasks | null>(null);
 
     useEffect(() => {
@@ -59,6 +63,7 @@ export const useDeviceTasks = (deviceId: string) => {
     const commit = useCallback((next: DeviceTasks) => {
         dataRef.current = next;
         setState({ deviceId, data: next, error: null });
+        setRevision((value) => value + 1);
         void primeDeviceTasks(deviceId, next);
     }, [deviceId]);
 
@@ -238,6 +243,19 @@ export const useDeviceTasks = (deviceId: string) => {
         }
     }, [deviceId, takeTask]);
 
+    /* Bitte um Entsperren (30.09.2026) — der Stand bleibt; die Verwaltung sieht sie unter «Requests». */
+    const requestUnlock = useCallback(async (task: ProductionTask, subtask: TaskSubtask, note: string): Promise<boolean> => {
+        try {
+            await productionTasksApi.requestUnlock(deviceId, task.id, subtask.id, note);
+            setRevision((value) => value + 1);
+            toast.success(t('productionTasks.requests.unlockSent'));
+            return true;
+        } catch (error) {
+            toast.error(productionTaskErrorText(error));
+            return false;
+        }
+    }, [deviceId]);
+
     const addStage = useCallback(async (area: string, name: string): Promise<boolean> => {
         try {
             commit(await productionTasksApi.addStage(deviceId, area, name));
@@ -249,9 +267,9 @@ export const useDeviceTasks = (deviceId: string) => {
         }
     }, [deviceId, commit]);
 
-    const saveTasks = useCallback(async (tasks: ProductionTask[]): Promise<boolean> => {
+    const saveTasks = useCallback(async (tasks: ProductionTask[], sections?: TaskSection[]): Promise<boolean> => {
         try {
-            commit(await productionTasksApi.updateTasks(deviceId, tasks));
+            commit(await productionTasksApi.updateTasks(deviceId, tasks, sections));
             toast.success(t('productionTasks.device.tasksSaved'));
             return true;
         } catch (error) {
@@ -290,6 +308,7 @@ export const useDeviceTasks = (deviceId: string) => {
         error: shown.error,
         loading: !shown.data && !shown.error,
         busyTaskId,
+        revision,
         reload: () => setTick((value) => value + 1),
         assignSubtask,
         setStatus,
@@ -301,6 +320,7 @@ export const useDeviceTasks = (deviceId: string) => {
         completeSubtask,
         requestSubtaskRevision,
         unlockSubtask,
+        requestUnlock,
         addChecklistItem,
         addStage,
         saveTasks,

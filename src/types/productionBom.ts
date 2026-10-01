@@ -575,7 +575,7 @@ export interface ProcurementRequest {
     closedByName: string | null;
     /** Letzter Handgriff an Talep oder einem seiner Vorgänge — die Liste sortiert danach. */
     lastActivityAt?: string;
-    bom: { id: string; bomNumber: string; kind: BomKind; status: BomStatus; area: TaskArea; revision: number; templateName: string; consumed: boolean } | null;
+    bom: { id: string; bomNumber: string; kind: BomKind; status: BomStatus; area: BuiltInArea; revision: number; templateName: string; consumed: boolean } | null;
     project: { id: string; projectNumber: string; projectName: string; customerName: string | null; deliveryDate: string | null } | null;
     device: { id: string; name: string; positionNumber: string | null } | null;
     lines: Array<{

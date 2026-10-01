@@ -7,7 +7,7 @@ import { t } from '@/i18n/translate';
 import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
 
 import { RevisionUploadDialog } from './RevisionUploadDialog';
-import { canRemoveFile, canUploadTo, fileGroups, fileProblem, formatMoment, isPdf, type SubtaskActions } from './subtaskFileModel';
+import { canRemoveFile, canReviseFile, canUploadTo, fileGroups, fileProblem, formatMoment, isPdf, type SubtaskActions } from './subtaskFileModel';
 import { hasSubtaskDocument, isSubtaskCompleted, needsPdfFirst, SUBTASK_FILE_ACCEPT } from './taskModel';
 
 /**
@@ -256,7 +256,7 @@ export const SubtaskDetail = ({
                             showVersion={older.length > 0 || (latest.version || 1) > 1}
                             onOpen={() => actions.openFile(task, subtask, latest)}
                             onRemove={canRemoveFile(actions, subtask, latest) ? () => setRemoving(latest) : undefined}
-                            onRevise={mayUpload ? () => pickRevision(latest) : undefined}
+                            onRevise={canReviseFile(actions, subtask, { latest, older }) ? () => pickRevision(latest) : undefined}
                             history={older}
                             onOpenVersion={(file) => actions.openFile(task, subtask, file)}
                             canRemoveVersion={(file) => canRemoveFile(actions, subtask, file)}

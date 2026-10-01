@@ -34,7 +34,7 @@ import {
     upsertTask,
     type TemplateDraft,
 } from './templateDraft';
-import { roundPercent, sameName, staffName } from './taskModel';
+import { sameName, staffName, stageTaskWeight } from './taskModel';
 
 const NEW = 'new';
 
@@ -394,9 +394,8 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
                     task={taskEdit.task}
                     isNew={taskEdit.isNew}
                     sections={shownDraft.sections}
-                    otherWeight={roundPercent(shownDraft.tasks
-                        .filter((task) => task.area === taskEdit.task.area && task.id !== taskEdit.task.id)
-                        .reduce((sum, task) => sum + task.weight, 0))}
+                    // Nur die Aufgaben derselben Stufe zählen (30.09.2026).
+                    otherWeight={stageTaskWeight(shownDraft.tasks, taskEdit.task.area, taskEdit.task.stage, taskEdit.task.id)}
                     names={names}
                     staff={staff}
                     staffLoading={staffLoading}

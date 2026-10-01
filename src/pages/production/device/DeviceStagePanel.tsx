@@ -7,7 +7,7 @@ import type { ComponentProps } from 'react';
 
 import { StageCard } from '../tasks/StageCard';
 import type { SubtaskActions } from '../tasks/subtaskFileModel';
-import { isBuiltInArea } from '../tasks/taskModel';
+import { isBuiltInArea, sectionLabel, stageLabel } from '../tasks/taskModel';
 import { DeviceAssignmentBoard } from './DeviceAssignmentBoard';
 import { isWorkStage, stageNumber, type DeviceStage } from './deviceStages';
 import { StageTasksFloat } from './StageTasksFloat';
@@ -28,6 +28,8 @@ type Props = {
     meId: string | null;
     staff: StaffDirectoryRow[];
     staffLoading: boolean;
+    /** Diese Unteraufgabe gleich zeigen (30.09.2026, «Go to subtask» von der Startseite). */
+    focusSubtaskId?: string | null;
 };
 
 /**
@@ -47,18 +49,29 @@ type Props = {
  * Die BOM-Liste gibt es nur auf der Stufe BOM der festen Bereiche Mekanik /
  * Elektrik — ein eigener Bereich einer Vorlage (28.09.2026) hat keine.
  */
-export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, names, isAdmin, meId, staff, staffLoading }: Props) => {
+export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, names, isAdmin, meId, staff, staffLoading, focusSubtaskId = null }: Props) => {
     const plan = handle.data?.plan ?? null;
     const workStage = isWorkStage(stage.id) ? section.stages.find((entry) => entry.key === stage.id) ?? null : null;
     const tasks = workStage && handle.data
         ? handle.data.tasks.filter((task) => task.area === section.key && task.stage === workStage.key)
         : [];
-    // Personen setzt die Verwaltung nur auf der Tafel «Görevlendirmeler», an den Unteraufgaben (29.09.2026).
+    // Personen setzt die Verwaltung an den Unteraufgaben (29.09.2026) — auf der Tafel und seit dem 30.09.2026 auch hier.
     // Den Stand setzt nur, wer an der Unteraufgabe steht — die Verwaltung nicht von Hand (29.09.2026).
     const canSetStatus: StageCardProps['canSetStatus'] = (task, subtask) =>
         Boolean(meId && (subtask ?? task).assigneeIds.includes(meId));
     const onStatus = (task: (typeof tasks)[number], status: (typeof tasks)[number]['status']) => void handle.setStatus(task, status);
     const onSubtaskStatus: StageCardProps['onSubtaskStatus'] = (task, subtask, status) => void handle.setSubtaskStatus(task, subtask, status);
+    /* Personen der Unteraufgaben auch auf den Stufen (30.09.2026: «the admin should be able to
+       assign people to subtasks or change the assigned people on the stage pages») — nur die
+       Verwaltung, wie auf der Tafel der Zuweisungen; der Server sichert es ebenso. */
+    const onAssignSubtask: StageCardProps['onAssignSubtask'] = isAdmin
+        ? (task, subtask, ids) => void handle.assignSubtask(
+            task,
+            subtask,
+            ids,
+            ids.map((id) => names.get(id)).filter((person): person is NonNullable<typeof person> => Boolean(person)),
+        )
+        : undefined;
     // Dateien und «Complete the task» der Unteraufgaben (28.09.2026).
     const subtaskActions: SubtaskActions = {
         isAdmin,
@@ -71,8 +84,17 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
         complete: handle.completeSubtask,
         requestRevision: handle.requestSubtaskRevision,
         unlock: handle.unlockSubtask,
+        // Wer nicht die Verwaltung ist, bittet um das Entsperren (30.09.2026).
+        requestUnlock: isAdmin ? undefined : handle.requestUnlock,
         setStatus: handle.setSubtaskStatus,
         addChecklistItem: handle.addChecklistItem,
+    };
+    /* Der Name einer Stufe für den Verlauf (30.09.2026): in einem anderen Bereich mit dessen Namen davor. */
+    const stageNameOf = (areaKey: string | null, stageKey: string | null): string => {
+        const owner = plan?.sections.find((entry) => entry.key === areaKey) ?? null;
+        const found = owner?.stages.find((entry) => entry.key === stageKey) ?? null;
+        const name = found ? stageLabel(found) : stageKey || '—';
+        return owner && owner.key !== section.key ? `${sectionLabel(owner)} · ${name}` : name;
     };
     const bomArea = stage.id === 'bom' && isBuiltInArea(section.key) ? section.key : null;
     /* Stufe BOM (27.09.2026, Samet: «görevler artık bir buton halinde bulunsun,
@@ -98,6 +120,7 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
                     busyTaskId={handle.busyTaskId}
                     onStatus={onStatus}
                     onSubtaskStatus={onSubtaskStatus}
+                    onAssignSubtask={onAssignSubtask}
                     canSetStatus={canSetStatus}
                     subtaskActions={subtaskActions}
                 />
@@ -129,6 +152,10 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
             {bomArea && <DeviceBomArea deviceId={deviceId} area={bomArea} tasks={bomTasks} />}
             {workStage && plan && tasks.length > 0 && !bomArea && (
                 <StageTasksFloat
+                    focusSubtaskId={focusSubtaskId}
+                    deviceId={deviceId}
+                    revision={handle.revision}
+                    stageNameOf={stageNameOf}
                     area={section.key}
                     stage={workStage}
                     number={stage.finish ? null : stageNumber(stages, workStage.key)}
@@ -142,6 +169,7 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
                     busyTaskId={handle.busyTaskId}
                     onStatus={onStatus}
                     onSubtaskStatus={onSubtaskStatus}
+                    onAssignSubtask={onAssignSubtask}
                     canSetStatus={canSetStatus}
                     subtaskActions={subtaskActions}
                 />

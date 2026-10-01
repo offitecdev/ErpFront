@@ -19,6 +19,51 @@
       "title": "Üretim: yeniden kontrol",
       "message": "{{actor}} yeni gereksinimler ekledi — yeniden kontrol edip tamamlayın: {{tasks}} — {{device}} ({{project}})",
       "messageNoActor": "Yeni gereksinimler eklendi — yeniden kontrol edip tamamlayın: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskRemoved": {
+      "title": "Üretim: atama kaldırıldı",
+      "message": "{{actor}} sizi şundan çıkardı: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Şundan çıkarıldınız: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskDeleted": {
+      "title": "Üretim: görev silindi",
+      "message": "{{actor}} sildi: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Silindi: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskUpdated": {
+      "title": "Üretim: görev değişti",
+      "message": "{{actor}} değiştirdi: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Değişti: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskApproved": {
+      "title": "Üretim: onaylandı",
+      "message": "{{actor}} onayladı: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Onaylandı: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskRevision": {
+      "title": "Üretim: revizyon istendi",
+      "message": "{{actor}} revizyon istedi: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Revizyon istendi: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionTaskRevisionNote": {
+      "title": "Üretim: revizyon istendi",
+      "message": "{{actor}} revizyon istedi: {{tasks}} — {{device}} ({{project}}) — «{{note}}»",
+      "messageNoActor": "Revizyon istendi: {{tasks}} — {{device}} ({{project}}) — «{{note}}»"
+    },
+    "productionTaskUnlocked": {
+      "title": "Üretim: kilit açıldı",
+      "message": "{{actor}} kilidi açtı — yeniden devam ediyor: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Kilit açıldı — yeniden devam ediyor: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionUnlockRequested": {
+      "title": "Üretim: kilit açma talebi",
+      "message": "{{actor}} kilidin açılmasını istiyor: {{tasks}} — {{device}} ({{project}})",
+      "messageNoActor": "Kilit açma talebi: {{tasks}} — {{device}} ({{project}})"
+    },
+    "productionUnlockRequestedNote": {
+      "title": "Üretim: kilit açma talebi",
+      "message": "{{actor}} kilidin açılmasını istiyor: {{tasks}} — {{device}} ({{project}}) — «{{note}}»",
+      "messageNoActor": "Kilit açma talebi: {{tasks}} — {{device}} ({{project}}) — «{{note}}»"
     }
   },
   "productionTasks": {
@@ -50,8 +95,10 @@
       "ready": "Hazır",
       "readyHint": "Paylar ve ağırlıklar %100 — şablon cihazlara yüklenebilir.",
       "shares": "Bölüm paylarının toplamı {{sum}}; %100 olmalı.",
-      "weights": "{{area}} görevlerinin ağırlık toplamı {{sum}}; %100 olmalı.",
-      "noSections": "Henüz bölüm eklenmedi."
+      "weights": "{{area}} aşamalarının ağırlık toplamı {{sum}}; %100 olmalı.",
+      "noSections": "Henüz bölüm eklenmedi.",
+      "stageTasks": "{{stage}} ({{area}}) görevlerinin toplamı aşamanın {{sum}}; %100 olmalı.",
+      "stageEmpty": "{{stage}} ({{area}}) {{weight}} ağırlığında ama görevi yok — görev ekleyin ya da ağırlığını %0 yapın."
     },
     "device": {
       "stageAdded": "“{{name}}” aşaması eklendi — şimdi görevlerini ekleyin.",
@@ -88,11 +135,23 @@
       "unloadTitle": "Görevler kaldırılsın mı?",
       "unloadText": "«{{name}}» şablonundan gelen tüm görevler ve kişi atamaları bu cihazdan silinir. Şablonun kendisi kalır.",
       "tasksSaved": "Bu cihaz için kaydedildi — şablon değişmedi.",
-      "customizeHint": "Buradaki değişiklikler yalnız bu cihaz için geçerlidir, şablonu değiştirmez."
+      "customizeHint": "Buradaki değişiklikler yalnız bu cihaz için geçerlidir, şablonu değiştirmez.",
+      "saveToTemplate": "Şablona kaydet",
+      "saveToHint": "Bu sürümü «{{name}}» şablonuna geri yaz",
+      "saveToTitle": "«{{name}}» şablonuna kaydedilsin mi?",
+      "saveToWarning": "Bu işlem yalnızca bu cihazı değil, ana şablon «{{name}}» şablonunun kendisini değiştirir.",
+      "saveToWhat": "Şablon bu cihazın bölümlerini, aşamalarını, ağırlıklarını, görevlerini, alt görevlerini ve atanan kişilerini alır. Durumlar, dosyalar ve tarihler cihazda kalır.",
+      "saveToOthers_one": "Bu şablonu {{count}} başka cihaz kullanıyor. Onun kopyası olduğu gibi kalır — yalnızca şablonu bundan sonra yükleyen cihazlar bu sürümü alır.",
+      "saveToOthers_other": "Bu şablonu {{count}} başka cihaz kullanıyor. Kopyaları olduğu gibi kalır — yalnızca şablonu bundan sonra yükleyen cihazlar bu sürümü alır.",
+      "saveToNoOthers": "Bu şablonu başka cihaz kullanmıyor. Bundan sonra yükleyen cihazlar bu sürümü alır.",
+      "saveToIncomplete": "Bu sürüm henüz %100 etmiyor — şablon da eksik olur ve düzeltilene kadar yüklenemez.",
+      "saveToConfirm": "Şablonu değiştir",
+      "savedToTemplate": "«{{name}}» şablonu güncellendi.",
+      "saveToGone": "«{{name}}» şablonu artık yok — lütfen «Şablon olarak kaydet» kullanın."
     },
     "err": {
       "REVISION_NOTE_REQUIRED": "Revizyon için neyin değiştiğini anlatan bir not gerekir.",
-      "SECTION_FULL": "“{{section}}” görevleri zaten %100 ediyor — aşama eklemeden önce bir görevin ağırlığını düşürün.",
+      "SECTION_FULL": "“{{section}}” aşamaları zaten %100 ediyor — yenisini eklemeden önce bir aşamanın ağırlığını düşürün.",
       "SUBTASK_AWAITING": "Bu alt görev onay bekliyor ve kilitli — bir yönetici onaylayana ya da revizyon isteyene kadar dosya değiştirilemez.",
       "CHECKLIST_TOO_MANY": "Kontrol listesinde en fazla {{max}} madde olabilir.",
       "CHECKLIST_ITEM_REQUIRED": "Kontrol maddesi için bir metin girin.",
@@ -144,7 +203,10 @@
       "FILE_TOO_LARGE": "Dosya çok büyük (en fazla {{max}} MB).",
       "FILES_TOO_MANY": "Bir alt görevde en fazla {{max}} dosya olabilir.",
       "FILE_NOT_FOUND": "Dosya bulunamadı.",
-      "FILE_FORBIDDEN": "Bunu yalnızca yöneticiler ve bu alt görevdeki kişiler yapabilir."
+      "FILE_FORBIDDEN": "Bunu yalnızca yöneticiler ve bu alt görevdeki kişiler yapabilir.",
+      "STAGE_WEIGHT_INVALID": "Aşama ağırlığı 0 ile 100 arasında olmalı.",
+      "UNLOCK_ALREADY_REQUESTED": "Bu alt görev için zaten kilit açma talebi var.",
+      "REQUEST_NOT_FOUND": "Talep bulunamadı ya da zaten çözüldü."
     },
     "people": {
       "assign": "Kişi ata",
@@ -165,7 +227,11 @@
       "pending_one": "{{count}} onay bekliyor",
       "pending_other": "{{count}} onay bekliyor",
       "pendingHint_one": "{{count}} alt görev onay bekliyor",
-      "pendingHint_other": "{{count}} alt görev onay bekliyor"
+      "pendingHint_other": "{{count}} alt görev onay bekliyor",
+      "full": "Bu aşamanın görevleri zaten %100 ediyor — önce bir görevin ağırlığını düşürün.",
+      "tasksSum": "Görevler {{sum}}",
+      "tasksOff": "Bu aşamanın görevleri {{sum}} ediyor — aşamanın %100’ü olmalı.",
+      "weightAria": "{{stage}} aşamasının bölüm içindeki ağırlığı"
     },
     "table": {
       "code": "Kod",
@@ -202,9 +268,9 @@
       "people": "Kişiler",
       "peopleFromSubtasks": "Kişiler alt görevlere atanır — burada hepsi görünür.",
       "weight": "Ağırlık",
-      "weightHint": "Bölüm içindeki ağırlığı {{weight}} · genel tamamlanmaya katkısı {{overall}}",
+      "weightHint": "Aşama içindeki ağırlığı {{weight}} · genel tamamlanmaya katkısı {{overall}}",
       "weightInvalid": "0 ile 100 arasında bir değer girin.",
-      "weightLeft": "Bu bölümde kalan: {{left}} — daha yüksek bir değer buna düşürülür.",
+      "weightLeft": "Bu aşamada kalan: {{left}} — daha yüksek bir değer buna düşürülür.",
       "startDate": "Başlangıç tarihi",
       "dueDate": "Termin tarihi",
       "dueBeforeStart": "Termin tarihi başlangıç tarihinden önce.",
@@ -294,7 +360,7 @@
       "unsavedLeave": "Bu şablonda kaydedilmemiş değişiklikler var. Sayfadan çıkmadan önce kaydetmek ister misiniz?",
       "usedBy_one": "{{count}} cihazda kullanılıyor",
       "usedBy_other": "{{count}} cihazda kullanılıyor",
-      "weightSum": "Görev toplamı {{sum}}",
+      "weightSum": "Aşamalar {{sum}}",
       "areaUnused": "Bu şablonda kullanılmıyor",
       "addSection": "Bölüm ekle",
       "sectionName": "Bölüm adı",
@@ -319,7 +385,7 @@
       "removeStageText_other": "«{{name}}» aşaması {{count}} göreviyle birlikte bu şablondan kaldırılacak.",
       "nameInUse": "Bu ad kullanılıyor",
       "nameRequired": "Ad gerekli",
-      "sectionFull": "Bu bölümde ağırlık kalmadı — görevleri zaten %100 ediyor. Önce bir görevin ağırlığını düşürün.",
+      "sectionFull": "Bu bölümün aşamaları zaten %100 ediyor — önce bir aşamanın ağırlığını düşürün.",
       "removeStageEmpty": "«{{name}}» aşaması bu şablondan kaldırılacak.",
       "removeSectionEmpty": "«{{name}}» bölümü bu şablondan kaldırılacak."
     },
@@ -517,6 +583,189 @@
       "cellFree": "Bu gün görev yok",
       "legendUpcoming": "Henüz gelmemiş görev günü",
       "cellUpcoming": "{{name}} · {{day}} henüz gelmedi"
+    },
+    "activity": {
+      "title": "Aktiviteler",
+      "region": "{{stage}} aktiviteleri",
+      "open": "{{stage}} aktivitelerini aç",
+      "summary": "Kim, ne zaman, ne yaptı",
+      "filterLabel": "Göster",
+      "filter": {
+        "all": "Tümü",
+        "work": "Çalışma",
+        "approval": "Onaylar",
+        "files": "Dosyalar",
+        "changes": "Değişiklikler"
+      },
+      "person": "Kişi",
+      "allPeople": "Herkes",
+      "loading": "Yükleniyor…",
+      "loadFailed": "Aktiviteler yüklenemedi.",
+      "retry": "Tekrar dene",
+      "empty": "Bu aşamada henüz bir hareket yok.",
+      "emptyFiltered": "Bu filtrelere uyan aktivite yok.",
+      "today": "Bugün",
+      "yesterday": "Dün",
+      "someone": "Biri",
+      "says": {
+        "SUBTASK_STARTED": "{{actor}}, {{target}} alt görevini başlattı",
+        "SUBTASK_STOPPED": "{{actor}}, {{target}} alt görevini durdurdu",
+        "SUBTASK_SUBMITTED": "{{actor}}, {{target}} alt görevini onaya gönderdi",
+        "SUBTASK_DONE": "{{actor}}, {{target}} alt görevini tamamladı",
+        "SUBTASK_APPROVED": "{{actor}}, {{target}} alt görevini onayladı",
+        "REVISION_REQUESTED": "{{actor}}, {{target}} için revizyon istedi",
+        "SUBTASK_UNLOCKED": "{{actor}}, {{target}} kilidini açtı",
+        "CHECKLIST_ITEM_ADDED": "{{actor}}, {{target}} onay listesine bir madde ekledi",
+        "FILE_UPLOADED": "{{actor}}, {{target}} alt görevine {{file}} dosyasını yükledi",
+        "FILE_REVISED": "{{actor}}, {{target}} alt görevine {{file}} dosyasının {{version}}. sürümünü yükledi",
+        "FILES_UPLOADED_one": "{{actor}}, {{target}} alt görevine {{count}} dosya yükledi",
+        "FILES_UPLOADED_other": "{{actor}}, {{target}} alt görevine {{count}} dosya yükledi",
+        "FILE_DELETED": "{{actor}}, {{target}} alt görevinden {{file}} dosyasını sildi",
+        "SUBTASK_ASSIGNED": "{{actor}}, {{target}} alt görevinin kişilerini değiştirdi",
+        "ASSIGNED_ADDED": "{{actor}}, {{target}} alt görevine {{people}} atadı",
+        "ASSIGNED_REMOVED": "{{actor}}, {{target}} alt görevinden {{people}} çıkardı",
+        "TASK_CREATED": "{{actor}}, {{target}} görevini oluşturdu",
+        "TASK_UPDATED": "{{actor}}, {{target}} görevini güncelledi",
+        "TASK_DELETED": "{{actor}}, {{target}} görevini sildi",
+        "TASK_MOVED": "{{actor}}, {{target}} görevini {{stage}} aşamasına taşıdı",
+        "TASK_STATUS": "{{actor}}, {{target}} görevinin durumunu «{{status}}» yaptı",
+        "SUBTASK_CREATED": "{{actor}}, {{target}} alt görevini oluşturdu",
+        "SUBTASK_UPDATED": "{{actor}}, {{target}} alt görevini güncelledi",
+        "SUBTASK_DELETED": "{{actor}}, {{target}} alt görevini sildi",
+        "STAGE_ADDED": "{{actor}}, {{stage}} aşamasını ekledi",
+        "PLAN_LOADED": "{{actor}}, {{template}} şablonunu yükledi",
+        "PLAN_REPLACED": "{{actor}}, görevleri {{template}} şablonuyla değiştirdi",
+        "PLAN_REMOVED": "{{actor}}, {{template}} görevlerini kaldırdı",
+        "ASSIGNED_BOTH": "{{actor}}, {{target}} alt görevine {{added}} atadı ve {{removed}} çıkardı",
+        "UNLOCK_REQUESTED": "{{actor}}, {{target}} kilidinin açılmasını istedi",
+        "REQUEST_SOLVED": "{{actor}}, {{target}} talebini çözüldü olarak işaretledi"
+      },
+      "detail": {
+        "yes": "Evet",
+        "no": "Hayır",
+        "deleted": "Silindi",
+        "fileGone": "Artık alt görevde değil",
+        "whatChanged": "Ne değişti",
+        "files": "Dosyalar",
+        "filesGone": "Onunla birlikte kaldırılan dosyalar",
+        "noNote": "Not yok",
+        "revisionNote": "Neyin değişmesi gerekiyor",
+        "approvalNote": "Onay notu",
+        "checklist": "İşaretlenen maddeler",
+        "checklistItem": "Yeni madde",
+        "added": "Atandı",
+        "removed": "Çıkarıldı",
+        "people": "Kişiler",
+        "field": "Alan",
+        "before": "Önce",
+        "after": "Sonra",
+        "subtasks": "Alt görevler",
+        "noSubtasks": "Alt görev yok.",
+        "template": "Şablon",
+        "previousTemplate": "Yerine geçtiği",
+        "taskCount": "Görevler"
+      },
+      "field": {
+        "name": "Ad",
+        "code": "Kod",
+        "weight": "Ağırlık",
+        "startDate": "Başlangıç",
+        "dueDate": "Bitiş",
+        "requiresDocument": "Doküman gerekli",
+        "requiresApproval": "Onay gerekli",
+        "checklist": "Onay kontrol listesi",
+        "status": "Durum"
+      },
+      "count_one": "{{count}} kayıt",
+      "count_other": "{{count}} kayıt",
+      "from": "Başlangıç",
+      "to": "Bitiş",
+      "anyDay": "Tüm günler",
+      "clearFilters": "Filtreleri temizle",
+      "pager": "Sayfalar",
+      "pageRange": "{{total}} kayıttan {{from}}–{{to}}",
+      "prevPage": "Önceki sayfa",
+      "nextPage": "Sonraki sayfa",
+      "page": "Sayfa {{page}}"
+    },
+    "myTasks": {
+      "title": "Üretim Görevlerim",
+      "open_one": "{{count}} açık alt görev",
+      "open_other": "{{count}} açık alt görev",
+      "projects": "Projeler",
+      "openDevice": "Cihazı aç",
+      "openHint_one": "{{count}} alt göreviniz henüz açık",
+      "openHint_other": "{{count}} alt göreviniz henüz açık",
+      "allDone": "Buradaki tüm alt görevleriniz tamamlandı"
+    },
+    "requests": {
+      "title": "Talepler",
+      "region": "{{stage}} talepleri",
+      "open": "{{stage}} taleplerini aç",
+      "openCount_one": "{{count}} açık",
+      "openCount_other": "{{count}} açık",
+      "noneOpen": "Onay ve kilit açma talepleri",
+      "statusLabel": "Durum",
+      "status": {
+        "open": "Açık",
+        "solved": "Çözüldü",
+        "all": "Tümü"
+      },
+      "kindLabel": "Tür",
+      "kindFilter": {
+        "all": "Tümü",
+        "APPROVAL": "Onay",
+        "UNLOCK": "Kilit açma"
+      },
+      "kind": {
+        "APPROVAL": "Onay",
+        "UNLOCK": "Kilit açma"
+      },
+      "underTask": "{{task}} görevinde",
+      "sentBy": "Gönderen {{name}} · {{time}}",
+      "requestedBy": "Talep eden",
+      "requestedAt": "Talep zamanı",
+      "markSolved": "Çözüldü olarak işaretle",
+      "solvedToast": "{{subtask}} talebi çözüldü olarak işaretlendi.",
+      "solvedBy": {
+        "MANUAL": "{{name}} tarafından çözüldü · {{time}}",
+        "APPROVED": "Çözüldü — {{name}} onayladı · {{time}}",
+        "REVISION": "Çözüldü — {{name}} revizyon istedi · {{time}}",
+        "UNLOCKED": "Çözüldü — {{name}} kilidi açtı · {{time}}"
+      },
+      "emptyOpen": "Bu aşamada açık talep yok.",
+      "empty": "Uygun talep yok.",
+      "loadFailed": "Talepler yüklenemedi.",
+      "unlockAsk": "Yöneticiden kilidi açmasını iste",
+      "unlockTitle": "Kilit açma talebi",
+      "unlockText": "«{{subtask}}» onaylandı ve kilitli. Yöneticilerden kilidi açmalarını isteyin.",
+      "unlockTextAwaiting": "«{{subtask}}» onay bekliyor ve kilitli. Yöneticilerden kilidi açmalarını isteyin.",
+      "unlockReason": "Neden",
+      "unlockReasonPlaceholder": "Neden açılmalı? (isteğe bağlı)",
+      "unlockSend": "Talebi gönder",
+      "unlockSent": "Kilit açma talebi yöneticilere gönderildi.",
+      "goToSubtask": "Alt göreve git"
+    },
+    "inbox": {
+      "title": "Üretim talepleri ve aktiviteleri",
+      "noOpen": "Açık talep yok",
+      "noOpenAnywhere": "Hiçbir yerde açık talep yok. Tüm projeleri görmek için işareti kaldırın.",
+      "noOpenHere": "Bu projenin hiçbir ünitesinde açık talep yok. Tümünü görmek için işareti kaldırın.",
+      "path": "Yol",
+      "allProjects": "Tüm projeler",
+      "searchProjects": "Proje veya ünite ara…",
+      "searchUnits": "Ünite ara…",
+      "onlyOpen": "Yalnızca açık talebi olanlar",
+      "units_one": "{{count}} ünite",
+      "units_other": "{{count}} ünite",
+      "noMatch": "Eşleşen yok.",
+      "goToAssignments": "Görevlendirmelere git"
+    },
+    "assignSection": {
+      "title": "Üretim görevlendirmeleri",
+      "search": "Proje veya ünite ara…",
+      "tasks_one": "{{count}} görev",
+      "tasks_other": "{{count}} görev"
     }
   }
 }

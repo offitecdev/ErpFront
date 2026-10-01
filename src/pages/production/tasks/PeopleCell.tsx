@@ -72,7 +72,7 @@ export const PeopleCell = ({
 
     if (!editable || !onCommit) {
         return (
-            <span className="ofi-ptk-people is-static">
+            <span className={`ofi-ptk-people is-static ${shown.length ? '' : 'is-empty'}`}>
                 {shown.length ? <PersonChips ids={shown} names={names} meId={meId} /> : <span className="ofi-ptk-people__none">—</span>}
             </span>
         );

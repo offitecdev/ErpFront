@@ -92,6 +92,8 @@ export const ProductionDevicePage = () => {
     const section = sections.find((entry) => entry.key === area) ?? sections[0] ?? null;
     const stages = useMemo(() => (section ? visibleDeviceStages(isAdmin, section) : []), [isAdmin, section]);
     const requested = section && stages.length ? deviceStageFrom(params.get('stage'), stages, section) : null;
+    // «Go to subtask» (30.09.2026, Startseite): diese Unteraufgabe gleich zeigen — Karte offen, Aufgabe aufgeklappt.
+    const focusSubtaskId = params.get('subtask');
     /* Die 100-%-Regel am Gerät (28.09.2026): passt die Verwaltung Gewichte an und
        geht die Kopie nicht mehr auf, bleibt sie in den Zuweisungen, bis sie wieder
        aufgeht — «they shouldn't be allowed to move to the stage tabs». */
@@ -269,6 +271,7 @@ export const ProductionDevicePage = () => {
                 meId={meId}
                 staff={staff}
                 staffLoading={staffLoading}
+                focusSubtaskId={focusSubtaskId}
             />
         </div>
     );

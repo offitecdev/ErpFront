@@ -759,3 +759,317 @@
     :is(#root, body > :not(#root)) .ofi-home-pick__panel { border-radius: 8px !important; }
     :is(#root, body > :not(#root)) .ofi-home-pick__dot { border-radius: 2.5px !important; }
 }
+
+/* ── «Görevlerim» — die eigenen Aufgaben der Produktion (30.09.2026) ──────────
+   Über den Kennzahlen: die Projekte als Reiter, je Gerät eine Karte mit den
+   Tabellen der Stufen. Die Tabellen tragen hier keinen eigenen Rahmen — die
+   Karte der Startseite ist der Rahmen. */
+.ofi-home-mytasks { margin-bottom: 24px; }
+.ofi-home-mytasks__total { color: var(--ofi-win-secondary); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ofi-home-mytasks__projects {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+#root .ofi-home-mytasks__project {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    max-width: 280px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--home-control-radius, 8px);
+    background: var(--ofi-win-surface);
+    color: var(--ofi-win-text);
+    font-family: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+#root .ofi-home-mytasks__project:hover { background: var(--ofi-win-hover); }
+#root .ofi-home-mytasks__project:focus-visible { outline: 2px solid var(--ofi-win-focus, var(--ofi-win-accent)); outline-offset: 1px; }
+#root .ofi-home-mytasks__project.is-selected { border-color: var(--ofi-win-accent); box-shadow: inset 0 0 0 1px var(--ofi-win-accent); }
+.ofi-home-mytasks__project > b { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-home-mytasks__project > span { min-width: 0; overflow: hidden; color: var(--ofi-win-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.ofi-home-mytasks__project > em {
+    flex: none;
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--ofi-win-accent);
+    color: #fff;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+}
+.ofi-home-mytasks__devices { display: flex; flex-direction: column; gap: 14px; }
+.ofi-home-mytasks__device .ofi-home-card__body { padding: 0; }
+.ofi-home-mytasks__stages { display: flex; flex-direction: column; min-width: 0; overflow-x: auto; }
+.ofi-home-mytasks__section + .ofi-home-mytasks__section { border-top: 1px solid var(--ofi-win-hairline); }
+.ofi-home-mytasks__area {
+    margin: 0;
+    padding: 10px 14px 0;
+    color: var(--ofi-win-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+.ofi-home-mytasks__stages .ofi-ptk-card {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.ofi-home-mytasks__stages .ofi-ptk-card + .ofi-ptk-card { border-top: 1px solid var(--ofi-win-hairline); }
+.ofi-home-mytasks__error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; color: var(--ofi-win-danger); font-size: 13px; }
+
+/* Die Geräte des Projekts (30.09.2026) — eine Reihe kleiner als die Projekte. */
+.ofi-home-mytasks__projects.is-devices { margin-top: -4px; }
+#root .ofi-home-mytasks__projects.is-devices .ofi-home-mytasks__project { height: 28px; font-size: 12px; }
+
+/* ── Eingerahmte Abschnitte der Produktion auf der Startseite (30.09.2026) ─────
+   «Increase the size of the My Production Tasks title, put that all tasks
+   section into a border so the user can distinguish it» — dasselbe für
+   «Anfragen und Verlauf» darunter. */
+.ofi-home-panel {
+    padding: 16px 18px 18px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--home-radius, 14px);
+    background: var(--ofi-win-surface);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 18px -12px rgba(0, 0, 0, 0.18);
+}
+.ofi-home[data-glass='full'] .ofi-home-panel { border-color: var(--home-glass-line, var(--ofi-win-border)); }
+.ofi-home-panel__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 14px;
+    margin-bottom: 14px;
+}
+.ofi-home-panel__title {
+    margin: 0;
+    color: var(--ofi-win-text);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+}
+.ofi-home-mytasks.ofi-home-panel { margin-bottom: 18px; }
+.ofi-home-inbox.ofi-home-panel { margin-bottom: 24px; }
+/* Die Gerätekarten liegen im Rahmen — ohne eigenen Schatten. */
+.ofi-home-panel .ofi-home-mytasks__device { box-shadow: none; }
+
+/* Anfragen · Aktivitäten: zwei Knöpfe wie die Glasplättchen der Stufen. */
+.ofi-home-inbox__tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+#root .ofi-home-inbox__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 220px;
+    padding: 8px 12px 8px 8px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 12px;
+    background: var(--ofi-win-surface);
+    color: var(--ofi-win-text);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+#root .ofi-home-inbox__tab:hover { background: var(--ofi-win-hover); }
+#root .ofi-home-inbox__tab:focus-visible { outline: 2px solid var(--ofi-win-focus, var(--ofi-win-accent)); outline-offset: 1px; }
+#root .ofi-home-inbox__tab.is-selected { border-color: var(--ofi-win-accent); box-shadow: inset 0 0 0 1px var(--ofi-win-accent); }
+.ofi-home-inbox__icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    color: #fff;
+}
+.ofi-home-inbox__icon > svg { width: 16px; height: 16px; }
+.ofi-home-inbox__icon.is-requests { background: #ff9500; }
+.ofi-home-inbox__icon.is-activity { background: #30a46c; }
+.ofi-home-inbox__text { display: flex; flex: 1 1 auto; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-home-inbox__text > b { font-size: 13px; font-weight: 600; }
+.ofi-home-inbox__text > small { color: var(--ofi-win-secondary); font-size: 11.5px; }
+.ofi-home-inbox__tab > em {
+    flex: none;
+    min-width: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #ff9500;
+    color: #fff;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+}
+.ofi-home-inbox__body { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.ofi-home-inbox__hint { margin: 0; padding: 18px 4px; color: var(--ofi-win-secondary); font-size: 13px; text-align: center; }
+.ofi-home-inbox__card .ofi-ptk-card {
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 12px;
+    background: var(--ofi-win-surface);
+    box-shadow: none;
+}
+
+
+
+/* ── Projekte und Einheiten als Karten (30.09.2026) ────────────────────────────
+   «Anfragen & Aktivitäten»: Projekte → Einheiten → Liste, mit Weg zurück.
+   «Zuweisungen»: je Projekt eine Karte mit ihren Einheiten. */
+.ofi-home-search { position: relative; display: inline-flex; align-items: center; min-width: 220px; max-width: 320px; flex: 1 1 220px; }
+.ofi-home-search > svg { position: absolute; left: 10px; width: 14px; height: 14px; color: var(--ofi-win-secondary); pointer-events: none; }
+#root .ofi-home-search > input {
+    width: 100%;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 10px 0 30px;
+    border: 1px solid var(--ofi-win-field-border);
+    border-radius: var(--home-control-radius, 8px);
+    background: var(--ofi-win-field);
+    color: var(--ofi-win-text);
+    font-family: inherit;
+    font-size: 13px;
+    box-shadow: none;
+}
+#root .ofi-home-search > input:focus { border-color: var(--ofi-win-accent); outline: none; box-shadow: 0 0 0 3px var(--ofi-win-focus, rgba(10, 122, 255, 0.24)); }
+.ofi-home-inbox__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ofi-home-inbox__only { display: inline-flex; align-items: center; gap: 6px; color: var(--ofi-win-secondary); font-size: 12.5px; cursor: pointer; }
+#root .ofi-home-inbox__tab.has-open:not(.is-selected) { border-color: rgba(255, 149, 0, 0.55); box-shadow: inset 0 0 0 1px rgba(255, 149, 0, 0.35); }
+
+.ofi-home-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12.5px; }
+.ofi-home-crumbs > svg { width: 13px; height: 13px; color: var(--ofi-win-muted, var(--ofi-win-secondary)); }
+#root .ofi-home-crumbs__step {
+    padding: 2px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ofi-win-accent);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+}
+#root .ofi-home-crumbs__step:hover:not(:disabled) { background: var(--ofi-win-hover); }
+#root .ofi-home-crumbs__step:disabled,
+.ofi-home-crumbs__step.is-current { color: var(--ofi-win-text); font-weight: 600; cursor: default; }
+
+.ofi-home-pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+#root .ofi-home-pcard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 12px 34px 12px 14px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 12px;
+    background: var(--ofi-win-surface);
+    color: var(--ofi-win-text);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+#root .ofi-home-pcard:hover { background: var(--ofi-win-hover); }
+#root .ofi-home-pcard:focus-visible { outline: 2px solid var(--ofi-win-focus, var(--ofi-win-accent)); outline-offset: 1px; }
+#root .ofi-home-pcard.has-open { border-color: rgba(255, 149, 0, 0.55); }
+#root .ofi-home-pcard.is-static { padding-right: 14px; cursor: default; }
+#root .ofi-home-pcard.is-static:hover { background: var(--ofi-win-surface); }
+.ofi-home-pcard__head { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-home-pcard__head > b { font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ofi-home-pcard__head > span { overflow: hidden; color: var(--ofi-win-secondary); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-home-pcard__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--ofi-win-secondary); font-size: 12px; }
+.ofi-home-pcard__meta > small { color: var(--ofi-win-muted, var(--ofi-win-secondary)); font-size: 11.5px; }
+.ofi-home-pcard__chevron { position: absolute; top: 50%; right: 12px; width: 16px; height: 16px; color: var(--ofi-win-secondary); transform: translateY(-50%); }
+.ofi-home-count {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgba(255, 149, 0, 0.14);
+    color: #c46a00;
+    font-size: 11.5px;
+    font-style: normal;
+    font-weight: 600;
+}
+.dark .ofi-home-count { color: #ffb340; }
+
+.ofi-home-assign .ofi-home-panel__head { align-items: center; }
+.ofi-home-units { display: flex; flex-direction: column; margin: 2px 0 0; padding: 0; list-style: none; }
+.ofi-home-unit { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+.ofi-home-unit + .ofi-home-unit { border-top: 1px solid var(--ofi-win-hairline); }
+.ofi-home-unit__text { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; }
+.ofi-home-unit__text > b { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-home-unit__text > small { overflow: hidden; color: var(--ofi-win-secondary); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-home-unit > .ofi-home-btn { flex: none; white-space: nowrap; }
+
+/* Zuweisungen der Produktion (30.09.2026): Abstand wie die übrigen Rahmen. */
+.ofi-home-assign.ofi-home-panel { margin-bottom: 24px; }
+
+/* Zuweisungen (30.09.2026): Projekte → Einheiten; «Zu den Zuweisungen» unten in der Karte der Einheit. */
+.ofi-home-inbox__body.is-flush { margin-top: 0; }
+#root .ofi-home-pcard__action { align-self: flex-start; margin-top: 4px; }
+
+/* Die Knöpfe in ihren Farben (30.09.2026): «Anfragen» orange (bei offenen), «Aktivitäten» immer grün;
+   gewählt dieselbe Farbe, kräftiger. */
+#root .ofi-home-inbox__tab.is-activity { border-color: rgba(48, 164, 108, 0.6); box-shadow: inset 0 0 0 1px rgba(48, 164, 108, 0.3); }
+#root .ofi-home-inbox__tab.is-activity.is-selected { border-color: #30a46c; box-shadow: inset 0 0 0 1px #30a46c; }
+#root .ofi-home-inbox__tab.is-requests.is-selected { border-color: #ff9500; box-shadow: inset 0 0 0 1px #ff9500; }
+
+/* Heller Modus (30.09.2026, Samet: «use a soft gray background for the background under the
+   sections, not the bg color of the sections»): die Seite hinter den Abschnitten der Startseite
+   leicht grau — die Abschnitte, Karten und Kacheln bleiben weiss (--ofi-win-surface). Nur die
+   Startseite; der dunkle Modus bleibt, wie er ist. */
+html:not(.dark) #root [data-page-scrollport]:has(.ofi-home) { background-color: #f2f3f5; }
+
+/* Die Uhr voll deckend (30.09.2026, Samet: «use full opacity for the clock in the dashboard»):
+   in jeder Glasstufe die feste Fläche statt des durchscheinenden Glases. */
+#root .ofi-home[data-glass='soft'] .ofi-home__clock,
+#root .ofi-home[data-glass='full'] .ofi-home__clock {
+    border-color: var(--ofi-win-border);
+    background: var(--ofi-win-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+/* Die Uhr bündig mit dem ersten eingerahmten Abschnitt (30.09.2026: «align its top with my production
+   tasks top»). Ohne ihn bleibt der Abstand zur ersten Karte unter «Überblick». */
+@media (min-width: 1280px) {
+    .ofi-home__workspace:has(> .ofi-home__main > .ofi-home-panel:first-child) > .ofi-home__aside { padding-top: 0; }
+}
+
+/* Alle eigenen Unteraufgaben erledigt (30.09.2026): grüner Kreis mit weissem Haken statt der Zahl. */
+.ofi-home-mytasks__project > em.is-done {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0;
+    background: #30a46c;
+}
+.ofi-home-mytasks__project > em.is-done > svg { width: 11px; height: 11px; color: #fff; stroke-width: 3.2; }
+
+/* Offene eigene Unteraufgaben als Text hinter einem grauen Strich (30.09.2026): «… | 1 open subtask». */
+.ofi-home-mytasks__open {
+    flex: none;
+    padding-left: 8px;
+    border-left: 1px solid var(--ofi-win-border);
+    color: var(--ofi-win-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.ofi-home-mytasks__project > em.is-done { margin-left: 2px; }
+.ofi-home-mytasks__project:has(> em.is-done) > span { padding-right: 8px; border-right: 1px solid var(--ofi-win-border); }

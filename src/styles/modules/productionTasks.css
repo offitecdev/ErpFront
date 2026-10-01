@@ -935,6 +935,22 @@ body > :not(#root) .ofi-ptk-card__title {
 .ofi-ptk-row { align-items: center; min-height: 38px; padding: 0 14px; }
 .ofi-ptk-row > * { min-width: 0; justify-self: center; text-align: center; }
 .ofi-ptk-row > :is(.is-left, .ofi-ptk-code, .ofi-ptk-cell-name, .ofi-ptk-cell-people, .ofi-ptk-cell-required) { justify-self: stretch; text-align: left; }
+/* Getrennte Spalten (29.09.2026: «separate the columns»): jede Zelle füllt ihre
+   Spalte und die Höhe der Zeile, eine feine Linie trennt sie von der vorigen —
+   statt der Lücke zwischen den Spalten ein Innenabstand. Ausrichtung wie oben:
+   links bzw. mittig. Die aufgeklappte Zeile der Dateien bleibt ungeteilt. */
+.ofi-ptk-table { column-gap: 0; }
+.ofi-ptk-row:not(.is-detail) > * {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    justify-self: stretch;
+    padding: 0 10px;
+}
+.ofi-ptk-row:not(.is-detail) > :is(.is-left, .ofi-ptk-code, .ofi-ptk-cell-name, .ofi-ptk-cell-people, .ofi-ptk-cell-required) { justify-content: flex-start; }
+.ofi-ptk-row:not(.is-detail) > :first-child { padding-left: 0; }
+.ofi-ptk-row:not(.is-detail) > * + * { border-left: 1px solid var(--ptk-hairline); }
 .ofi-ptk-row.is-head {
     min-height: 30px;
     border-bottom: 1px solid var(--ptk-hairline);
@@ -954,6 +970,9 @@ body > :not(#root) .ofi-ptk-card__title {
 /* Die Pflichtfelder einer Unteraufgabe: in der letzten Spalte, nur zu lesen. */
 .ofi-ptk-cell-required { display: inline-flex; align-items: center; justify-content: flex-start; gap: 6px; white-space: nowrap; }
 #root .ofi-ptk .ofi-ptk-cell-people .ofi-ptk-people { justify-content: flex-start; margin-left: -4px; }
+/* Ohne Personen (29.09.2026): «Kişi ata» bzw. «—» mittig in der Spalte, unter der Überschrift. */
+.ofi-ptk-row:not(.is-detail) > .ofi-ptk-cell-people:has(> .ofi-ptk-people.is-empty) { justify-content: center; }
+#root .ofi-ptk .ofi-ptk-cell-people .ofi-ptk-people.is-empty { margin-left: 0; }
 /* Die Tage: Angelegt, Beginn, Termin — ohne Tag ein blasser «-». */
 .ofi-ptk-day { font-size: 12.5px; color: var(--ptk-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ofi-ptk-day.is-empty { color: var(--ptk-muted); }
@@ -2702,3 +2721,319 @@ body > :not(#root) .ofi-ptk-drop__pick:hover { text-decoration: underline; }
 /* Ein Aufgabentag, der noch kommt: ein leerer Ring (28.09.2026). */
 .ofi-ptk-daydot.is-upcoming { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ptk-muted); }
 .ofi-ptk-history td > .ofi-ptk-daydot.is-upcoming { vertical-align: middle; }
+
+/* ── Der Verlauf der Stufe: drittes Glasplättchen unter «Dateien» (30.09.2026) ──
+   «Who did what … I should click and see the details.» Nach Tagen, neueste
+   zuerst; jeder Eintrag klappt an Ort und Stelle auf. */
+.ofi-ptk-float__icon.is-activity,
+.ofi-ptk-stagefiles__icon.is-activity { background: #30a46c; box-shadow: 0 1px 2px rgba(48, 164, 108, 0.35); }
+.ofi-ptk-activity .ofi-ptk-stagefiles__bar { align-items: center; }
+.ofi-ptk-activity .ofi-ptk-seg { flex-wrap: wrap; }
+.ofi-ptk-card__empty.is-activity { padding: 18px 4px; text-align: center; }
+.ofi-ptk-activity__error { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 4px; color: var(--ptk-danger); font-size: 12.5px; }
+.ofi-ptk-activity__error > p { margin: 0; }
+/* Kein eigener Rollbalken (30.09.2026: «expand the window so the user can see them clearly
+   without scroll») — die Karte wächst mit den aufgeklappten Einträgen, die Seite rollt. */
+.ofi-ptk-activity__days { display: flex; flex-direction: column; gap: 14px; }
+.ofi-ptk-activity__day { display: flex; flex-direction: column; gap: 4px; }
+.ofi-ptk-activity__dayhead {
+    margin: 0;
+    padding: 4px 2px;
+    color: var(--ptk-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+.ofi-ptk-activity__list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.ofi-ptk-activity__more { align-self: center; }
+
+.ofi-ptk-act { border-radius: 10px; }
+.ofi-ptk-act.is-open { background: var(--ptk-fill); }
+#root .ofi-ptk .ofi-ptk-act__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ptk-text);
+    font-family: var(--ptk-font);
+    text-align: left;
+    cursor: pointer;
+}
+#root .ofi-ptk .ofi-ptk-act__row:hover { background: var(--float-hover, var(--ptk-row-hover)); }
+#root .ofi-ptk .ofi-ptk-act__row:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: -2px; }
+.ofi-ptk-act__icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: var(--ptk-fill-strong);
+    color: var(--ptk-secondary);
+}
+.ofi-ptk-act__icon > svg { width: 14px; height: 14px; }
+.ofi-ptk-act__icon.is-blue { background: rgba(10, 122, 255, 0.12); color: #0a6ee0; }
+.ofi-ptk-act__icon.is-green { background: rgba(31, 138, 59, 0.13); color: var(--ptk-success); }
+.ofi-ptk-act__icon.is-orange { background: var(--ptk-warning-soft); color: var(--ptk-warning); }
+.ofi-ptk-act__icon.is-red { background: rgba(215, 0, 21, 0.1); color: var(--ptk-danger); }
+.ofi-ptk-act__icon.is-purple { background: rgba(94, 92, 230, 0.13); color: #5e5ce6; }
+.dark .ofi-ptk-act__icon.is-blue { background: rgba(59, 141, 255, 0.2); color: #7fb2ff; }
+.dark .ofi-ptk-act__icon.is-green { background: rgba(48, 209, 88, 0.16); }
+.dark .ofi-ptk-act__icon.is-red { background: rgba(255, 69, 58, 0.16); }
+.dark .ofi-ptk-act__icon.is-purple { background: rgba(125, 122, 255, 0.2); color: #a5a3ff; }
+.ofi-ptk-act__text { flex: 1 1 auto; min-width: 0; }
+.ofi-ptk-act__line { font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; }
+.ofi-ptk-act__line > b { font-weight: 600; }
+.ofi-ptk-act__time { flex: none; color: var(--ptk-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ofi-ptk-act__chevron { flex: none; width: 15px; height: 15px; color: var(--ptk-muted); transition: transform 160ms ease; }
+.ofi-ptk-act.is-open .ofi-ptk-act__chevron { transform: rotate(180deg); color: var(--ptk-accent); }
+.ofi-ptk-act__details { display: flex; flex-direction: column; gap: 10px; padding: 2px 10px 10px 44px; }
+.ofi-ptk-act__foot { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ptk-muted); font-size: 11.5px; }
+
+/* Einzelheiten: Dateien, Notizen, vorher → nachher, Personen. */
+.ofi-ptk-actfiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.ofi-ptk-actfile { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ofi-ptk-actfile__gone {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px dashed var(--ptk-field-border);
+    border-radius: 12px;
+    background: var(--ptk-surface);
+}
+.ofi-ptk-actfile__gone.is-deleted { border-color: rgba(215, 0, 21, 0.35); }
+.ofi-ptk-actfile__type {
+    flex: none;
+    padding: 3px 6px;
+    border-radius: 6px;
+    background: rgba(215, 0, 21, 0.1);
+    color: var(--ptk-danger);
+    font-size: 10.5px;
+    font-weight: 700;
+}
+.ofi-ptk-actfile__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-ptk-actfile__text > b { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+.ofi-ptk-actfile__gone.is-deleted .ofi-ptk-actfile__text > b { text-decoration: line-through; text-decoration-color: var(--ptk-muted); }
+.ofi-ptk-actfile__text > small { color: var(--ptk-secondary); font-size: 11.5px; }
+.ofi-ptk-actfile__text > em { color: var(--ptk-muted); font-size: 11px; font-style: normal; }
+.ofi-ptk-actfile__gone.is-deleted .ofi-ptk-actfile__text > em { color: var(--ptk-danger); }
+
+.ofi-ptk-actnote {
+    margin: 0;
+    padding: 8px 10px;
+    border-left: 3px solid var(--ptk-accent);
+    border-radius: 0 8px 8px 0;
+    background: var(--ptk-surface);
+    font-size: 12.5px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.ofi-ptk-actnote > span { display: block; margin-bottom: 2px; color: var(--ptk-secondary); font-size: 11px; font-weight: 600; white-space: normal; }
+.ofi-ptk-actnote.is-empty { color: var(--ptk-muted); border-left-color: var(--ptk-field-border); }
+.ofi-ptk-actnote.is-small { padding: 6px 8px; font-size: 12px; }
+.ofi-ptk-actblock { display: flex; flex-direction: column; gap: 6px; }
+.ofi-ptk-actblock__label { color: var(--ptk-secondary); font-size: 11px; font-weight: 600; }
+.ofi-ptk-actmuted { margin: 0; color: var(--ptk-muted); font-size: 12px; }
+
+.ofi-ptk-actstep { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
+.ofi-ptk-actstep > svg { width: 14px; height: 14px; color: var(--ptk-muted); }
+.ofi-ptk-actstatus {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--ptk-fill-strong);
+    color: var(--ptk-text);
+    font-size: 11.5px;
+    font-weight: 500;
+}
+.ofi-ptk-actstatus.is-in_progress { background: rgba(10, 122, 255, 0.12); color: var(--ptk-accent-text); }
+.ofi-ptk-actstatus.is-pending { background: var(--ptk-warning-soft); color: var(--ptk-warning); }
+.ofi-ptk-actstatus.is-revision { background: rgba(215, 0, 21, 0.1); color: var(--ptk-danger); }
+.ofi-ptk-actstatus.is-done { background: rgba(31, 138, 59, 0.13); color: var(--ptk-success); }
+
+.ofi-ptk-actpeople { display: flex; flex-wrap: wrap; gap: 6px; }
+.ofi-ptk-actperson {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px 2px 2px;
+    border-radius: 999px;
+    background: var(--ptk-surface);
+    box-shadow: inset 0 0 0 1px var(--ptk-border);
+    font-size: 12px;
+}
+.ofi-ptk-actperson.is-add { box-shadow: inset 0 0 0 1px rgba(31, 138, 59, 0.4); }
+.ofi-ptk-actperson.is-remove { box-shadow: inset 0 0 0 1px rgba(215, 0, 21, 0.35); text-decoration: line-through; text-decoration-color: var(--ptk-muted); }
+.ofi-ptk-actperson__dot {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--ptk-person-tone, #8e8e93);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.ofi-ptk-actfacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px 14px; margin: 0; }
+.ofi-ptk-actfacts > div { display: flex; flex-direction: column; gap: 1px; }
+.ofi-ptk-actfacts dt { color: var(--ptk-secondary); font-size: 11px; }
+.ofi-ptk-actfacts dd { margin: 0; font-size: 12.5px; }
+
+.ofi-ptk-actchanges { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ofi-ptk-actchanges th,
+.ofi-ptk-actchanges td { padding: 5px 8px; border-bottom: 1px solid var(--ptk-hairline); text-align: left; vertical-align: top; }
+.ofi-ptk-actchanges thead th { color: var(--ptk-secondary); font-size: 11px; font-weight: 600; }
+.ofi-ptk-actchanges tbody th { color: var(--ptk-secondary); font-weight: 500; white-space: nowrap; }
+.ofi-ptk-actchanges td:nth-child(2) { color: var(--ptk-secondary); }
+.ofi-ptk-actchanges :is(s, ins) { display: block; }
+.ofi-ptk-actchanges ins { text-decoration: none; color: var(--ptk-success); }
+
+.ofi-ptk-actchecks,
+.ofi-ptk-actlist { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+.ofi-ptk-actchecks > li { display: flex; align-items: flex-start; gap: 6px; }
+.ofi-ptk-actchecks svg { flex: none; width: 14px; height: 14px; margin-top: 2px; color: var(--ptk-success); }
+.ofi-ptk-actlist > li > b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-ptk-actlist > li > small { margin-left: 6px; color: var(--ptk-muted); font-size: 11.5px; }
+
+@media (max-width: 640px) {
+    .ofi-ptk-act__details { padding-left: 10px; }
+}
+
+/* Verlauf: Seiten und Zeitraum (30.09.2026). Unten «1–25 von 132», zurück, die
+   Seiten, weiter; bis die nächste Seite da ist, bleibt die vorige gedimmt stehen. */
+.ofi-ptk-activity .ofi-ptk-stagefiles__filters { align-items: flex-end; }
+.ofi-ptk-activity__days.is-busy { opacity: 0.55; transition: opacity 120ms ease; pointer-events: none; }
+.ofi-ptk-activity__pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--float-stripe, var(--ptk-hairline));
+}
+.ofi-ptk-activity__pager .ofi-ptk-pager__range { min-width: 0; text-align: left; }
+.ofi-ptk-activity__pages { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+#root .ofi-ptk .ofi-ptk-activity__page {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ptk-secondary);
+    font-family: var(--ptk-font);
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+#root .ofi-ptk .ofi-ptk-activity__page:hover { background: var(--ptk-fill); color: var(--ptk-text); }
+#root .ofi-ptk .ofi-ptk-activity__page.is-current { background: var(--ptk-accent); color: #fff; font-weight: 600; cursor: default; }
+#root .ofi-ptk .ofi-ptk-activity__page:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: 1px; }
+.ofi-ptk-activity__gap { min-width: 16px; color: var(--ptk-muted); font-size: 12px; text-align: center; }
+
+/* ── Gewicht der Stufe im Kopf der Karte (30.09.2026) ──
+   «The weights of the task only should fill the weight of its stage.» Die Stufe trägt ihr
+   Gewicht im Bereich (Feld in Vorlage und Zuweisungen); ergeben ihre Aufgaben nicht 100 %
+   der Stufe, steht die Summe orange davor. */
+.ofi-ptk-card__sum:has(.ofi-ptk-stageweight) { align-items: center; }
+.ofi-ptk-stageweight.is-compact { width: 68px; }
+#root .ofi-ptk .ofi-ptk-stageweight > input.ofi-ptk-input { height: 26px; min-height: 26px; padding-left: 8px; font-size: 12.5px; font-weight: 600; }
+.ofi-ptk-card__tasksum {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--ptk-warning-soft);
+    color: var(--ptk-warning);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 600;
+}
+
+/* Luft unter den Glaskarten (30.09.2026: «increase the padding of the bottom so when the
+   activities is open it doesn't touch the bottom of the page»). */
+.ofi-ptk-floatwrap { padding-bottom: 48px; }
+
+/* «In Vorlage speichern» (30.09.2026): die Warnung im Fenster. */
+.ofi-ptk-saveto { display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.45; }
+.ofi-ptk-saveto > p { margin: 0; }
+.ofi-ptk-saveto__warn { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--ptk-warning-soft); color: var(--ptk-warning); }
+.ofi-ptk-saveto__warn > svg { flex: none; width: 15px; height: 15px; margin-top: 2px; }
+
+/* ── Anfragen an die Verwaltung: viertes Glasplättchen unter «Aktivitäten» (30.09.2026) ── */
+.ofi-ptk-float__icon.is-requests,
+.ofi-ptk-stagefiles__icon.is-requests { background: #ff9500; box-shadow: 0 1px 2px rgba(255, 149, 0, 0.35); }
+.ofi-ptk-requests .ofi-ptk-stagefiles__bar { justify-content: flex-start; }
+.ofi-ptk-requests__list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ofi-ptk-requests__list.is-busy { opacity: 0.55; pointer-events: none; }
+.ofi-ptk-request {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--ptk-border);
+    border-radius: 12px;
+    background: var(--ptk-surface);
+}
+.ofi-ptk-request.is-solved { background: transparent; opacity: 0.85; }
+.ofi-ptk-request__kind {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 5px;
+    min-width: 92px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+.ofi-ptk-request__kind > svg { width: 13px; height: 13px; }
+.ofi-ptk-request__kind.is-approval { background: rgba(10, 122, 255, 0.12); color: var(--ptk-accent-text); }
+.ofi-ptk-request__kind.is-unlock { background: var(--ptk-warning-soft); color: var(--ptk-warning); }
+.ofi-ptk-request__main { display: flex; flex: 1 1 auto; flex-direction: column; gap: 4px; min-width: 0; }
+.ofi-ptk-request__what { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 0; font-size: 13px; }
+.ofi-ptk-request__what > b { font-weight: 600; overflow-wrap: anywhere; }
+.ofi-ptk-request__what > span { color: var(--ptk-secondary); font-size: 12px; }
+.ofi-ptk-request__meta { margin: 0; color: var(--ptk-secondary); font-size: 12px; }
+.ofi-ptk-request__solved { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--ptk-success); font-size: 12px; font-weight: 500; }
+.ofi-ptk-request__solved > svg { width: 14px; height: 14px; }
+.ofi-ptk-request__solve { flex: none; }
+@media (max-width: 640px) {
+    .ofi-ptk-request { flex-wrap: wrap; }
+}
+
+/* Das ganze Gerät (30.09.2026): in welcher Stufe eine Zeile steht. */
+.ofi-ptk-act__stage {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 0 6px;
+    border-radius: 5px;
+    background: var(--ptk-fill-strong);
+    color: var(--ptk-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 17px;
+    vertical-align: 1px;
+}
+
+/* «Go to subtask» neben Datum und Uhrzeit einer Zeile des Verlaufs (30.09.2026, Startseite). */
+.ofi-ptk-act__head { display: flex; align-items: center; gap: 6px; }
+.ofi-ptk-act__head > .ofi-ptk-act__row { flex: 1 1 auto; min-width: 0; }
+#root .ofi-ptk .ofi-ptk-act__goto { flex: none; margin-right: 6px; }
+.ofi-ptk-act__goto > svg { width: 13px; height: 13px; }
+@media (max-width: 640px) {
+    .ofi-ptk-act__head { flex-wrap: wrap; }
+    #root .ofi-ptk .ofi-ptk-act__goto { margin-left: 44px; }
+}
