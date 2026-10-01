@@ -88,6 +88,8 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
         requestUnlock: isAdmin ? undefined : handle.requestUnlock,
         setStatus: handle.setSubtaskStatus,
         addChecklistItem: handle.addChecklistItem,
+        // Die KI-Prüfung noch einmal (01.10.2026) — nur die Verwaltung.
+        retryAnalysis: isAdmin ? handle.retryAnalysis : undefined,
     };
     /* Der Name einer Stufe für den Verlauf (30.09.2026): in einem anderen Bereich mit dessen Namen davor. */
     const stageNameOf = (areaKey: string | null, stageKey: string | null): string => {

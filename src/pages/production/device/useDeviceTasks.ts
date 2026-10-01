@@ -7,11 +7,13 @@ import {
     productionTaskErrorText,
     productionTasksApi,
     readDeviceTasks,
+    refreshDeviceTasks,
 } from '@/lib/api/productionTasks';
 import type { DeviceTasks, ProductionTask, TaskPerson, TaskSection, TaskStatus, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
 
 import { openBlob } from '../bom/device/bomFiles';
 
+import { ANALYSIS_POLL_MS, hasActiveAnalysis } from '../tasks/subtaskFileModel';
 import { statusOfSubtasks, withSubtaskAssignees } from '../tasks/taskModel';
 
 interface State {
@@ -57,6 +59,20 @@ export const useDeviceTasks = (deviceId: string) => {
             })),
         );
     }, [deviceId, tick]);
+
+    /* Läuft eine KI-Prüfung (01.10.2026), fragt die Seite still nach, bis sie fertig ist — am
+       Speicher vorbei, sonst käme 15 s lang dieselbe Antwort. */
+    const analysing = state.deviceId === deviceId && Boolean(state.data && hasActiveAnalysis(state.data.tasks));
+    useEffect(() => {
+        if (!deviceId || !analysing) return undefined;
+        const timer = window.setInterval(() => {
+            void refreshDeviceTasks(deviceId).then((value) => {
+                dataRef.current = value;
+                setState((current) => (current.deviceId === deviceId ? { deviceId, data: value, error: null } : current));
+            }, () => undefined);
+        }, ANALYSIS_POLL_MS);
+        return () => window.clearInterval(timer);
+    }, [deviceId, analysing]);
 
     const shown = state.deviceId === deviceId ? state : { deviceId, data: null, error: null };
 
@@ -221,6 +237,16 @@ export const useDeviceTasks = (deviceId: string) => {
         }
     }, [deviceId, takeTask]);
 
+    const retryAnalysis = useCallback(async (task: ProductionTask, subtask: TaskSubtask, file: TaskSubtaskFile): Promise<boolean> => {
+        try {
+            takeTask((await productionTasksApi.retryFileAnalysis(deviceId, task.id, subtask.id, file.id)).task);
+            return true;
+        } catch (error) {
+            toast.error(productionTaskErrorText(error));
+            return false;
+        }
+    }, [deviceId, takeTask]);
+
     const unlockSubtask = useCallback(async (task: ProductionTask, subtask: TaskSubtask): Promise<boolean> => {
         try {
             takeTask((await productionTasksApi.unlockSubtask(deviceId, task.id, subtask.id)).task);
@@ -322,6 +348,7 @@ export const useDeviceTasks = (deviceId: string) => {
         unlockSubtask,
         requestUnlock,
         addChecklistItem,
+        retryAnalysis,
         addStage,
         saveTasks,
         load,

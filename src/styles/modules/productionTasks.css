@@ -1610,6 +1610,8 @@ body > :not(#root) .ofi-ptk-btn.ofi-ptk-checklistbtn svg { width: 13px; height: 
     font-variant-numeric: tabular-nums;
 }
 body > :not(#root) .ofi-ptk-btn.ofi-ptk-checklistbtn.is-open { background: var(--ptk-accent-soft); border-color: var(--ptk-accent); color: var(--ptk-accent); }
+/* Standards geschrieben (01.10.2026): der Knopf in der Akzentfarbe. */
+body > :not(#root) .ofi-ptk-btn.ofi-ptk-checklistbtn.is-set { border-color: var(--ptk-accent); color: var(--ptk-accent); }
 .ofi-ptk-apchecklist {
     display: flex;
     flex-direction: column;
@@ -1881,8 +1883,11 @@ body > :not(#root) .ofi-ptk-filechip__open {
     text-align: left;
     cursor: pointer;
 }
+/* Die Färbung beim Zeigen gilt der GANZEN Datei — mit Fassungs- und Überarbeitungsknopf (01.10.2026). */
+.ofi-ptk-filechip { transition: background-color 0.12s ease; }
+.ofi-ptk-filechip:hover { background: var(--ptk-row-hover); }
 #root .ofi-ptk .ofi-ptk-filechip__open:hover,
-body > :not(#root) .ofi-ptk-filechip__open:hover { background: var(--ptk-row-hover); }
+body > :not(#root) .ofi-ptk-filechip__open:hover { background: transparent; }
 #root .ofi-ptk .ofi-ptk-filechip__open:focus-visible,
 body > :not(#root) .ofi-ptk-filechip__open:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: 0; }
 .ofi-ptk-filechip__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
@@ -1913,6 +1918,7 @@ body > :not(#root) .ofi-ptk-filechip__remove:hover { background: color-mix(in sr
 /* ── Fassungen einer Datei (28.09.2026): «v2», «Upload a revision», frühere Fassungen ── */
 .ofi-ptk-filechip { max-width: 440px; }
 .ofi-ptk-filechip.is-older { box-shadow: none; background: var(--ptk-zebra); opacity: 0.85; }
+.ofi-ptk-filechip.is-older:hover { background: var(--ptk-row-hover); }
 .ofi-ptk-filechip__text > b { display: inline-flex; align-items: center; gap: 6px; }
 .ofi-ptk-versiontag {
     flex: none;
@@ -1948,77 +1954,74 @@ body > :not(#root) .ofi-ptk-filechip__revise {
 }
 #root .ofi-ptk .ofi-ptk-filechip__revise:hover { background: var(--ptk-accent-soft); border-color: var(--ptk-accent); color: var(--ptk-accent); }
 .ofi-ptk-filechip__revise > svg { width: 13px; height: 13px; }
-/* Frühere Fassungen (28.09.2026): nur eine Uhr links in der Datei; ein Klick öffnet die Auswahlliste. */
+/* Frühere Fassungen (01.10.2026): der Knopf sitzt am ENDE der Datei — Zeichen und Name stehen
+   in jeder Datei an derselben Stelle. Uhr, Anzahl, Pfeil (gedreht, solange offen). */
 #root .ofi-ptk .ofi-ptk-filechip__history,
 body > :not(#root) .ofi-ptk-filechip__history {
     display: inline-flex;
     flex: none;
     align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
+    gap: 3px;
+    height: 26px;
     min-height: 0;
-    margin: 0 -4px 0 6px;
-    padding: 0;
-    border: 0;
-    border-radius: 6px !important;
-    background: transparent;
+    margin: 0 4px 0 0;
+    padding: 0 6px;
+    border: 1px solid var(--ptk-field-border);
+    border-radius: 7px !important;
+    background: var(--ptk-surface);
     box-shadow: none;
     color: var(--ptk-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
     cursor: pointer;
 }
 #root .ofi-ptk .ofi-ptk-filechip__history:hover,
-#root .ofi-ptk .ofi-ptk-filechip__history.is-open { background: var(--ptk-accent-soft); color: var(--ptk-accent); }
-.ofi-ptk-filechip__history > svg { width: 14px; height: 14px; }
+#root .ofi-ptk .ofi-ptk-filechip__history.is-open,
+body > :not(#root) .ofi-ptk-filechip__history:hover,
+body > :not(#root) .ofi-ptk-filechip__history.is-open { background: var(--ptk-accent-soft); border-color: var(--ptk-accent); color: var(--ptk-accent); }
+.ofi-ptk-filechip__history > svg { width: 13px; height: 13px; }
+/* Immer gleich breit — eine Datei mit 9 oder 12 Fassungen schiebt nichts; der leere Platz ebenso breit. */
+#root .ofi-ptk .ofi-ptk-filechip__history,
+body > :not(#root) .ofi-ptk-filechip__history { justify-content: center; width: 60px; }
+.ofi-ptk-filechip__history.is-slot { visibility: hidden; flex: none; height: 26px; margin: 0 4px 0 0; }
+.ofi-ptk-filechip__history > .ofi-ptk-filechip__chev { width: 12px; height: 12px; transition: transform 0.15s ease; }
+.ofi-ptk-filechip__history.is-open > .ofi-ptk-filechip__chev { transform: rotate(180deg); }
+/* Der Name kürzt sich mit «…», das «v2» daneben bleibt ganz. */
+.ofi-ptk-filechip__text > b { min-width: 0; max-width: 100%; }
+.ofi-ptk-filechip__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Die Notiz einer früheren Fassung: was sich geändert hat. */
+.ofi-ptk-filechip__text > q { margin-top: 2px; color: var(--ptk-secondary); font-size: 11px; font-style: italic; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+.ofi-ptk-filechip__text > q::before,
+.ofi-ptk-filechip__text > q::after { content: none; }
 /* Datei und — geöffnet — ihre früheren Fassungen darunter, im Fluss: die Zeile (und die Tabelle) wächst mit. */
 .ofi-ptk-filechipwrap { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; max-width: 100%; }
-/* Luft über und unter der Liste der Fassungen (28.09.2026): sie klebt nicht an der Datei und nicht an den Knöpfen. */
-.ofi-ptk-filechipwrap > .ofi-ptk-versionmenu { margin: 10px 0 14px; }
+/* Die aktuellen Fassungen einer offenen Unteraufgabe (01.10.2026): der Name steht in einer festen
+   Spalte (höchstens 15 Zeichen), dahinter die Knöpfe — Zeilen mit denselben Knöpfen sind gleich breit
+   («the widths are too big»: keine feste Breite für alle Knöpfe mehr). */
+.ofi-ptk-filechipwrap.is-current > .ofi-ptk-filechip { max-width: none; }
+.ofi-ptk-filechipwrap.is-current > .ofi-ptk-filechip .ofi-ptk-filechip__text { flex: none; width: 180px; }
+/* Die früheren Fassungen: schmaler als die aktuelle (01.10.2026: «the previous versions' width should
+   be smaller») — dieselbe Namensspalte, aber ohne Knöpfe; untereinander gleich breit. */
+.ofi-ptk-filechipwrap.is-current > .ofi-ptk-versionlist .ofi-ptk-filechip { max-width: none; }
+.ofi-ptk-filechipwrap.is-current > .ofi-ptk-versionlist .ofi-ptk-filechip__text { flex: none; width: 180px; }
+/* Die früheren Fassungen: dieselben Karten, gedämpft, eingerückt an einer Leitlinie. */
+.ofi-ptk-versionlist {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+    margin: 6px 0 4px 14px;
+    padding-left: 12px;
+    border-left: 2px solid var(--ptk-hairline);
+}
 .ofi-ptk-files__list { align-items: flex-start; }
 /* «+ Datei hinzufügen» (32px) und «keine Dateien» mittig zur ersten Reihe der 44px hohen Dateien. */
 #root .ofi-ptk .ofi-ptk-files__list > .ofi-ptk-files__add,
 body > :not(#root) .ofi-ptk-files__list > .ofi-ptk-files__add { margin-top: 6px; }
 .ofi-ptk-files__list > .ofi-ptk-files__none { display: inline-flex; align-items: center; min-height: 44px; }
-.ofi-ptk-versionmenu {
-    position: static;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: max-content;
-    min-width: 260px;
-    max-width: 360px;
-    max-height: 280px;
-    padding: 4px;
-    overflow-y: auto;
-    border: 1px solid var(--ptk-border);
-    border-radius: 10px;
-    background: var(--ptk-surface);
-    box-shadow: 0 10px 30px rgb(0 0 0 / 0.16), 0 1px 3px rgb(0 0 0 / 0.1);
-}
-.ofi-ptk-versionmenu__row { display: flex; align-items: flex-start; gap: 2px; border-radius: 7px; }
-.ofi-ptk-versionmenu__row:hover { background: var(--ptk-row-hover); }
-#root .ofi-ptk .ofi-ptk-versionmenu__open,
-body > :not(#root) .ofi-ptk-versionmenu__open {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1px;
-    min-width: 0;
-    min-height: 0;
-    padding: 6px 8px;
-    border: 0;
-    background: none;
-    box-shadow: none;
-    color: var(--ptk-text);
-    text-align: left;
-    cursor: pointer;
-}
-.ofi-ptk-versionmenu__open > b { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12.5px; font-weight: 500; }
-.ofi-ptk-versionmenu__open > b > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ofi-ptk-versionmenu__open > small { color: var(--ptk-secondary); font-size: 11px; }
-.ofi-ptk-versionmenu__open > q { color: var(--ptk-secondary); font-size: 11.5px; white-space: pre-wrap; }
-.ofi-ptk-versionmenu__row > .ofi-ptk-filechip__remove { margin-top: 4px; }
 .ofi-ptk-revision__picked { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; }
 
 .ofi-ptk-fileglyph {
@@ -2179,8 +2182,24 @@ body > :not(#root) .ofi-ptk-review__filelink:hover b { text-decoration: underlin
 /* Neuer Punkt der Checkliste in der Prüfansicht — schlicht, ohne Zebra-Grund. */
 .ofi-ptk-review__additem.ofi-ptk-subedit__row.is-new { padding: 0; background: none; }
 /* Die Notiz der Prüfansicht füllt den Rest der Spalte (28.09.2026) — ohne Ziehgriff. */
-.ofi-ptk-review__noteblock { flex: 1 1 auto; min-height: 0; }
-body > :not(#root) textarea.ofi-ptk-input.ofi-ptk-review__note { flex: 1 1 auto; min-height: 96px; }
+/* Die Notiz beim Prüfen: feste, kleine Höhe statt «füllt den Rest» (01.10.2026: «too big»). */
+.ofi-ptk-review__noteblock { flex: none; }
+body > :not(#root) textarea.ofi-ptk-input.ofi-ptk-review__note { flex: none; height: 128px; min-height: 128px; }
+/* Die Standards der Dokumente (01.10.2026): zu lesen, Zeilen bleiben. */
+.ofi-ptk-review__standards {
+    max-height: 180px;
+    margin: 0;
+    padding: 8px 10px;
+    overflow: auto;
+    border: 1px solid var(--ptk-hairline);
+    border-radius: 9px;
+    background: var(--ptk-zebra);
+    color: var(--ptk-text);
+    font-size: 12.5px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
 .ofi-ptk-review__viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .ofi-ptk-review__toolbar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--ptk-hairline); }
 .ofi-ptk-review__nav,
@@ -2302,6 +2321,8 @@ body > :not(#root) textarea.ofi-ptk-input.ofi-ptk-complete__note {
     overflow: auto;
     resize: none !important;
 }
+/* Das Fenster der Standards (01.10.2026): Platz für mehrere Zeilen. */
+body > :not(#root) textarea.ofi-ptk-input.ofi-ptk-standards__input { min-height: 168px; }
 body > :not(#root) textarea.ofi-ptk-input.ofi-ptk-complete__note:focus { border-color: var(--ptk-accent); outline: none; box-shadow: 0 0 0 3px var(--ptk-ring); }
 .ofi-ptk-complete__hint { display: inline-flex; align-items: flex-start; gap: 7px; max-width: 290px; color: var(--ptk-secondary, #6e6e73); font-size: 11.5px; line-height: 1.35; }
 .ofi-ptk-complete__hint > svg { flex: none; width: 14px; height: 14px; margin-top: 1px; }
@@ -3037,3 +3058,63 @@ body > :not(#root) .ofi-ptk-drop__pick:hover { text-decoration: underline; }
     .ofi-ptk-act__head { flex-wrap: wrap; }
     #root .ofi-ptk .ofi-ptk-act__goto { margin-left: 44px; }
 }
+
+/* ── KI-Prüfung der PDFs gegen die Standards (01.10.2026) ─────────────────── */
+.ofi-ptk-aitag {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 11px;
+    background: var(--ptk-fill);
+    color: var(--ptk-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.ofi-ptk-aitag > svg { width: 13px; height: 13px; flex: none; }
+.ofi-ptk-aitag.is-pass { background: color-mix(in srgb, var(--ptk-success) 14%, transparent); color: var(--ptk-success); }
+.ofi-ptk-aitag.is-fail { background: color-mix(in srgb, var(--ptk-danger) 13%, transparent); color: var(--ptk-danger); }
+.ofi-ptk-aitag.is-unclear { background: var(--ptk-warning-soft); color: var(--ptk-warning); }
+.ofi-ptk-aitag.is-running { background: var(--ptk-accent-soft); color: var(--ptk-accent); }
+.ofi-ptk-aientry { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+body > :not(#root) .ofi-ptk-aientry .ofi-ptk-btn svg { width: 13px; height: 13px; }
+.ofi-ptk-review__standards + .ofi-ptk-aientry,
+.ofi-ptk-review__standards + .ofi-ptk-field__hint { margin-top: 8px; }
+/* Die Dateien einer offenen Unteraufgabe: eine je Zeile, daneben «KI-Bericht ansehen» (01.10.2026). */
+.ofi-ptk-files__list.is-lines { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; gap: 6px; }
+.ofi-ptk-fileline { display: flex; align-items: flex-start; gap: 8px; min-width: 0; max-width: 100%; }
+/* Der Knopf mittig zur 44px hohen Datei — die Liste der Fassungen darunter schiebt ihn nicht. */
+#root .ofi-ptk .ofi-ptk-btn.ofi-ptk-aireportbtn,
+body > :not(#root) .ofi-ptk-btn.ofi-ptk-aireportbtn { flex: none; gap: 5px; margin-top: 8px; }
+#root .ofi-ptk .ofi-ptk-btn.ofi-ptk-aireportbtn svg,
+body > :not(#root) .ofi-ptk-btn.ofi-ptk-aireportbtn svg { width: 13px; height: 13px; }
+.ofi-ptk-aireport { display: flex; flex-direction: column; gap: 12px; }
+.ofi-ptk-aireport__head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.ofi-ptk-aireport__meta { color: var(--ptk-secondary); font-size: 12px; }
+.ofi-ptk-aireport__summary { margin: 0; color: var(--ptk-text); font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.ofi-ptk-aireport__checks { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ofi-ptk-aireport__checks > li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 8px 10px;
+    border: 1px solid var(--ptk-hairline);
+    border-radius: 9px;
+    background: var(--ptk-zebra);
+}
+.ofi-ptk-aireport__checks > li > svg { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+.ofi-ptk-aireport__checks > li.is-met > svg { color: var(--ptk-success); }
+.ofi-ptk-aireport__checks > li.is-not_met > svg { color: var(--ptk-danger); }
+.ofi-ptk-aireport__checks > li.is-unclear > svg { color: var(--ptk-warning); }
+.ofi-ptk-aireport__checks > li > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-ptk-aireport__checks b { color: var(--ptk-text); font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.ofi-ptk-aireport__checks em { color: var(--ptk-secondary); font-size: 11.5px; font-style: normal; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.ofi-ptk-aireport__checks small { color: var(--ptk-secondary); font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; }
+
+/* ── Die Standards als PDF (01.10.2026) ──────────────────────────────────── */
+.ofi-ptk-standardspdf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.ofi-ptk-standardspdf > .ofi-ptk-filechip .ofi-ptk-filechip__text { max-width: 260px; }
+.ofi-ptk-review__standardspdf { max-width: 100%; margin-bottom: 8px; }

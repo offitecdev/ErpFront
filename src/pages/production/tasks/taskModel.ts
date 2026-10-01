@@ -100,6 +100,7 @@ export const TASK_LIMITS = {
     subtaskName: 200,
     checklistItems: 30,
     checklistItemText: 200,
+    documentStandards: 2000,
 } as const;
 
 const SUM_TOLERANCE = 0.01;

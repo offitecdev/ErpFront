@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { t } from '@/i18n/translate';
 import { productionTaskErrorText, productionTasksApi } from '@/lib/api/productionTasks';
 import { openBlob } from '@/pages/production/bom/device/bomFiles';
-import type { SubtaskActions } from '@/pages/production/tasks/subtaskFileModel';
+import { ANALYSIS_POLL_MS, hasActiveAnalysis, type SubtaskActions } from '@/pages/production/tasks/subtaskFileModel';
 import { statusOfSubtasks } from '@/pages/production/tasks/taskModel';
 import type { MyProductionTasks, ProductionTask, TaskStatus, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
 
@@ -52,6 +52,14 @@ export const useMyTasks = (meId: string | null) => {
         );
         return () => { cancelled = true; };
     }, [tick, meId]);
+
+    /* Läuft die KI-Prüfung eines eigenen PDFs (01.10.2026), still nachfragen, bis sie fertig ist. */
+    const analysing = Boolean(data?.projects.some((project) => project.devices.some((entry) => hasActiveAnalysis(entry.tasks))));
+    useEffect(() => {
+        if (!analysing) return undefined;
+        const timer = window.setTimeout(() => setTick((value) => value + 1), ANALYSIS_POLL_MS);
+        return () => window.clearTimeout(timer);
+    }, [analysing, data]);
 
     useEffect(() => {
         const onFocus = () => { if (document.visibilityState === 'visible') setTick((value) => value + 1); };

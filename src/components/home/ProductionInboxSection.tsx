@@ -103,6 +103,7 @@ const ProductionInbox = ({ meId }: { meId: string | null }) => {
         unlock: handle.unlockSubtask,
         setStatus: handle.setSubtaskStatus,
         addChecklistItem: handle.addChecklistItem,
+        retryAnalysis: handle.retryAnalysis,
     };
     const searchLabel = t(project ? 'productionTasks.inbox.searchUnits' : 'productionTasks.inbox.searchProjects');
 

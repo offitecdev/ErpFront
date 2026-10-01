@@ -1,5 +1,5 @@
 import { t } from '@/i18n/translate';
-import type { ProductionTask, TaskStatus, TaskSubtask, TaskSubtaskFile, TaskSubtaskRevisionRequest } from '@/types/productionTasks';
+import type { ProductionTask, TaskFileAnalysis, TaskStatus, TaskSubtask, TaskSubtaskFile, TaskSubtaskRevisionRequest } from '@/types/productionTasks';
 
 import { isSubtaskCompleted, SUBTASK_FILE_MAX_BYTES } from './taskModel';
 
@@ -32,7 +32,22 @@ export interface SubtaskActions {
      * die Verwaltung ist: ein Klick auf das Schloss. Fehlt es, ist das Schloss nur ein Zeichen.
      */
     requestUnlock?: (task: ProductionTask, subtask: TaskSubtask, note: string) => Promise<boolean>;
+    /** Die KI-Prüfung eines PDFs noch einmal (01.10.2026) — nur die Verwaltung; fehlt es, kein Knopf. */
+    retryAnalysis?: (task: ProductionTask, subtask: TaskSubtask, file: TaskSubtaskFile) => Promise<boolean>;
 }
+
+/* ── KI-Prüfung der PDFs gegen die Standards (01.10.2026) ─────────────────── */
+
+/** Wartet oder läuft die Prüfung? Dann fragt die Seite nach, bis sie fertig ist. */
+export const isAnalysisActive = (analysis?: TaskFileAnalysis | null): boolean =>
+    analysis?.status === 'QUEUED' || analysis?.status === 'RUNNING';
+
+/** Läuft irgendwo in diesen Aufgaben eine Prüfung? */
+export const hasActiveAnalysis = (tasks: ReadonlyArray<Pick<ProductionTask, 'subtasks'>>): boolean =>
+    tasks.some((task) => task.subtasks.some((subtask) => subtask.files.some((file) => isAnalysisActive(file.analysis))));
+
+/** So oft fragt die Seite nach, solange eine Prüfung läuft. */
+export const ANALYSIS_POLL_MS = 5000;
 
 const two = (value: number) => String(value).padStart(2, '0');
 

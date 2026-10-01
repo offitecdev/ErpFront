@@ -82,6 +82,42 @@ export interface TaskSubtaskFile {
     uploadedByName: string | null;
     /** Zeitpunkt (ISO). */
     uploadedAt: string;
+    /** Die KI-Prüfung gegen die Standards der Dokumente (01.10.2026) — null/fehlt: nie geprüft. */
+    analysis?: TaskFileAnalysis | null;
+}
+
+/** Das PDF mit den Standards einer Unteraufgabe (01.10.2026) — `ref` ist der Verweis des Servers. */
+export interface TaskStandardsFile {
+    ref: string;
+    name: string;
+    size: number;
+    /** Zeitpunkt (ISO). */
+    uploadedAt: string;
+}
+
+export type TaskFileAnalysisStatus = 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
+export type TaskFileAnalysisVerdict = 'PASS' | 'FAIL' | 'UNCLEAR';
+export type TaskFileAnalysisResult = 'MET' | 'NOT_MET' | 'UNCLEAR';
+
+/**
+ * Die KI-Prüfung eines PDFs (01.10.2026): beim Schicken zur Freigabe prüft gpt-5.4-mini
+ * die Datei gegen die Standards der Unteraufgabe — nur ein Rat für die Verwaltung.
+ */
+export interface TaskFileAnalysis {
+    status: TaskFileAnalysisStatus;
+    /** Die Standards, gegen die geprüft wurde. */
+    standards: string;
+    /** … und das PDF der Standards (sein `ref`), falls eines dabei war. */
+    standardsFileRef?: string | null;
+    /** Zeitpunkte (ISO). */
+    requestedAt: string;
+    finishedAt: string | null;
+    verdict: TaskFileAnalysisVerdict | null;
+    summary: string | null;
+    checks: Array<{ standard: string; result: TaskFileAnalysisResult; reason: string }>;
+    model: string | null;
+    /** Warum sie scheiterte (GPT_NOT_CONFIGURED, GPT_QUOTA, ANALYSIS_INTERRUPTED …). */
+    errorCode: string | null;
 }
 
 /** Ein Punkt der Freigabe-Checkliste einer Unteraufgabe (28.09.2026). */
@@ -107,6 +143,10 @@ export interface TaskSubtask {
     requiresApproval: boolean;
     /** Die Freigabe-Checkliste (nur mit «Approval», sonst leer). */
     approvalChecklist: TaskSubtaskChecklistItem[];
+    /** Die Standards der Dokumente (01.10.2026) — freier Text mit Zeilen, nur mit «Document», sonst null. */
+    documentStandards: string | null;
+    /** Die Standards als PDF (01.10.2026) — dazu oder statt des Textes; die KI nimmt beides. Nur mit «Document». */
+    documentStandardsFile?: TaskStandardsFile | null;
     /** Dateien am Gerät (in der Vorlage keine). */
     files: TaskSubtaskFile[];
     /** Abgeschlossen («Complete the task», die Verwaltung) — danach gesperrt. */

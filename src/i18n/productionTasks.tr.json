@@ -206,7 +206,10 @@
       "FILE_FORBIDDEN": "Bunu yalnızca yöneticiler ve bu alt görevdeki kişiler yapabilir.",
       "STAGE_WEIGHT_INVALID": "Aşama ağırlığı 0 ile 100 arasında olmalı.",
       "UNLOCK_ALREADY_REQUESTED": "Bu alt görev için zaten kilit açma talebi var.",
-      "REQUEST_NOT_FOUND": "Talep bulunamadı ya da zaten çözüldü."
+      "REQUEST_NOT_FOUND": "Talep bulunamadı ya da zaten çözüldü.",
+      "NO_STANDARDS": "Bu alt görevin kontrol edilecek doküman standartları yok.",
+      "ANALYSIS_RUNNING": "Yapay zekâ analizi zaten çalışıyor.",
+      "STANDARDS_FILE_NOT_FOUND": "Standartlar PDF'i bulunamadı."
     },
     "people": {
       "assign": "Kişi ata",
@@ -325,7 +328,21 @@
       "collapse": "{{code}} alt görevlerini gizle",
       "showFiles": "Dosyaları göster",
       "removeTitle": "Alt görev silinsin mi?",
-      "removeText": "«{{name}}» alt görevi bu görevden kaldırılacak."
+      "removeText": "«{{name}}» alt görevi bu görevden kaldırılacak.",
+      "standardsShort": "Standartlar",
+      "standardsAdd": "Doküman standartları ekle",
+      "standardsEdit": "Doküman standartlarını düzenle",
+      "standardsTitle": "Doküman standartları",
+      "standardsLabel": "Bu alt göreve eklenen dokümanların uyması gereken standartlar",
+      "standardsPlaceholder": "örn. yalnızca PDF · mühendis imzalı · antette revizyon numarası",
+      "standardsHint": "Yöneticiler dosyaları onaylarken bu standartları görür.",
+      "standardsPdf": "Standartlar PDF'i",
+      "standardsPdfUpload": "Standartlar PDF'i yükle",
+      "standardsPdfReplace": "PDF'i değiştir",
+      "standardsPdfRemove": "Standartlar PDF'ini kaldır",
+      "standardsPdfOnly": "Yalnızca PDF dosyaları yüklenebilir.",
+      "standardsPdfTooLarge": "PDF çok büyük (en fazla {{max}} MB).",
+      "standardsBothHint": "PDF yükleyin, standartları yazın ya da ikisini birden — yapay zekâ dokümanları buradaki her şeye göre kontrol eder."
     },
     "dates": {
       "from": "{{date}} itibarıyla",
@@ -499,7 +516,8 @@
       "approveFirst": "{{count}} dosya — görevi onaylamadan önce onaylayın",
       "approvedDetail": "{{count}} dosya incelendi ve onaylandı",
       "toReview": "İncelenecek",
-      "approvedValue": "Onaylandı"
+      "approvedValue": "Onaylandı",
+      "standards": "Doküman standartları"
     },
     "complete": {
       "button": "Görevi onayla",
@@ -766,6 +784,48 @@
       "search": "Proje veya ünite ara…",
       "tasks_one": "{{count}} görev",
       "tasks_other": "{{count}} görev"
+    },
+    "ai": {
+      "title": "Yapay zekâ analizi",
+      "section": "Yapay zekâ analizi",
+      "open": "Yapay zekâ raporunu gör",
+      "run": "Yapay zekâ analizini başlat",
+      "rerun": "Yeniden çalıştır",
+      "close": "Kapat",
+      "summary": "Özet",
+      "checks": "Kontrol edilen standartlar",
+      "runningHint": "Yapay zekâ bu PDF'i doküman standartlarına göre kontrol ediyor. Bittiğinde rapor burada görünür.",
+      "notAnalysed": "Bu dosya henüz yapay zekâ ile analiz edilmedi.",
+      "outdated": "Doküman standartları bu analizden sonra değişti — analiz eski standartlara göre yapıldı.",
+      "advice": "Yalnızca yapay zekâ önerisidir — onaylamadan önce dosyayı kendiniz kontrol edin.",
+      "status": {
+        "QUEUED": "Yapay zekâ bekleniyor…",
+        "RUNNING": "Yapay zekâ analiz ediyor…",
+        "FAILED": "Yapay zekâ analizi başarısız"
+      },
+      "verdict": {
+        "PASS": "Standartlara uygun",
+        "FAIL": "Standartlara uygun değil",
+        "UNCLEAR": "Yakından bakılmalı"
+      },
+      "result": {
+        "MET": "Karşılanıyor",
+        "NOT_MET": "Karşılanmıyor",
+        "UNCLEAR": "Belirsiz"
+      },
+      "errors": {
+        "generic": "Yapay zekâ bu dosyayı analiz edemedi.",
+        "GPT_NOT_CONFIGURED": "Sunucuda yapay zekâ kurulu değil (OpenAI API anahtarı yok).",
+        "GPT_KEY_REJECTED": "OpenAI API anahtarını kabul etmedi.",
+        "GPT_QUOTA": "OpenAI meşgul ya da kredi bitti — daha sonra tekrar deneyin.",
+        "GPT_TIMEOUT": "Yapay zekâ çok uzun sürede yanıt verdi.",
+        "GPT_UNREACHABLE": "OpenAI'a ulaşılamadı.",
+        "GPT_MODEL_UNAVAILABLE": "Yapay zekâ modeli bu API anahtarı için kullanılamıyor.",
+        "GPT_REJECTED": "OpenAI bu PDF'i reddetti (çok fazla sayfa ya da okunamıyor).",
+        "ANALYSIS_TOO_LARGE": "PDF yapay zekâ analizi için çok büyük (en fazla 20 MB).",
+        "ANALYSIS_INTERRUPTED": "Analiz yarıda kesildi (sunucu yeniden başladı).",
+        "STANDARDS_FILE_NOT_FOUND": "Standartlar PDF'i bulunamadı — yeniden yükleyin."
+      }
     }
   }
 }

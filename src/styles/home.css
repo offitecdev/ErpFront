@@ -47,7 +47,7 @@
 @media (max-width: 640px) {
     #root .ofi-home .ofi-home__title { font-size: 24px; }
     .ofi-home .ofi-home__welcome { gap: 20px; margin-bottom: 24px; }
-    .ofi-home .ofi-home-card__head { flex-wrap: wrap; padding: 16px 16px 0; }
+    .ofi-home .ofi-home-card__head { flex-wrap: wrap; padding: 16px 14px 0; }
     .ofi-home .ofi-home-card__title { white-space: normal; }
     #root .ofi-home .ofi-home-qm__tile { width: 174px; }
     #root .ofi-home .ofi-home-tile { padding: 14px; }
@@ -179,7 +179,8 @@
     justify-content: space-between;
     gap: 12px;
     min-height: 44px;
-    padding: 18px 20px 0;
+    /* Seitlich wie `.ofi-home-mytasks__area` (14px) — Titel und Bereichsname stehen bündig. */
+    padding: 18px 14px 0;
 }
 .ofi-home-card__title {
     overflow: hidden;

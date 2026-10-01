@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
-import { ArrowDown, ArrowUp, ClipboardCheck, Info, ListChecks, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ClipboardCheck, Info, ListChecks, Plus, ScrollText, Trash2, X } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
@@ -9,6 +9,7 @@ import { useBackDismiss } from '@/lib/backDismiss';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
 import type { ProductionTask, TaskSection, TaskSubtask } from '@/types/productionTasks';
 
+import { DocumentStandardsDialog } from './DocumentStandardsDialog';
 import { PeopleCell, type PersonNames } from './PeopleCell';
 import type { SubtaskFlag } from './StageCard';
 import {
@@ -31,6 +32,9 @@ import {
 } from './taskModel';
 
 const weightText = (value: number): string => (Number.isFinite(value) ? String(value).replace('.', ',') : '');
+
+/** Trägt die Unteraufgabe Standards der Dokumente — Text, PDF oder beides (01.10.2026)? */
+const hasStandards = (subtask: TaskSubtask): boolean => Boolean(subtask.documentStandards?.trim() || subtask.documentStandardsFile);
 
 /**
  * Ein Gewicht höchstens bis zu dem, was noch frei ist (28.09.2026: «if the
@@ -70,6 +74,8 @@ const emptySubtask = (name: string): TaskSubtask => ({
     requiresDocument: false,
     requiresApproval: false,
     approvalChecklist: [],
+    documentStandards: null,
+    documentStandardsFile: null,
 });
 
 /**
@@ -133,6 +139,8 @@ export const TaskEditDialog = ({
     // Die Freigabe-Checkliste (28.09.2026): offen je Unteraufgabe, dazu der Text des neuen Punkts.
     const [openChecklists, setOpenChecklists] = useState<ReadonlySet<string>>(() => new Set());
     const [newChecklistItems, setNewChecklistItems] = useState<Record<string, string>>({});
+    // Die Standards der Dokumente (01.10.2026): die Unteraufgabe, deren Fenster offen ist.
+    const [standardsFor, setStandardsFor] = useState<string | null>(null);
     const [tried, setTried] = useState(false);
 
     const section = sections.find((entry) => entry.key === task.area) ?? null;
@@ -215,6 +223,7 @@ export const TaskEditDialog = ({
         });
     const removeChecklistItem = (subtask: TaskSubtask, itemId: string) =>
         patchSubtask(subtask.id, { approvalChecklist: subtask.approvalChecklist.filter((item) => item.id !== itemId) });
+    const standardsSubtask = subtasks.find((entry) => entry.id === standardsFor) ?? null;
     const onNewSubtaskKey = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.key !== 'Enter') return;
         // Enter im Feld der neuen Unteraufgabe fügt an — es übernimmt nicht die ganze Aufgabe.
@@ -244,6 +253,9 @@ export const TaskEditDialog = ({
                         .map((item) => ({ ...item, text: item.text.replace(/\s+/g, ' ').trim() }))
                         .filter((item) => item.text)
                     : [],
+                // Ohne «Document» keine Standards.
+                documentStandards: entry.requiresDocument ? entry.documentStandards?.trim() || null : null,
+                documentStandardsFile: entry.requiresDocument ? entry.documentStandardsFile ?? null : null,
             }))
             .filter((entry) => entry.name)
             // Eine Vorlage trägt keine Tage (28.09.2026) — auch keine alten; ohne
@@ -279,7 +291,7 @@ export const TaskEditDialog = ({
             icon={<ListChecks size={18} />}
             width={780}
             // Solange eine Bestätigung offen ist, gehört Escape ihr.
-            closeOnEscape={!confirmDelete && removingSubtask === null}
+            closeOnEscape={!confirmDelete && removingSubtask === null && standardsSubtask === null}
             footer={(
                 <PopupActions
                     start={onDelete ? (
@@ -542,6 +554,23 @@ export const TaskEditDialog = ({
                                                     )}
                                                 </button>
                                             )}
+                                            {/* «Document» gewählt: daneben die Standards der Dokumente (01.10.2026). */}
+                                            {subtask.requiresDocument && (
+                                                <button
+                                                    type="button"
+                                                    className={`ofi-ptk-btn is-small ofi-nosize ofi-ptk-checklistbtn ${hasStandards(subtask) ? 'is-set' : ''}`}
+                                                    title={hasStandards(subtask)
+                                                        ? t('productionTasks.subtask.standardsEdit')
+                                                        : t('productionTasks.subtask.standardsAdd')}
+                                                    aria-label={hasStandards(subtask)
+                                                        ? t('productionTasks.subtask.standardsEdit')
+                                                        : t('productionTasks.subtask.standardsAdd')}
+                                                    onClick={() => setStandardsFor(subtask.id)}
+                                                >
+                                                    {hasStandards(subtask) ? <ScrollText aria-hidden /> : <Plus aria-hidden />}
+                                                    {t('productionTasks.subtask.standardsShort')}
+                                                </button>
+                                            )}
                                         </span>
                                     </div>
                                     {subtask.requiresApproval && openChecklists.has(subtask.id) && (
@@ -692,6 +721,18 @@ export const TaskEditDialog = ({
                     if (target) setSubtasks((current) => current.filter((entry) => entry.id !== target.id));
                 }}
             />
+            {standardsSubtask && (
+                <DocumentStandardsDialog
+                    subtaskName={standardsSubtask.name}
+                    value={standardsSubtask.documentStandards}
+                    file={standardsSubtask.documentStandardsFile ?? null}
+                    onClose={() => setStandardsFor(null)}
+                    onSave={(text, file) => {
+                        patchSubtask(standardsSubtask.id, { documentStandards: text.trim() || null, documentStandardsFile: file });
+                        setStandardsFor(null);
+                    }}
+                />
+            )}
         </PopupDialog>
     );
 };

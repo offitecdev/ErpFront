@@ -13,6 +13,7 @@ import type {
     TaskRequestList,
     TaskPerson,
     TaskSection,
+    TaskStandardsFile,
     TaskStatus,
     TaskTemplate,
     TaskTemplateInput,
@@ -85,6 +86,18 @@ export const productionTasksApi = {
     /** Ein Punkt mehr in der Freigabe-Checkliste — aus der Prüfansicht, nur die Verwaltung; der Stand bleibt. */
     addChecklistItem: async (deviceId: string, taskId: string, subtaskId: string, text: string): Promise<{ task: ProductionTask }> =>
         (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/checklist`, { text })).data,
+    /** Die Standards als PDF hochladen (01.10.2026) — nur die Verwaltung; an die Unteraufgabe kommt es mit dem Speichern. */
+    uploadStandardsFile: async (file: File): Promise<{ file: TaskStandardsFile }> => {
+        const form = new FormData();
+        form.append('file', file, file.name);
+        return (await apiClient.post('/production/task-standards', form)).data;
+    },
+    /** Das PDF der Standards. */
+    standardsFile: async (standards: TaskStandardsFile): Promise<Blob> =>
+        (await apiClient.get('/production/task-standards/file', { params: { ref: standards.ref, name: standards.name }, responseType: 'blob' })).data,
+    /** Die KI-Prüfung eines PDFs gegen die Standards noch einmal (01.10.2026) — nur die Verwaltung. */
+    retryFileAnalysis: async (deviceId: string, taskId: string, subtaskId: string, fileId: string): Promise<{ task: ProductionTask }> =>
+        (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/files/${encodeURIComponent(fileId)}/analysis`, {})).data,
     /** Die Sperre aufheben — nur die Verwaltung; wartet danach wieder auf die Freigabe. */
     unlockSubtask: async (deviceId: string, taskId: string, subtaskId: string): Promise<{ task: ProductionTask }> =>
         (await apiClient.post(`${subtaskPath(deviceId, taskId, subtaskId)}/unlock`, {})).data,

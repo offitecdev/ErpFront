@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { CheckCircle2, Clock3, ImageIcon, Loader2, Plus, RotateCcw, Send, Upload, X } from 'lucide-react';
+import { useRef, useState, type ChangeEvent } from 'react';
+import { CheckCircle2, ChevronDown, Clock3, ImageIcon, Loader2, Plus, RotateCcw, Send, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { t } from '@/i18n/translate';
 import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
 
+import { AiReportButton } from './AiAnalysis';
 import { RevisionUploadDialog } from './RevisionUploadDialog';
 import { canRemoveFile, canReviseFile, canUploadTo, fileGroups, fileProblem, formatMoment, isPdf, type SubtaskActions } from './subtaskFileModel';
 import { hasSubtaskDocument, isSubtaskCompleted, needsPdfFirst, SUBTASK_FILE_ACCEPT } from './taskModel';
@@ -39,6 +40,11 @@ export const VersionTag = ({ version, older = false }: { version: number; older?
     </span>
 );
 
+/** So lang darf ein Dateiname im Plättchen sein (01.10.2026: «max 15 characters») — der ganze steht im Tooltip. */
+const FILE_NAME_MAX = 15;
+const shortFileName = (name: string): string =>
+    (name.length > FILE_NAME_MAX ? `${name.slice(0, FILE_NAME_MAX - 1).trimEnd()}…` : name);
+
 /** Ein Plättchen je Datei — ein Klick öffnet sie in einem neuen Tab. */
 export const FileChip = ({
     file,
@@ -52,6 +58,7 @@ export const FileChip = ({
     onOpenVersion,
     canRemoveVersion,
     onRemoveVersion,
+    reserveHistory = false,
 }: {
     file: TaskSubtaskFile;
     /** Z. B. «M-01.2 · Saha ölçüsü» in der Liste der Stufe. */
@@ -69,47 +76,24 @@ export const FileChip = ({
     onOpenVersion?: (file: TaskSubtaskFile) => void;
     canRemoveVersion?: (file: TaskSubtaskFile) => boolean;
     onRemoveVersion?: (file: TaskSubtaskFile) => void;
+    /**
+     * Den Platz des Fassungs-Knopfs auch ohne frühere Fassungen freihalten (01.10.2026: «use the
+     * same width always like if the clock icon always in them») — die Knöpfe stehen in jeder
+     * Zeile an derselben Stelle. Die früheren Fassungen selbst halten keinen frei.
+     */
+    reserveHistory?: boolean;
 }) => {
     const meta = [formatMoment(file.uploadedAt), file.uploadedByName].filter(Boolean).join(' · ');
-    // Die Auswahlliste der früheren Fassungen: auf mit der Uhr, zu mit Klick daneben oder Escape.
+    // Die früheren Fassungen: auf und zu mit dem Knopf am Ende der Datei (01.10.2026).
     const [historyOpen, setHistoryOpen] = useState(false);
-    const chipRef = useRef<HTMLSpanElement>(null);
-    useEffect(() => {
-        if (!historyOpen) return undefined;
-        const onDown = (event: MouseEvent) => {
-            if (!chipRef.current?.contains(event.target as Node)) setHistoryOpen(false);
-        };
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape') return;
-            event.stopPropagation();
-            setHistoryOpen(false);
-        };
-        document.addEventListener('mousedown', onDown);
-        window.addEventListener('keydown', onKey, true);
-        return () => {
-            document.removeEventListener('mousedown', onDown);
-            window.removeEventListener('keydown', onKey, true);
-        };
-    }, [historyOpen]);
     return (
-        /* Die Liste der früheren Fassungen steht UNTER der Datei im Fluss (28.09.2026: «it goes
-           under the table bottom border») — so wächst die Zeile und mit ihr die Tabelle, statt
-           dass der Rand der Tabelle die Liste abschneidet. */
-        <span ref={chipRef} className={`ofi-ptk-filechipwrap ${historyOpen ? 'is-open' : ''}`}>
+        /* Die früheren Fassungen stehen UNTER der Datei im Fluss (28.09.2026: «it goes under the
+           table bottom border») — so wächst die Zeile und mit ihr die Tabelle. Seit dem 01.10.2026
+           («the clock icon moves the pdf content … the previous version looks very different»):
+           der Knopf sitzt am ENDE der Datei, und jede frühere Fassung ist dieselbe Datei-Karte,
+           nur gedämpft, eingerückt an einer Leitlinie. */
+        <span className={`ofi-ptk-filechipwrap ${historyOpen ? 'is-open' : ''} ${reserveHistory ? 'is-current' : ''}`}>
         <span className={`ofi-ptk-filechip ${older ? 'is-older' : ''}`}>
-            {history.length > 0 && (
-                <button
-                    type="button"
-                    className={`ofi-ptk-filechip__history ofi-nosize ${historyOpen ? 'is-open' : ''}`}
-                    aria-haspopup="listbox"
-                    aria-expanded={historyOpen}
-                    aria-label={t('productionTasks.files.olderVersions', { count: history.length })}
-                    title={t('productionTasks.files.olderVersions', { count: history.length })}
-                    onClick={() => setHistoryOpen((open) => !open)}
-                >
-                    <Clock3 aria-hidden />
-                </button>
-            )}
             <button
                 type="button"
                 className="ofi-ptk-filechip__open ofi-nosize"
@@ -119,12 +103,28 @@ export const FileChip = ({
                 <FileGlyph type={file.type} />
                 <span className="ofi-ptk-filechip__text">
                     <b>
-                        {file.name}
+                        <span className="ofi-ptk-filechip__name">{shortFileName(file.name)}</span>
                         {showVersion && <VersionTag version={file.version || 1} older={older} />}
                     </b>
                     <small>{context ? `${context} · ${meta}` : meta}</small>
+                    {older && file.revisionNote && <q>{file.revisionNote}</q>}
                 </span>
             </button>
+            {history.length > 0 && (
+                <button
+                    type="button"
+                    className={`ofi-ptk-filechip__history ofi-nosize ${historyOpen ? 'is-open' : ''}`}
+                    aria-expanded={historyOpen}
+                    aria-label={t('productionTasks.files.olderVersions', { count: history.length })}
+                    title={t('productionTasks.files.olderVersions', { count: history.length })}
+                    onClick={() => setHistoryOpen((open) => !open)}
+                >
+                    <Clock3 aria-hidden />
+                    <span>{history.length}</span>
+                    <ChevronDown className="ofi-ptk-filechip__chev" aria-hidden />
+                </button>
+            )}
+            {history.length === 0 && reserveHistory && <span className="ofi-ptk-filechip__history is-slot" aria-hidden />}
             {onRevise && (
                 <button
                     type="button"
@@ -149,34 +149,16 @@ export const FileChip = ({
             )}
         </span>
             {historyOpen && (
-                <span className="ofi-ptk-versionmenu" role="listbox" aria-label={t('productionTasks.review.versions')}>
+                <span className="ofi-ptk-versionlist" role="group" aria-label={t('productionTasks.review.versions')}>
                     {history.map((entry) => (
-                        <span key={entry.id} className="ofi-ptk-versionmenu__row" role="option" aria-selected={false}>
-                            <button
-                                type="button"
-                                className="ofi-ptk-versionmenu__open ofi-nosize"
-                                title={t('productionTasks.files.open', { name: entry.name })}
-                                onClick={() => { setHistoryOpen(false); onOpenVersion?.(entry); }}
-                            >
-                                <b>
-                                    <VersionTag version={entry.version || 1} older />
-                                    <span>{entry.name}</span>
-                                </b>
-                                <small>{[formatMoment(entry.uploadedAt), entry.uploadedByName].filter(Boolean).join(' · ')}</small>
-                                {entry.revisionNote && <q>{entry.revisionNote}</q>}
-                            </button>
-                            {onRemoveVersion && canRemoveVersion?.(entry) && (
-                                <button
-                                    type="button"
-                                    className="ofi-ptk-filechip__remove ofi-nosize"
-                                    aria-label={t('productionTasks.files.remove', { name: entry.name })}
-                                    title={t('productionTasks.files.remove', { name: entry.name })}
-                                    onClick={() => { setHistoryOpen(false); onRemoveVersion(entry); }}
-                                >
-                                    <X aria-hidden />
-                                </button>
-                            )}
-                        </span>
+                        <FileChip
+                            key={entry.id}
+                            file={entry}
+                            showVersion
+                            older
+                            onOpen={() => onOpenVersion?.(entry)}
+                            onRemove={onRemoveVersion && canRemoveVersion?.(entry) ? () => onRemoveVersion(entry) : undefined}
+                        />
                     ))}
                 </span>
             )}
@@ -245,23 +227,27 @@ export const SubtaskDetail = ({
         <div className="ofi-ptk-subdetail">
             <div className="ofi-ptk-files">
                 <span className="ofi-ptk-files__label">{t('productionTasks.files.title')}</span>
-                <div className="ofi-ptk-files__list">
+                {/* Eine Datei je Zeile (01.10.2026), daneben nur «KI-Bericht ansehen». */}
+                <div className="ofi-ptk-files__list is-lines">
                     {subtask.files.length === 0 && <span className="ofi-ptk-files__none">{t('productionTasks.files.none')}</span>}
                     {/* Je Datei die aktuelle Fassung mit «Upload a revision»; die früheren Fassungen
                         hinter der Uhr links in der Datei — eine Auswahlliste (28.09.2026). */}
                     {fileGroups(subtask.files).map(({ latest, older }) => (
-                        <FileChip
-                            key={latest.groupId || latest.id}
-                            file={latest}
-                            showVersion={older.length > 0 || (latest.version || 1) > 1}
-                            onOpen={() => actions.openFile(task, subtask, latest)}
-                            onRemove={canRemoveFile(actions, subtask, latest) ? () => setRemoving(latest) : undefined}
-                            onRevise={canReviseFile(actions, subtask, { latest, older }) ? () => pickRevision(latest) : undefined}
-                            history={older}
-                            onOpenVersion={(file) => actions.openFile(task, subtask, file)}
-                            canRemoveVersion={(file) => canRemoveFile(actions, subtask, file)}
-                            onRemoveVersion={(file) => setRemoving(file)}
-                        />
+                        <div key={latest.groupId || latest.id} className="ofi-ptk-fileline">
+                            <FileChip
+                                file={latest}
+                                reserveHistory
+                                showVersion={older.length > 0 || (latest.version || 1) > 1}
+                                onOpen={() => actions.openFile(task, subtask, latest)}
+                                onRemove={canRemoveFile(actions, subtask, latest) ? () => setRemoving(latest) : undefined}
+                                onRevise={canReviseFile(actions, subtask, { latest, older }) ? () => pickRevision(latest) : undefined}
+                                history={older}
+                                onOpenVersion={(file) => actions.openFile(task, subtask, file)}
+                                canRemoveVersion={(file) => canRemoveFile(actions, subtask, file)}
+                                onRemoveVersion={(file) => setRemoving(file)}
+                            />
+                            <AiReportButton task={task} subtask={subtask} file={latest} actions={actions} />
+                        </div>
                     ))}
                     {mayUpload && (
                         <>

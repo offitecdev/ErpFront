@@ -206,7 +206,10 @@
       "FILE_FORBIDDEN": "Only admins and the people on this subtask can do this.",
       "STAGE_WEIGHT_INVALID": "A stage weight must be between 0 and 100.",
       "UNLOCK_ALREADY_REQUESTED": "An unlock has already been requested for this subtask.",
-      "REQUEST_NOT_FOUND": "The request was not found or is already solved."
+      "REQUEST_NOT_FOUND": "The request was not found or is already solved.",
+      "NO_STANDARDS": "This subtask has no document standards to check against.",
+      "ANALYSIS_RUNNING": "The AI analysis is already running.",
+      "STANDARDS_FILE_NOT_FOUND": "The standards PDF could not be found."
     },
     "people": {
       "assign": "Assign person",
@@ -325,7 +328,21 @@
       "collapse": "Hide the subtasks of {{code}}",
       "showFiles": "Show files",
       "removeTitle": "Delete the subtask?",
-      "removeText": "The subtask “{{name}}” will be removed from this task."
+      "removeText": "The subtask “{{name}}” will be removed from this task.",
+      "standardsShort": "Standards",
+      "standardsAdd": "Add document standards",
+      "standardsEdit": "Edit document standards",
+      "standardsTitle": "Document standards",
+      "standardsLabel": "Standards the documents of this subtask must meet",
+      "standardsPlaceholder": "e.g. PDF only · signed by the engineer · revision number in the title block",
+      "standardsHint": "Admins see these standards when they approve the files.",
+      "standardsPdf": "Standards PDF",
+      "standardsPdfUpload": "Upload standards PDF",
+      "standardsPdfReplace": "Replace PDF",
+      "standardsPdfRemove": "Remove standards PDF",
+      "standardsPdfOnly": "Only PDF files can be uploaded.",
+      "standardsPdfTooLarge": "The PDF is too large (max. {{max}} MB).",
+      "standardsBothHint": "Upload a PDF, write the standards, or both — the AI checks the documents against everything here."
     },
     "dates": {
       "from": "from {{date}}",
@@ -499,7 +516,8 @@
       "approveFirst": "{{count}} file(s) — approve them before approving the task",
       "approvedDetail": "{{count}} file(s) reviewed and approved",
       "toReview": "To review",
-      "approvedValue": "Approved"
+      "approvedValue": "Approved",
+      "standards": "Document standards"
     },
     "complete": {
       "button": "Approve the task",
@@ -766,6 +784,48 @@
       "search": "Search projects or units…",
       "tasks_one": "{{count}} task",
       "tasks_other": "{{count}} tasks"
+    },
+    "ai": {
+      "title": "AI analysis",
+      "section": "AI analysis",
+      "open": "View AI report",
+      "run": "Run AI analysis",
+      "rerun": "Run again",
+      "close": "Close",
+      "summary": "Summary",
+      "checks": "Standards checked",
+      "runningHint": "The AI is checking this PDF against the document standards. The report appears here when it is done.",
+      "notAnalysed": "This file has not been analysed by AI yet.",
+      "outdated": "The document standards changed after this analysis — it checked the old standards.",
+      "advice": "AI advice only — check the file yourself before approving.",
+      "status": {
+        "QUEUED": "Waiting for AI…",
+        "RUNNING": "AI is analysing…",
+        "FAILED": "AI analysis failed"
+      },
+      "verdict": {
+        "PASS": "Meets the standards",
+        "FAIL": "Does not meet the standards",
+        "UNCLEAR": "Needs a closer look"
+      },
+      "result": {
+        "MET": "Met",
+        "NOT_MET": "Not met",
+        "UNCLEAR": "Unclear"
+      },
+      "errors": {
+        "generic": "The AI could not analyse this file.",
+        "GPT_NOT_CONFIGURED": "AI is not set up on the server (no OpenAI API key).",
+        "GPT_KEY_REJECTED": "OpenAI rejected the API key.",
+        "GPT_QUOTA": "OpenAI is busy or the credit is used up — try again later.",
+        "GPT_TIMEOUT": "The AI took too long to answer.",
+        "GPT_UNREACHABLE": "OpenAI could not be reached.",
+        "GPT_MODEL_UNAVAILABLE": "The AI model is not available for this API key.",
+        "GPT_REJECTED": "OpenAI rejected this PDF (too many pages or unreadable).",
+        "ANALYSIS_TOO_LARGE": "The PDF is too large for AI analysis (max. 20 MB).",
+        "ANALYSIS_INTERRUPTED": "The analysis was interrupted (the server restarted).",
+        "STANDARDS_FILE_NOT_FOUND": "The standards PDF could not be found — upload it again."
+      }
     }
   }
 }

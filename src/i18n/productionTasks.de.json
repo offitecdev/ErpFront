@@ -206,7 +206,10 @@
       "FILE_FORBIDDEN": "Das dürfen nur die Verwaltung und die Personen dieser Unteraufgabe.",
       "STAGE_WEIGHT_INVALID": "Das Gewicht einer Stufe muss zwischen 0 und 100 liegen.",
       "UNLOCK_ALREADY_REQUESTED": "Um das Entsperren dieser Unteraufgabe wurde schon gebeten.",
-      "REQUEST_NOT_FOUND": "Die Anfrage gibt es nicht oder sie ist schon erledigt."
+      "REQUEST_NOT_FOUND": "Die Anfrage gibt es nicht oder sie ist schon erledigt.",
+      "NO_STANDARDS": "Diese Unteraufgabe hat keine Dokumentstandards zum Prüfen.",
+      "ANALYSIS_RUNNING": "Die KI-Analyse läuft bereits.",
+      "STANDARDS_FILE_NOT_FOUND": "Das PDF der Standards wurde nicht gefunden."
     },
     "people": {
       "assign": "Person zuweisen",
@@ -325,7 +328,21 @@
       "collapse": "Unteraufgaben von {{code}} ausblenden",
       "showFiles": "Dateien zeigen",
       "removeTitle": "Unteraufgabe löschen?",
-      "removeText": "Die Unteraufgabe «{{name}}» wird aus dieser Aufgabe entfernt."
+      "removeText": "Die Unteraufgabe «{{name}}» wird aus dieser Aufgabe entfernt.",
+      "standardsShort": "Standards",
+      "standardsAdd": "Dokumentstandards hinzufügen",
+      "standardsEdit": "Dokumentstandards bearbeiten",
+      "standardsTitle": "Dokumentstandards",
+      "standardsLabel": "Standards, die die Dokumente dieser Unteraufgabe erfüllen müssen",
+      "standardsPlaceholder": "z. B. nur PDF · vom Ingenieur unterschrieben · Revisionsnummer im Schriftfeld",
+      "standardsHint": "Die Verwaltung sieht diese Standards beim Freigeben der Dateien.",
+      "standardsPdf": "Standards als PDF",
+      "standardsPdfUpload": "Standards-PDF hochladen",
+      "standardsPdfReplace": "PDF ersetzen",
+      "standardsPdfRemove": "Standards-PDF entfernen",
+      "standardsPdfOnly": "Es lassen sich nur PDF-Dateien hochladen.",
+      "standardsPdfTooLarge": "Das PDF ist zu gross (höchstens {{max}} MB).",
+      "standardsBothHint": "Ein PDF hochladen, die Standards schreiben oder beides — die KI prüft die Dokumente gegen alles hier."
     },
     "dates": {
       "from": "ab {{date}}",
@@ -499,7 +516,8 @@
       "approveFirst": "{{count}} Datei(en) — vor der Freigabe der Aufgabe freigeben",
       "approvedDetail": "{{count}} Datei(en) geprüft und freigegeben",
       "toReview": "Zu prüfen",
-      "approvedValue": "Freigegeben"
+      "approvedValue": "Freigegeben",
+      "standards": "Dokumentstandards"
     },
     "complete": {
       "button": "Aufgabe freigeben",
@@ -766,6 +784,48 @@
       "search": "Projekte oder Einheiten suchen …",
       "tasks_one": "{{count}} Aufgabe",
       "tasks_other": "{{count}} Aufgaben"
+    },
+    "ai": {
+      "title": "KI-Analyse",
+      "section": "KI-Analyse",
+      "open": "KI-Bericht ansehen",
+      "run": "KI-Analyse starten",
+      "rerun": "Erneut ausführen",
+      "close": "Schliessen",
+      "summary": "Zusammenfassung",
+      "checks": "Geprüfte Standards",
+      "runningHint": "Die KI prüft dieses PDF gegen die Dokumentstandards. Der Bericht erscheint hier, sobald sie fertig ist.",
+      "notAnalysed": "Diese Datei wurde noch nicht von der KI geprüft.",
+      "outdated": "Die Dokumentstandards haben sich nach dieser Analyse geändert — geprüft wurden die alten Standards.",
+      "advice": "Nur ein Rat der KI — die Datei vor der Freigabe selbst prüfen.",
+      "status": {
+        "QUEUED": "Wartet auf die KI…",
+        "RUNNING": "KI prüft…",
+        "FAILED": "KI-Analyse fehlgeschlagen"
+      },
+      "verdict": {
+        "PASS": "Erfüllt die Standards",
+        "FAIL": "Erfüllt die Standards nicht",
+        "UNCLEAR": "Genauer prüfen"
+      },
+      "result": {
+        "MET": "Erfüllt",
+        "NOT_MET": "Nicht erfüllt",
+        "UNCLEAR": "Unklar"
+      },
+      "errors": {
+        "generic": "Die KI konnte diese Datei nicht prüfen.",
+        "GPT_NOT_CONFIGURED": "Die KI ist auf dem Server nicht eingerichtet (kein OpenAI-Schlüssel).",
+        "GPT_KEY_REJECTED": "OpenAI hat den Schlüssel abgelehnt.",
+        "GPT_QUOTA": "OpenAI ist ausgelastet oder das Guthaben ist aufgebraucht — später erneut versuchen.",
+        "GPT_TIMEOUT": "Die KI hat zu lange gebraucht.",
+        "GPT_UNREACHABLE": "OpenAI ist nicht erreichbar.",
+        "GPT_MODEL_UNAVAILABLE": "Das KI-Modell steht diesem Schlüssel nicht offen.",
+        "GPT_REJECTED": "OpenAI hat dieses PDF abgelehnt (zu viele Seiten oder unlesbar).",
+        "ANALYSIS_TOO_LARGE": "Das PDF ist für die KI-Analyse zu gross (höchstens 20 MB).",
+        "ANALYSIS_INTERRUPTED": "Die Analyse wurde unterbrochen (Neustart des Servers).",
+        "STANDARDS_FILE_NOT_FOUND": "Das PDF der Standards wurde nicht gefunden — bitte erneut hochladen."
+      }
     }
   }
 }

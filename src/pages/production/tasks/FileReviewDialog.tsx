@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
-import { Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, FileSearch, History, Loader2, Plus, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, FileSearch, History, Loader2, Plus, RotateCcw, ScrollText, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
+import { productionTaskErrorText, productionTasksApi } from '@/lib/api/productionTasks';
 import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/productionTasks';
 
+import { openBlob } from '../bom/device/bomFiles';
+import { AiAnalysisEntry } from './AiAnalysis';
+import { FileGlyph } from './SubtaskFiles';
 import { loadPdfjs } from './fileThumbs';
 import {
     fileGroups,
@@ -537,6 +541,39 @@ export const FileReviewDialog = ({
                         {!allTicked && <span className="ofi-ptk-field__hint">{t('productionTasks.review.tickAll')}</span>}
                     </section>
 
+                    {/* Die Standards der Dokumente (01.10.2026) — nach Checkliste und neuem Punkt. */}
+                    {(subtask.documentStandards || subtask.documentStandardsFile) && (
+                        <section className="ofi-ptk-complete__block">
+                            <h3 className="ofi-ptk-complete__label ofi-ptk-review__label">
+                                <ScrollText aria-hidden />
+                                {t('productionTasks.review.standards')}
+                            </h3>
+                            {/* Das PDF der Standards (01.10.2026) — ein Klick öffnet es. */}
+                            {subtask.documentStandardsFile && (
+                                <span className="ofi-ptk-filechip ofi-ptk-review__standardspdf">
+                                    <button
+                                        type="button"
+                                        className="ofi-ptk-filechip__open ofi-nosize"
+                                        title={t('productionTasks.files.open', { name: subtask.documentStandardsFile.name })}
+                                        onClick={() => {
+                                            const standards = subtask.documentStandardsFile;
+                                            if (standards) void openBlob(() => productionTasksApi.standardsFile(standards), (error) => productionTaskErrorText(error));
+                                        }}
+                                    >
+                                        <FileGlyph type="application/pdf" />
+                                        <span className="ofi-ptk-filechip__text">
+                                            <b><span className="ofi-ptk-filechip__name">{subtask.documentStandardsFile.name}</span></b>
+                                            <small>{t('productionTasks.subtask.standardsPdf')}</small>
+                                        </span>
+                                    </button>
+                                </span>
+                            )}
+                            {subtask.documentStandards && <p className="ofi-ptk-review__standards">{subtask.documentStandards}</p>}
+                            {/* Darunter die KI-Prüfung DIESER Datei (01.10.2026) — ihr Bericht auf Knopfdruck. */}
+                            {file && <AiAnalysisEntry key={file.id} task={task} subtask={subtask} file={file} actions={actions} />}
+                        </section>
+                    )}
+
                     {/* Der Verlauf (28.09.2026): Fassungen und Rückgaben nach Datum, älteste zuerst.
                         Eine Fassung öffnet sich mit einem Klick. */}
                     {timeline.length > 1 && (
@@ -571,14 +608,14 @@ export const FileReviewDialog = ({
                         </section>
                     )}
 
-                    {/* Die Notiz füllt den Rest der Höhe — ohne Ziehgriff (28.09.2026). */}
+                    {/* Die Notiz: eine feste, kleine Höhe (01.10.2026: «too big») — ohne Ziehgriff. */}
                     <label className="ofi-ptk-complete__block ofi-ptk-review__noteblock">
                         <span className="ofi-ptk-complete__label">
                             {t('productionTasks.complete.note')} <em>{t('productionTasks.complete.optional')}</em>
                         </span>
                         <textarea
                             className="ofi-ptk-input ofi-ptk-complete__note ofi-ptk-review__note"
-                            rows={4}
+                            rows={6}
                             maxLength={500}
                             value={note}
                             placeholder={allTicked ? undefined : t('productionTasks.review.notePlaceholder')}
