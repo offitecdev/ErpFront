@@ -216,7 +216,7 @@ export const BomLinesTable = ({
     const showReceived = Boolean(numericOnly) && mode === 'active';
     const editQty = editable && (mode === 'template' || mode === 'draft');
     // So viele Spalten wie der Kopf — die leere Zeile spannt über alle.
-    const columnCount = (hideSupplier ? 4 : 5) + (mode !== 'consumed' ? 1 : 0) + (mode === 'draft' || mode === 'template' ? 1 : 0)
+    const columnCount = (hideSupplier ? 2 : 3) + (mode !== 'consumed' ? 1 : 0) + (mode === 'draft' || mode === 'template' ? 1 : 0)
         + 1 + (mode === 'active' ? 3 : 0) + (showReceived ? 1 : 0) + (mode === 'consumed' ? 1 : 0) + 1;
     return (
         <div className={`ofi-bom-tablewrap${plain ? ' is-plain' : ''}`}>
@@ -225,8 +225,6 @@ export const BomLinesTable = ({
                     <tr>
                         <th className="is-code">{t('productionBom.columns.erpCode')}</th>
                         <th className="is-name">{t('productionBom.columns.name')}</th>
-                        <th>{t('productionBom.columns.brand')}</th>
-                        <th>{t('productionBom.columns.modelNumber')}</th>
                         {!hideSupplier && <th>{t('productionBom.columns.supplier')}</th>}
                         {mode !== 'consumed' && <th className="is-num">{t('productionBom.columns.stock')}</th>}
                         {(mode === 'draft' || mode === 'template') && <th className="is-num">{t('productionBom.columns.free')}</th>}
@@ -267,8 +265,6 @@ export const BomLinesTable = ({
                                             : row.description && <small>{row.description}</small>}
                                     </span>
                                 </td>
-                                <td>{row.brand ?? <Dash />}</td>
-                                <td className="is-mono">{row.modelNumber ?? <Dash />}</td>
                                 {!hideSupplier && <td>{row.supplierName ?? <Dash />}</td>}
                                 {mode !== 'consumed' && <td className="is-num">{row.stock === null ? <Dash /> : fmtQty(row.stock)}</td>}
                                 {(mode === 'draft' || mode === 'template') && (

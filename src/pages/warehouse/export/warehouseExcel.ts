@@ -25,12 +25,13 @@ import { groupTemplateLabel } from '../warehouseCodes';
 export type ImportField =
     | 'group'
     | 'name'
-    | 'productCode'
     | 'brand'
     | 'modelNumber'
     | 'unit'
     | 'supplierName'
     | 'supplierEmail'
+    | 'supplierArticleNumber'
+    | 'supplierOrderNumber'
     | 'manufacturerBarcode'
     | 'description'
     | 'quantity'
@@ -44,7 +45,7 @@ export type ImportField =
  * göre ürün barkodu»); ohne Lieferant gehört er der Karte.
  */
 export const TEMPLATE_FIELDS: ImportField[] = [
-    'group', 'name', 'productCode', 'brand', 'modelNumber', 'unit', 'supplierName', 'supplierEmail', 'manufacturerBarcode',
+    'group', 'name', 'brand', 'modelNumber', 'unit', 'supplierName', 'supplierEmail', 'supplierArticleNumber', 'supplierOrderNumber', 'manufacturerBarcode',
     'description', 'quantity', 'purchasePrice', 'currency', 'serialRequired',
 ];
 
@@ -52,8 +53,6 @@ export const TEMPLATE_FIELDS: ImportField[] = [
 const HEADER_ALIASES: Record<ImportField, string[]> = {
     group: ['malzeme grubu', 'material group', 'materialgruppe', 'grup', 'group', 'gruppe'],
     name: ['ürün adı', 'urun adi', 'product name', 'produktname', 'name', 'ad', 'ürün'],
-    // «Ürün kodu» (30.09.2026) — steht im PDF des Lieferanten.
-    productCode: ['ürün kodu', 'urun kodu', 'product code', 'produktcode', 'artikelnummer', 'article number'],
     brand: ['marka', 'ürün markası', 'brand', 'marke'],
     // «Üretici kodu» = früher «Model numarası» (derselbe Wert).
     modelNumber: ['üretici kodu', 'uretici kodu', 'manufacturer code', 'herstellercode', 'herstellernummer',
@@ -62,6 +61,20 @@ const HEADER_ALIASES: Record<ImportField, string[]> = {
     supplierName: ['tedarikçi adı', 'tedarikçi', 'tedarikci', 'supplier name', 'supplier', 'lieferant', 'lieferantenname'],
     supplierEmail: ['tedarikçi e-postası', 'tedarikçi e-posta', 'tedarikçi maili', 'tedarikçi mail', 'e-posta', 'supplier e-mail', 'supplier email',
         'e-mail des lieferanten', 'e-mail', 'email', 'mail'],
+    /* Artikel- und Bestellnummer DES Lieferanten der Zeile (01.10.2026). Die
+       frühere Karten-Spalte «Ürün kodu» (30.09.) zählt als seine Artikelnummer —
+       «ürün kodu da tedarikçiye özel» (Samet). */
+    supplierArticleNumber: ['tedarikçi ürün tip no.', 'ürün tip no.', 'ürün tip numarası', 'supplier product type no.', 'product type no.',
+        'produkttypnummer des lieferanten', 'produkttypnummer', 'produkttyp-nr.',
+        'tedarikçi ürün no.', 'tedarikçi ürün no', 'tedarikçi ürün numarası', 'ürün no.', 'ürün no', 'ürün numarası',
+        'supplier item no.', 'supplier item no', 'supplier item number', 'item no.', 'item number',
+        'artikel-nr. des lieferanten', 'artikel-nr.', 'artikelnummer', 'article number',
+        'ürün kodu', 'urun kodu', 'product code', 'produktcode'],
+    supplierOrderNumber: ['tedarikçi ürün sip. no.', 'ürün sip. no.', 'ürün sip. numarası', 'supplier product order no.', 'product order no.',
+        'bestellnummer des lieferanten',
+        'tedarikçi sipariş no.', 'tedarikçi sipariş no', 'tedarikçi sipariş numarası', 'sipariş no.', 'sipariş no', 'sipariş numarası',
+        'supplier order no.', 'supplier order no', 'supplier order number', 'order no.', 'order number',
+        'bestell-nr. des lieferanten', 'bestell-nr.', 'bestellnummer'],
     // Die frühere Spalte «Tedarikçi ürün kodu» (Vorlage vor dem vierten Durchgang) war nach
     // Samet schon der Barcode des Lieferanten — sie zählt, wenn die Datei keine Barcodespalte hat.
     manufacturerBarcode: ['üretici barkodu', 'uretici barkodu', 'ürün barkodu', 'urun barkodu', 'tedarikçi barkodu', 'manufacturer barcode',
@@ -104,8 +117,8 @@ const download = (data: ArrayBuffer | Uint8Array, fileName: string) => {
 export interface ListExcelTexts {
     sheet: string;
     headers: {
-        erpCode: string; barcode: string; name: string; productCode: string; category: string; group: string; brand: string; modelNumber: string;
-        unit: string; supplier: string; makerBarcodes: string; description: string; quantity: string; purchasePrice: string; currency: string;
+        erpCode: string; barcode: string; name: string; category: string; group: string; brand: string; modelNumber: string;
+        unit: string; supplier: string; supplierArticleNumbers: string; supplierOrderNumbers: string; makerBarcodes: string; description: string; quantity: string; purchasePrice: string; currency: string;
         serialRequired: string;
     };
     /** Die Einheiten in der Sprache der Oberfläche (PCS → «Adet» …). */
@@ -124,15 +137,19 @@ const makerBarcodesText = (product: WarehouseProduct): string => [
     ...product.suppliers.map((entry) => (entry.barcode ? `${entry.name}: ${entry.barcode}` : '')),
 ].filter(Boolean).join('; ');
 
+/** Artikel- bzw. Bestellnummern der Lieferanten in EINER Zelle: «Lieferant: Nummer; …» (01.10.2026). */
+const supplierNumbersText = (product: WarehouseProduct, field: 'articleNumber' | 'orderNumber'): string =>
+    product.suppliers.map((entry) => (entry[field] ? `${entry.name}: ${entry[field]}` : '')).filter(Boolean).join('; ');
+
 export const downloadListExcel = (products: WarehouseProduct[], texts: ListExcelTexts) => {
     const h = texts.headers;
-    const header = [h.erpCode, h.barcode, h.name, h.productCode, h.category, h.group, h.brand, h.modelNumber, h.unit, h.supplier, h.makerBarcodes,
+    const header = [h.erpCode, h.barcode, h.name, h.category, h.group, h.brand, h.modelNumber, h.unit, h.supplier,
+        h.supplierArticleNumbers, h.supplierOrderNumbers, h.makerBarcodes,
         h.description, h.quantity, h.purchasePrice, h.currency, h.serialRequired];
     const rows = products.map((product) => [
         product.erpCode ?? '',
         product.barcode ?? '',
         product.name,
-        product.productCode ?? '',
         product.materialGroup?.category?.name ?? '',
         product.materialGroup?.name ?? '',
         product.brand ?? '',
@@ -140,6 +157,8 @@ export const downloadListExcel = (products: WarehouseProduct[], texts: ListExcel
         product.unit ? texts.units[product.unit] ?? product.unit : '',
         // Mehrere Lieferanten: die Namen mit «; » getrennt, ihre Barcodes daneben.
         product.suppliers.map((entry) => entry.name).join('; '),
+        supplierNumbersText(product, 'articleNumber'),
+        supplierNumbersText(product, 'orderNumber'),
         makerBarcodesText(product),
         product.description ?? '',
         product.quantity,
@@ -150,12 +169,12 @@ export const downloadListExcel = (products: WarehouseProduct[], texts: ListExcel
     const sheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
     // Codes bleiben Text — sonst verliert der Barcode seine führende 0.
     for (let index = 0; index < rows.length; index += 1) {
-        for (const col of [0, 1, 3, 10]) {
+        for (const col of [0, 1, 9, 10, 11]) {
             const cell = sheet[XLSX.utils.encode_cell({ r: index + 1, c: col })];
             if (cell) { cell.t = 's'; cell.z = '@'; }
         }
     }
-    sheet['!cols'] = [18, 16, 40, 16, 18, 22, 16, 18, 10, 24, 34, 48, 10, 12, 8, 12].map((wch) => ({ wch }));
+    sheet['!cols'] = [18, 16, 40, 18, 22, 16, 18, 10, 24, 30, 30, 34, 48, 10, 12, 8, 12].map((wch) => ({ wch }));
     sheet['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(rows.length, 1), c: header.length - 1 } }) };
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, texts.sheet.slice(0, 31));
@@ -235,7 +254,7 @@ export const downloadTemplate = (catalog: WarehouseCatalog, texts: TemplateTexts
     // Blatt 1: die Produkte — nur die Kopfzeile, ausgefüllt wird von Hand.
     const header = TEMPLATE_FIELDS.map((field) => texts.headers[field]);
     const products = XLSX.utils.aoa_to_sheet([header]);
-    products['!cols'] = [34, 34, 16, 16, 18, 12, 24, 28, 18, 40, 10, 12, 12, 16].map((wch) => ({ wch }));
+    products['!cols'] = [34, 34, 16, 18, 12, 24, 28, 20, 20, 18, 40, 10, 12, 12, 16].map((wch) => ({ wch }));
 
     // Blatt 2: Anleitung.
     const help = XLSX.utils.aoa_to_sheet(texts.help.map((line) => [line]));

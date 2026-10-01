@@ -27,13 +27,17 @@ const NAMES: Record<PurchaseDocLang, Record<string, string>> = {
         stdUnitPrice: 'Birim Fiyat',
         stdNetPrice: 'Net Fiyat',
         stdAmount: 'Tutar',
-        // Üretim şablonu (30.09.2026)
-        stdGroup: 'Malzeme grubu',
+        // Üretim şablonu (30.09.2026; adlar 01.10.2026 Samet'in yazdığı gibi)
+        stdGroup: 'Malzeme Grubu',
         stdProductCode: 'Ürün kodu',
-        stdName: 'Ürün adı',
+        // Tedarikçinin kendi numaraları, Depo kartındaki satırından (01.10.2026)
+        // 01.10.2026 kısaltıldı (Samet: «Ürün Tip Num. · Ürün Sip Num.»)
+        stdArticleNo: 'Ürün Tip Num.',
+        stdOrderNo: 'Ürün Sip Num.',
+        stdName: 'Malzeme Adı',
         stdUnit: 'Birim',
         stdDiscount: 'İndirim',
-        stdLineTotal: 'Satır tutarı',
+        stdLineTotal: 'Satır Fiyatı',
     },
     de: {
         stdErp: 'ERP-Code',
@@ -45,7 +49,9 @@ const NAMES: Record<PurchaseDocLang, Record<string, string>> = {
         stdAmount: 'Betrag',
         stdGroup: 'Materialgruppe',
         stdProductCode: 'Produktcode',
-        stdName: 'Produktname',
+        stdArticleNo: 'Produkttyp-Nr.',
+        stdOrderNo: 'Bestell-Nr.',
+        stdName: 'Materialbezeichnung',
         stdUnit: 'Einheit',
         stdDiscount: 'Rabatt',
         stdLineTotal: 'Betrag',
@@ -58,12 +64,14 @@ const NAMES: Record<PurchaseDocLang, Record<string, string>> = {
         stdUnitPrice: 'Unit Price',
         stdNetPrice: 'Net Price',
         stdAmount: 'Amount',
-        stdGroup: 'Material group',
+        stdGroup: 'Material Group',
         stdProductCode: 'Product code',
-        stdName: 'Product name',
+        stdArticleNo: 'Product Type No.',
+        stdOrderNo: 'Product Order No.',
+        stdName: 'Material Name',
         stdUnit: 'Unit',
         stdDiscount: 'Discount',
-        stdLineTotal: 'Line total',
+        stdLineTotal: 'Line Price',
     },
 };
 
@@ -75,8 +83,23 @@ const TITLES: Record<PurchaseDocLang, string> = {
 
 const fold = (value: unknown): string => String(value ?? '').trim().toLocaleLowerCase('tr-TR');
 
+/**
+ * Frühere Schreibweisen, die ältere Belege gespeichert haben — sie gelten
+ * weiter als «Standardname» und werden darum übersetzt statt wörtlich gedruckt.
+ */
+const LEGACY_NAMES: Record<string, string[]> = {
+    stdGroup: ['Malzeme grubu', 'Material group'],
+    stdName: ['Produktname', 'Ürün adı', 'Product name'],
+    stdArticleNo: ['Produkttypnummer', 'Ürün Tip Numarası', 'Artikel-Nr.', 'Ürün No.', 'Item No.'],
+    stdOrderNo: ['Bestellnummer', 'Ürün Sip. Numarası', 'Sipariş No.', 'Order No.'],
+    stdLineTotal: ['Satır tutarı', 'Line total'],
+};
+
 /** Bir standart sütunun üç dildeki yazımı (karşılaştırma için katlanmış). */
-const variantsOf = (key: string): Set<string> => new Set(LANGS.map((lang) => fold(NAMES[lang][key])).filter(Boolean));
+const variantsOf = (key: string): Set<string> => new Set([
+    ...LANGS.map((lang) => fold(NAMES[lang][key])),
+    ...(LEGACY_NAMES[key] ?? []).map(fold),
+].filter(Boolean));
 
 /** Sunucunun kurduğu ad («Standard») ve üç dildeki başlık. */
 const TITLE_VARIANTS = new Set(['standard', ...LANGS.map((lang) => fold(TITLES[lang]))]);
@@ -100,12 +123,15 @@ export const displayColumnName = (key: unknown, storedName: unknown, lang: Purch
  * ── ÜRETİM ŞABLONU (Vorgabe Samet, 30.09.2026) ─────────────────────────────
  * «Fiyat talebi: malzeme grubu, ürün kodu (boş olabilir), ürün adı, birim,
  *  miktar. Siparişte: … birim fiyat, indirim, satır tutarı, en altta varsa
- *  KDV.» Nur die Belege der BOM tragen diese Spalten (Stok bleibt, wie er ist);
+ *  KDV.» 01.10.2026 dazu die Artikel- und Bestellnummer DES Lieferanten
+ * (`stdArticleNo` / `stdOrderNo`, von seiner Zeile auf der Depo-Karte). Nur die Belege der BOM tragen diese Spalten (Stok bleibt, wie er ist);
  * erkannt an `stdGroup` / `stdName`. Die Einheit steht als Wort in der Zeile
  * (`stdUnit`, «Adet» …) und wird im PDF und auf dem Schirm in die Sprache
  * übersetzt.
  */
-export const PRODUCTION_COLUMN_KEYS = ['stdGroup', 'stdProductCode', 'stdName', 'stdUnit', 'stdDiscount', 'stdLineTotal'] as const;
+export const PRODUCTION_COLUMN_KEYS = [
+    'stdGroup', 'stdProductCode', 'stdArticleNo', 'stdOrderNo', 'stdName', 'stdUnit', 'stdDiscount', 'stdLineTotal',
+] as const;
 
 export const isProductionColumns = (columns: unknown): boolean =>
     Array.isArray(columns) && columns.some((column) => {

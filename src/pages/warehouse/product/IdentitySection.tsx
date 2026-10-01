@@ -81,17 +81,9 @@ export const IdentitySection = ({
                 onChange={(event) => update('name', event.target.value)}
             />
         </Row>
-        <Row label={t('warehouse.fields.productCode')} htmlFor="wh-product-code" hint={t('warehouse.fields.productCodeHint')}>
-            <input
-                id="wh-product-code"
-                className="ofi-wh-input is-mono"
-                value={form.productCode}
-                maxLength={120}
-                spellCheck={false}
-                disabled={readOnly}
-                onChange={(event) => update('productCode', event.target.value)}
-            />
-        </Row>
+        {/* «Ürün kodu» ist seit dem 01.10.2026 die «Ürün no.» JE LIEFERANT (Samet:
+            «ürün kodu da tedarikçiye özel … ürün kodu labelını kaldırman lazım») —
+            sie steht in der Zeile des Lieferanten, nicht mehr auf der Karte. */}
         <Row label={t('warehouse.fields.brand')} htmlFor="wh-brand">
             <input id="wh-brand" className="ofi-wh-input" value={form.brand} maxLength={120} disabled={readOnly} onChange={(event) => update('brand', event.target.value)} />
         </Row>

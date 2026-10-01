@@ -520,6 +520,14 @@ const growToward = (widths: number[], caps: number[], spare: number): number => 
    Namen der Vorlage («GESAMTMENGE», nicht «Menge»). Gemessen wird wie oben
    beschrieben; die Beschreibung nimmt, was uebrig bleibt — wo immer die
    Vorlage sie hingestellt hat. */
+/**
+ * Die MwSt, die der Betrag JEDER Zeile enthält: bei Gesamt-MwSt sonst der
+ * Satz der Bestellung. Belege der BOM (01.10.2026, Samet: «Satır Fiyatı … KDV
+ * en sona»): die Zeile bleibt netto, die MwSt steht NUR unten in den Summen.
+ */
+const lineVatRateOf = (order: PurchaseOrderRow): number | null =>
+    (order.vatMode === 'TOTAL' && !isProductionColumns(order.tableColumns) ? (order.orderVatRate || 0) : null);
+
 const buildTableLayout = (
     doc: jsPDF,
     order: PurchaseOrderRow,
@@ -528,7 +536,7 @@ const buildTableLayout = (
 ): TableLayout => {
     const items = order.items ?? [];
     const names = items.map((item) => (item.name || '').trim());
-    const totalVatRate = order.vatMode === 'TOTAL' ? (order.orderVatRate || 0) : null;
+    const totalVatRate = lineVatRateOf(order);
     const desc = columns.find((column) => column.kind === 'desc');
     const others = columns.filter((column) => column.kind !== 'desc');
     // Der Betrag endet an `C_PRICE_R` — sein eigener Abstand faellt dort weg.
@@ -578,9 +586,21 @@ const buildTableLayout = (
 
     /* ── Die Dichtestufe: die erste, in der jede Spalte ihr Mindestmass bekommt.
        Sie gilt fuer die GANZE Tabelle — Titel, Namen, Werte, Abstände. ──── */
-    let step: TableStep = TABLE_STEPS[TABLE_STEPS.length - 1];
-    for (const candidate of TABLE_STEPS) {
-        if (minSumOf(measureAll(candidate)) + descMinFor(candidate) <= roomFor(candidate.gap)) { step = candidate; break; }
+    /* 01.10.2026 (Samet: «tablo biraz daha büyük … malzeme adı sığmayan aşağı
+       satıra geçsin»): eine grössere Stufe nur, wenn der Name dabei seine
+       Hauptspalte behält (bis `DESC_FLOOR_W` bzw. so breit wie der längste
+       Name) — sonst die erste Stufe, in der wenigstens die Mindestmasse passen. */
+    const descWantFor = (candidate: TableStep): number => Math.max(
+        descMinFor(candidate),
+        Math.min(DESC_FLOOR_W, ...names.map((name) => fullWidth(doc, name, NAME_STYLE, nameSizeOf(candidate.fs)) * 1.03 + candidate.gap)),
+    );
+    const roomyStep = TABLE_STEPS.find((candidate) =>
+        minSumOf(measureAll(candidate)) + descWantFor(candidate) <= roomFor(candidate.gap));
+    let step: TableStep = roomyStep ?? TABLE_STEPS[TABLE_STEPS.length - 1];
+    if (!roomyStep) {
+        for (const candidate of TABLE_STEPS) {
+            if (minSumOf(measureAll(candidate)) + descMinFor(candidate) <= roomFor(candidate.gap)) { step = candidate; break; }
+        }
     }
     const { fs, gap } = step;
     const room = roomFor(gap);
@@ -718,7 +738,10 @@ const discountLines = (item: PurchaseOrderRow['items'][number]): string[] =>
    breiteste Wort ihres Werts, bei Zahlen der ganze Betrag. Die erste passende
    Stufe gilt für die GANZE Tabelle. Neun Spalten stehen so ohne ein zerhacktes
    Wort; erst jenseits davon bricht als letzter Ausweg ein Wort. */
+/* 01.10.2026 (Samet: «tablo biraz daha büyük olsun») eine grössere Stufe vorn. */
 const TABLE_STEPS: ReadonlyArray<{ fs: number; gap: number; head: number }> = [
+    { fs: 9.6, gap: 4.4, head: 8.8 },
+    { fs: 9.2, gap: 4.2, head: 8.5 },
     { fs: 9, gap: 4.2, head: 8.4 },
     { fs: 8.6, gap: 3.8, head: 8.1 },
     { fs: 8.2, gap: 3.4, head: 7.8 },
@@ -893,6 +916,8 @@ export async function buildOrderPdfBytes(
         hidden: new Set([...hidden, 'code']),
         maxExtras: PDF_MAX_EXTRA_COLUMNS,
         lang,
+        // Belege der BOM: eine Spalte ohne einen einzigen Wert wird nicht gedruckt (01.10.2026).
+        dropEmptyExtras: isProductionColumns(order.tableColumns),
     }).map((column) => ({ ...column, caption: upper(column.caption) }));
     const layout = buildTableLayout(doc, order, columns, fmt);
     const posCaption = upper(L.colPos);
@@ -920,7 +945,7 @@ export async function buildOrderPdfBytes(
             fmt,
             L,
             layout,
-            order.vatMode === 'TOTAL' ? (order.orderVatRate || 0) : null,
+            lineVatRateOf(order),
         );
     });
 
@@ -1167,10 +1192,14 @@ function splitCaption(doc: jsPDF, label: string, width: number, size: number): {
         /* Ein zusammengesetztes Wort bricht an seiner Fuge («PRODUKTTYP-» /
            «NUMMER»); was in eine Zeile passt, bleibt ohne Trennstrich zusammen. */
         if (line) lines.push(line);
+        /* Ein echter Bindestrich («Bestell-Nr.») bleibt stehen, auch wenn beide
+           Glieder in eine Zeile passen; nur eine gedachte Fuge (Grundwort,
+           weiches Trennzeichen) verschwindet dann. */
+        const glue = word.includes('-') ? '-' : '';
         let run = '';
         pieces.forEach((piece, index) => {
             const last = index === pieces.length - 1;
-            const trial = run + piece;
+            const trial = run ? run + glue + piece : piece;
             if (fits(trial + (last ? '' : '-'))) { run = trial; return; }
             if (run) lines.push(`${run}-`);
             if (!fits(piece + (last ? '' : '-'))) chopped = true;

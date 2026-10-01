@@ -6,7 +6,7 @@ import { isProductionColumns } from '@/utils/standardOrderColumns';
  * ── DIE VORLAGE DER PRODUKTION AUF DER AUFTRAGSSEITE (30.09.2026) ──────────
  *
  * Ein Beleg der BOM trägt seine Spalten selbst (Materialgruppe · Produktcode ·
- * Produktname · Einheit · Menge · bei Bestellungen Einzelpreis · Rabatt ·
+ * Artikel-Nr. · Bestell-Nr. des Lieferanten · Produktname · Einheit · Menge · bei Bestellungen Einzelpreis · Rabatt ·
  * Betrag — `shared/standardOrderTemplate.ts` im Backend). Diese Vorlage gibt
  * es auf dem Server nicht; die Auftragsseite baut sie aus dem Beleg und nimmt
  * sie, solange niemand von Hand eine andere wählt — sonst schriebe das
@@ -17,6 +17,9 @@ export const PRODUCTION_TEMPLATE_ID = 'production-bom';
 const WIDTHS: Record<string, number> = {
     stdGroup: 150,
     stdProductCode: 150,
+    // Artikel-/Bestellnummer des Lieferanten (01.10.2026)
+    stdArticleNo: 140,
+    stdOrderNo: 140,
     stdName: 260,
     stdUnit: 90,
     stdQty: 100,

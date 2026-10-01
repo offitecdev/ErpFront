@@ -95,11 +95,20 @@ export const fmtDocDate = (iso?: string | null): string => {
 
 const O = brandKit.C;
 
-/** Das Raster der Offerte (tenderPdfModern: ML 14 · MR 196 · Inhalt 44/38 → 266). */
+/*
+ * Das Raster der Offerte (tenderPdfModern: Inhalt 44/38 → 266) — mit
+ * SCHMALEREN Rändern (01.10.2026, Samet: «sağ ve sol kenar boşluklarını azalt,
+ * tablo biraz daha büyük olsun»): 10 statt 14 mm links und rechts, acht
+ * Millimeter mehr für die Tabelle. Der Kopf (Logo, Welle, Kontaktzeile) folgt
+ * denselben Rändern (`drawOfferHeader`).
+ */
+const SUPPLIER_ML = 10;
+const SUPPLIER_MR = 200;
+
 export const OFFER = {
-    ML: brandKit.ML,
-    MR: brandKit.MR,
-    CONTENT_W: brandKit.CONTENT_W,
+    ML: SUPPLIER_ML,
+    MR: SUPPLIER_MR,
+    CONTENT_W: SUPPLIER_MR - SUPPLIER_ML,
     CONTENT_TOP_FIRST: 44,
     CONTENT_TOP_REST: 38,
     CONTENT_BOTTOM: brandKit.CONTENT_BOTTOM,
@@ -108,9 +117,9 @@ export const OFFER = {
     /** Die Belegkarte links. */
     CARD_W: 82,
     /** Linke Kante des Summenblocks (rechts davon die Summen, links die Hinweiskarte). */
-    TOTALS_X: 116,
+    TOTALS_X: 120,
     /** Der Betrag endet 1 mm vor dem rechten Rand. */
-    PRICE_R: brandKit.MR - 1,
+    PRICE_R: SUPPLIER_MR - 1,
     tones: O,
 };
 
@@ -127,7 +136,9 @@ const fitSize = (doc: jsPDF, text: string, maxW: number, base: number, min: numb
 /** Logo, Welle und Kontaktzeile — genau die der Offerte. */
 export const loadOfferLogo = (doc: jsPDF) => brandKit.loadLogo(doc);
 export const loadOfferWave = () => brandKit.loadHeaderWave(brandKit.WAVE_W, brandKit.WAVE_H);
-export const drawOfferHeader = brandKit.drawPageHeader;
+type HeaderArgs = Parameters<typeof brandKit.drawPageHeader>;
+export const drawOfferHeader = (doc: jsPDF, logo: HeaderArgs[1], wave: HeaderArgs[2], settings: HeaderArgs[3]) =>
+    brandKit.drawPageHeader(doc, logo, wave, settings, { ml: SUPPLIER_ML, mr: SUPPLIER_MR });
 
 /** Das getönte Kopfband mit der weichen Navy-Kante — Tabellenkopf und Kopf der Belegkarte. */
 export function drawOfferBand(doc: jsPDF, y: number, x: number, w: number, h: number) {

@@ -22,7 +22,6 @@ export interface FormState {
     brand: string;
     /** «Üretici kodu» (früher «Model numarası»). */
     modelNumber: string;
-    productCode: string;
     unit: WarehouseUnit | null;
     /**
      * Die Lieferanten, jeder mit seiner E-Mail und seinem Barcode des Produkts
@@ -44,7 +43,6 @@ export const EMPTY_FORM: FormState = {
     name: '',
     brand: '',
     modelNumber: '',
-    productCode: '',
     unit: 'PCS',
     suppliers: supplierRowsOf(null),
     description: '',
@@ -60,7 +58,6 @@ export const formOf = (product: WarehouseProduct): FormState => ({
     name: product.name,
     brand: product.brand ?? '',
     modelNumber: product.modelNumber ?? '',
-    productCode: product.productCode ?? '',
     unit: product.unit ?? null,
     suppliers: supplierRowsOf(product),
     description: product.description ?? '',
@@ -76,7 +73,6 @@ export const sameForm = (a: FormState, b: FormState): boolean =>
     && a.name === b.name
     && a.brand === b.brand
     && a.modelNumber === b.modelNumber
-    && a.productCode === b.productCode
     && a.unit === b.unit
     && sameSupplierRows(a.suppliers, b.suppliers)
     && a.description === b.description
@@ -134,7 +130,9 @@ export const buildInput = (form: FormState, base: FormState | null): Built => {
     if ('errorKey' in suppliers) {
         const error = suppliers.kind === 'email'
             ? t('warehouse.supplier.emailInvalid', { email: suppliers.code })
-            : t('warehouse.supplier.barcodeWithoutSupplier', { code: suppliers.code });
+            : suppliers.kind === 'numbers'
+                ? t('warehouse.supplier.numbersWithoutSupplier', { code: suppliers.code })
+                : t('warehouse.supplier.barcodeWithoutSupplier', { code: suppliers.code });
         return { error, text: error, field: 'suppliers', rowKey: suppliers.errorKey };
     }
     const text = (value: string) => value.trim() || null;
@@ -143,7 +141,6 @@ export const buildInput = (form: FormState, base: FormState | null): Built => {
         name,
         brand: text(form.brand),
         modelNumber: text(form.modelNumber),
-        productCode: text(form.productCode),
         unit: form.unit,
         suppliers: suppliers.suppliers,
         description: form.description.trim() ? form.description : null,

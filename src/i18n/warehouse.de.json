@@ -151,8 +151,6 @@
       "barcodeGs1": "GS1 EAN-13 · firmenintern (04…)",
       "printLabel": "Etikett drucken",
       "printNeedsCode": "Für ein Etikett braucht es einen ERP-Code.",
-      "productCode": "Produktcode",
-      "productCodeHint": "Steht im PDF der Preisanfrage und der Bestellung; darf vorerst leer bleiben.",
       "modelNumberHint": "Teilenummer des Herstellers — wird nicht gedruckt.",
       "unit": "Einheit"
     },
@@ -184,7 +182,17 @@
       "emailPlaceholder": "offerte@lieferant.ch",
       "emailOf": "E-Mail von {{name}}",
       "emailLabel": "E-Mail der Zeile {{index}}",
-      "emailInvalid": "«{{email}}» ist keine gültige E-Mail, oder der Zeile fehlt der Lieferant."
+      "emailInvalid": "«{{email}}» ist keine gültige E-Mail, oder der Zeile fehlt der Lieferant.",
+      "articleNumber": "Produkttyp-Nr.",
+      "orderNumber": "Bestell-Nr.",
+      "articleNumberPlaceholder": "Produkttypnummer des Lieferanten",
+      "orderNumberPlaceholder": "Bestellnummer des Lieferanten",
+      "articleNumberOf": "Produkttypnummer von {{name}}",
+      "orderNumberOf": "Bestellnummer von {{name}}",
+      "articleNumberLabel": "Produkttypnummer der Zeile {{index}}",
+      "orderNumberLabel": "Bestellnummer der Zeile {{index}}",
+      "numbersHint": "Steht in Preisanfrage und Bestellung an diesen Lieferanten",
+      "numbersWithoutSupplier": "Für die Nummer «{{code}}» zuerst den Lieferanten der Zeile wählen."
     },
     "scan": {
       "openCamera": "Mit der Kamera scannen",
@@ -509,7 +517,8 @@
         "purchasePrice": "Einkaufspreis",
         "currency": "Währung",
         "serialRequired": "Seriennummer nötig",
-        "productCode": "Produktcode",
+        "supplierArticleNumbers": "Produkttypnummer des Lieferanten",
+        "supplierOrderNumbers": "Bestellnummer des Lieferanten",
         "unit": "Einheit"
       },
       "yes": "Ja",
@@ -529,11 +538,12 @@
         "currency": "Währung",
         "manufacturerBarcode": "Herstellerbarcode",
         "serialRequired": "Seriennummer nötig",
-        "productCode": "Produktcode",
+        "supplierArticleNumber": "Produkttypnummer des Lieferanten",
+        "supplierOrderNumber": "Bestellnummer des Lieferanten",
         "unit": "Einheit",
         "supplierEmail": "E-Mail des Lieferanten"
       },
-      "help1": "Jede Zeile ist eine Produktkarte. Pflicht ist der «Produktname»; Karten ohne Einheit, Lieferant oder E-Mail des Lieferanten kommen als Entwurf. Der «Herstellerbarcode» ist der Produkt-Barcode des Lieferanten derselben Zeile.",
+      "help1": "Jede Zeile ist eine Produktkarte. Pflicht ist der «Produktname»; Karten ohne Einheit, Lieferant oder E-Mail des Lieferanten kommen als Entwurf. Der «Herstellerbarcode» ist der Produkt-Barcode des Lieferanten derselben Zeile. Auch «Produkttypnummer des Lieferanten» und «Bestellnummer des Lieferanten» gehören diesem Lieferanten; sie stehen in Preisanfrage und Bestellung.",
       "help2": "Die «Materialgruppe» aus der Liste wählen. ERP-Code (z. B. ELK-PLC-00001) und GS1-Barcode werden nach dem Import automatisch vergeben.",
       "help3": "Menge und Einkaufspreis als Zahl (z. B. 12.50). Ohne Währung gilt CHF.",
       "help4": "Bei Produkten mit Seriennummer «Seriennummer nötig» = Ja wählen und keine Menge eintragen; die Stücke kommen mit ihrer Seriennummer.",

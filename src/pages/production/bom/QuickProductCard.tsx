@@ -41,7 +41,9 @@ export const QuickProductCard = ({
     const [name, setName] = useState(seedIsCode ? '' : seed);
     const [brand, setBrand] = useState('');
     const [modelNumber, setModelNumber] = useState(seedIsCode ? seed : '');
-    const [productCode, setProductCode] = useState('');
+    /* Seine Artikel- und Bestellnummer (01.10.2026) — statt des früheren «Ürün kodu» der Karte. */
+    const [articleNumber, setArticleNumber] = useState('');
+    const [orderNumber, setOrderNumber] = useState('');
     const [unit, setUnit] = useState<WarehouseUnit>('PCS');
     const [group, setGroup] = useState<WarehouseGroupRef | null>(null);
     const [supplier, setSupplier] = useState<SupplierValue | null>(null);
@@ -61,7 +63,9 @@ export const QuickProductCard = ({
     const minimumValue = parseInputNumber(minimum);
     const minimumInvalid = minimum.trim() !== '' && (minimumValue === null || Number.isNaN(minimumValue) || minimumValue <= 0);
     const emailInvalid = supplierEmail.trim() !== '' && (!supplier || !isEmail(supplierEmail));
-    const canCreate = Boolean(name.trim()) && !minimumInvalid && !emailInvalid && !busy;
+    // Die Nummern gehören dem Lieferanten — ohne ihn gibt es sie nicht.
+    const numbersInvalid = !supplier && Boolean(articleNumber.trim() || orderNumber.trim());
+    const canCreate = Boolean(name.trim()) && !minimumInvalid && !emailInvalid && !numbersInvalid && !busy;
     // Was einer fertigen Karte fehlt — die Karte entsteht dann als Taslak (der Server entscheidet genauso).
     const draft = !supplier || !supplierEmail.trim();
 
@@ -74,10 +78,16 @@ export const QuickProductCard = ({
                 name: name.trim(),
                 brand: brand.trim() || null,
                 modelNumber: modelNumber.trim() || null,
-                productCode: productCode.trim() || null,
                 unit,
                 materialGroupId: group?.id ?? null,
-                suppliers: supplier ? [{ supplierId: supplier.id, name: supplier.name, barcode: null, email: supplierEmail.trim() || null }] : [],
+                suppliers: supplier ? [{
+                    supplierId: supplier.id,
+                    name: supplier.name,
+                    barcode: null,
+                    email: supplierEmail.trim() || null,
+                    articleNumber: articleNumber.trim() || null,
+                    orderNumber: orderNumber.trim() || null,
+                }] : [],
                 serialRequired,
                 quantity: 0,
                 // Die Mindestbestellmenge versteht der Server ab der Migration der BOM.
@@ -155,12 +165,6 @@ export const QuickProductCard = ({
                             </div>
                         </div>
                         <div className="ofi-wh-row">
-                            <label className="ofi-wh-row__label" htmlFor="bom-qc-code">{t('productionBom.quickCard.productCode')}</label>
-                            <div className="ofi-wh-row__control">
-                                <input id="bom-qc-code" className="ofi-wh-input is-mono" value={productCode} onChange={(event) => setProductCode(event.target.value)} />
-                            </div>
-                        </div>
-                        <div className="ofi-wh-row">
                             <span className="ofi-wh-row__label">{t('productionBom.quickCard.unit')}<b>*</b></span>
                             <div className="ofi-wh-row__control">
                                 <UnitPicker value={unit} onChange={setUnit} />
@@ -201,6 +205,35 @@ export const QuickProductCard = ({
                                 <span className={`ofi-wh-row__hint${draft ? ' is-warn' : ''}`}>
                                     {draft ? t('productionBom.quickCard.draftHint') : t('productionBom.quickCard.completeHint')}
                                 </span>
+                            </div>
+                        </div>
+                        <div className="ofi-wh-row">
+                            <label className="ofi-wh-row__label" htmlFor="bom-qc-article">{t('productionBom.quickCard.articleNumber')}</label>
+                            <div className="ofi-wh-row__control">
+                                <input
+                                    id="bom-qc-article"
+                                    className={`ofi-wh-input is-mono${numbersInvalid && articleNumber.trim() ? ' is-invalid' : ''}`}
+                                    value={articleNumber}
+                                    maxLength={120}
+                                    spellCheck={false}
+                                    placeholder={t('warehouse.supplier.articleNumberPlaceholder')}
+                                    onChange={(event) => setArticleNumber(event.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="ofi-wh-row">
+                            <label className="ofi-wh-row__label" htmlFor="bom-qc-order">{t('productionBom.quickCard.orderNumber')}</label>
+                            <div className="ofi-wh-row__control">
+                                <input
+                                    id="bom-qc-order"
+                                    className={`ofi-wh-input is-mono${numbersInvalid && orderNumber.trim() ? ' is-invalid' : ''}`}
+                                    value={orderNumber}
+                                    maxLength={120}
+                                    spellCheck={false}
+                                    placeholder={t('warehouse.supplier.orderNumberPlaceholder')}
+                                    onChange={(event) => setOrderNumber(event.target.value)}
+                                />
+                                {numbersInvalid && <span className="ofi-wh-row__hint is-warn">{t('productionBom.quickCard.numbersNeedSupplier')}</span>}
                             </div>
                         </div>
                         <div className="ofi-wh-row">

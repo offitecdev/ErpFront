@@ -151,8 +151,6 @@
       "barcodeGs1": "GS1 EAN-13 · company-internal (04…)",
       "printLabel": "Print label",
       "printNeedsCode": "A label needs an ERP code.",
-      "productCode": "Product code",
-      "productCodeHint": "Printed on the price request and order PDF; may stay empty for now.",
       "modelNumberHint": "The manufacturer's part number — not printed.",
       "unit": "Unit"
     },
@@ -184,7 +182,17 @@
       "emailPlaceholder": "sales@supplier.com",
       "emailOf": "E-mail of {{name}}",
       "emailLabel": "E-mail of row {{index}}",
-      "emailInvalid": "«{{email}}» is not a valid e-mail, or the row has no supplier."
+      "emailInvalid": "«{{email}}» is not a valid e-mail, or the row has no supplier.",
+      "articleNumber": "Type no.",
+      "orderNumber": "Order no.",
+      "articleNumberPlaceholder": "Supplier's product type number",
+      "orderNumberPlaceholder": "Supplier's product order number",
+      "articleNumberOf": "Product type number from {{name}}",
+      "orderNumberOf": "Product order number from {{name}}",
+      "articleNumberLabel": "Product type number of row {{index}}",
+      "orderNumberLabel": "Product order number of row {{index}}",
+      "numbersHint": "Printed on the price request and order sent to this supplier",
+      "numbersWithoutSupplier": "Choose the row's supplier first for number «{{code}}»."
     },
     "scan": {
       "openCamera": "Scan with the camera",
@@ -509,7 +517,8 @@
         "purchasePrice": "Purchase price",
         "currency": "Currency",
         "serialRequired": "Serial number required",
-        "productCode": "Product code",
+        "supplierArticleNumbers": "Supplier product type no.",
+        "supplierOrderNumbers": "Supplier product order no.",
         "unit": "Unit"
       },
       "yes": "Yes",
@@ -529,11 +538,12 @@
         "currency": "Currency",
         "manufacturerBarcode": "Manufacturer barcode",
         "serialRequired": "Serial number required",
-        "productCode": "Product code",
+        "supplierArticleNumber": "Supplier product type no.",
+        "supplierOrderNumber": "Supplier product order no.",
         "unit": "Unit",
         "supplierEmail": "Supplier e-mail"
       },
-      "help1": "Each row is one product card. «Product name» is required; cards without unit, supplier or supplier e-mail are imported as drafts. «Manufacturer barcode» is the product barcode of the supplier in the same row.",
+      "help1": "Each row is one product card. «Product name» is required; cards without unit, supplier or supplier e-mail are imported as drafts. «Manufacturer barcode» is the product barcode of the supplier in the same row. «Supplier product type no.» and «Supplier product order no.» belong to that supplier too; they are printed on the price request and the order.",
       "help2": "Pick the «Material group» from the list. The ERP code (e.g. ELK-PLC-00001) and the GS1 barcode are assigned automatically after the import.",
       "help3": "Quantity and purchase price are numbers (e.g. 12.50). An empty currency counts as CHF.",
       "help4": "For serial-numbered products choose «Serial number required» = Yes and leave the quantity empty; units are added with their serial numbers.",

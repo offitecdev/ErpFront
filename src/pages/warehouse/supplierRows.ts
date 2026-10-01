@@ -24,6 +24,13 @@ export interface SupplierRow {
     barcode: string;
     /** Die E-Mail des Lieferanten für diese Karte (30.09.2026) — an sie geht die Preisanfrage. */
     email: string;
+    /**
+     * SEINE Artikel- und Bestellnummer des Produkts (01.10.2026, Samet: «her
+     * tedarikçiye özel ürün numarası ve sipariş numarası») — sie stehen in
+     * der Preisanfrage und Bestellung, die an DIESEN Lieferanten geht.
+     */
+    articleNumber: string;
+    orderNumber: string;
 }
 
 /** Eine E-Mail, wie ein Mailprogramm sie annimmt. */
@@ -37,11 +44,12 @@ let rowSeq = 0;
 /** Eine neue, leere Zeile. */
 export const emptySupplierRow = (): SupplierRow => {
     rowSeq += 1;
-    return { key: `sr-${rowSeq}`, value: null, barcode: '', email: '' };
+    return { key: `sr-${rowSeq}`, value: null, barcode: '', email: '', articleNumber: '', orderNumber: '' };
 };
 
 /** Ohne Lieferant und ohne Barcode — die bereitstehende Zeile. */
-export const isBlankRow = (row: SupplierRow): boolean => !row.value && !row.barcode.trim() && !row.email.trim();
+export const isBlankRow = (row: SupplierRow): boolean =>
+    !row.value && !row.barcode.trim() && !row.email.trim() && !row.articleNumber.trim() && !row.orderNumber.trim();
 
 /** Am Ende steht immer eine leere Zeile bereit (solange ein Lieferant mehr erlaubt ist). */
 export const withBlankRow = (rows: SupplierRow[]): SupplierRow[] => {
@@ -60,13 +68,17 @@ export const supplierRowsOf = (
     product: Pick<WarehouseProduct, 'suppliers' | 'manufacturerBarcode'> | null,
 ): SupplierRow[] => {
     const rows: SupplierRow[] = [];
-    if (product?.manufacturerBarcode) rows.push({ key: 'sr-maker', value: null, barcode: product.manufacturerBarcode, email: '' });
+    if (product?.manufacturerBarcode) {
+        rows.push({ key: 'sr-maker', value: null, barcode: product.manufacturerBarcode, email: '', articleNumber: '', orderNumber: '' });
+    }
     (product?.suppliers ?? []).forEach((entry, index) => {
         rows.push({
             key: `sr-saved-${index}-${entry.name}`,
             value: { id: entry.id, name: entry.name },
             barcode: entry.barcode ?? '',
             email: entry.email ?? '',
+            articleNumber: entry.articleNumber ?? '',
+            orderNumber: entry.orderNumber ?? '',
         });
     });
     return withBlankRow(rows);
@@ -81,7 +93,7 @@ export type SupplierEntries = NonNullable<WarehouseProductInput['suppliers']>;
  */
 export const supplierInputOf = (
     rows: SupplierRow[],
-): { suppliers: SupplierEntries; manufacturerBarcode: string | null } | { errorKey: string; code: string; kind?: 'email' } => {
+): { suppliers: SupplierEntries; manufacturerBarcode: string | null } | { errorKey: string; code: string; kind?: 'email' | 'numbers' } => {
     const suppliers: SupplierEntries = [];
     let manufacturerBarcode: string | null = null;
     for (const row of rows) {
@@ -89,8 +101,14 @@ export const supplierInputOf = (
         const email = row.email.trim() || null;
         // Eine E-Mail muss eine E-Mail sein — und braucht ihren Lieferanten.
         if (email && (!row.value || !isEmail(email))) return { errorKey: row.key, code: email, kind: 'email' };
+        const articleNumber = row.articleNumber.trim() || null;
+        const orderNumber = row.orderNumber.trim() || null;
+        // Seine Nummern gehören zu SEINEM Lieferanten — ohne ihn gibt es sie nicht.
+        if ((articleNumber || orderNumber) && !row.value) {
+            return { errorKey: row.key, code: articleNumber ?? orderNumber ?? '', kind: 'numbers' };
+        }
         if (row.value) {
-            suppliers.push({ supplierId: row.value.id, name: row.value.name, barcode, email });
+            suppliers.push({ supplierId: row.value.id, name: row.value.name, barcode, email, articleNumber, orderNumber });
         } else if (barcode) {
             if (manufacturerBarcode !== null) return { errorKey: row.key, code: barcode };
             manufacturerBarcode = barcode;

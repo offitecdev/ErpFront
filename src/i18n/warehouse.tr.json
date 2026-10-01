@@ -145,8 +145,6 @@
       "barcodeGs1": "GS1 EAN-13 · firmaya özel (04…)",
       "printLabel": "Etiket yazdır",
       "printNeedsCode": "Etiket için ERP kodu gerekli.",
-      "productCode": "Ürün kodu",
-      "productCodeHint": "Tedarikçiye giden fiyat talebi ve sipariş PDF'inde yazar; şimdilik boş kalabilir.",
       "modelNumberHint": "Üreticinin parça numarası — PDF'e basılmaz.",
       "unit": "Birim"
     },
@@ -178,7 +176,17 @@
       "emailPlaceholder": "teklif@tedarikci.com",
       "emailOf": "{{name}} e-postası",
       "emailLabel": "{{index}}. satırın e-postası",
-      "emailInvalid": "«{{email}}» geçerli bir e-posta değil ya da satırın tedarikçisi seçilmedi."
+      "emailInvalid": "«{{email}}» geçerli bir e-posta değil ya da satırın tedarikçisi seçilmedi.",
+      "articleNumber": "Ürün tip no.",
+      "orderNumber": "Ürün sip. no.",
+      "articleNumberPlaceholder": "Tedarikçinin ürün tip numarası",
+      "orderNumberPlaceholder": "Tedarikçinin ürün sipariş numarası",
+      "articleNumberOf": "{{name}} ürün tip numarası",
+      "orderNumberOf": "{{name}} ürün sipariş numarası",
+      "articleNumberLabel": "{{index}}. satırın ürün tip numarası",
+      "orderNumberLabel": "{{index}}. satırın ürün sipariş numarası",
+      "numbersHint": "Bu tedarikçiye giden fiyat talebi ve siparişte yazar",
+      "numbersWithoutSupplier": "«{{code}}» numarası için önce satırın tedarikçisini seçin."
     },
     "scan": {
       "openCamera": "Kamerayla okut",
@@ -492,7 +500,8 @@
         "purchasePrice": "Alış fiyatı",
         "currency": "Para birimi",
         "serialRequired": "Seri numarası gerekli",
-        "productCode": "Ürün kodu",
+        "supplierArticleNumbers": "Tedarikçi ürün tip no.",
+        "supplierOrderNumbers": "Tedarikçi ürün sip. no.",
         "unit": "Birim"
       },
       "yes": "Evet",
@@ -512,11 +521,12 @@
         "currency": "Para birimi",
         "manufacturerBarcode": "Üretici barkodu",
         "serialRequired": "Seri numarası gerekli",
-        "productCode": "Ürün kodu",
+        "supplierArticleNumber": "Tedarikçi ürün tip no.",
+        "supplierOrderNumber": "Tedarikçi ürün sip. no.",
         "unit": "Birim",
         "supplierEmail": "Tedarikçi e-postası"
       },
-      "help1": "Her satır bir ürün kartıdır. «Ürün adı» zorunludur; birim, tedarikçi ve tedarikçi e-postası eksik olan kartlar taslak olarak aktarılır. «Üretici barkodu», aynı satırdaki tedarikçinin ürün barkodudur.",
+      "help1": "Her satır bir ürün kartıdır. «Ürün adı» zorunludur; birim, tedarikçi ve tedarikçi e-postası eksik olan kartlar taslak olarak aktarılır. «Üretici barkodu», aynı satırdaki tedarikçinin ürün barkodudur. «Tedarikçi ürün tip no.» ve «Tedarikçi ürün sip. no.» da o tedarikçiye aittir; fiyat talebinde ve siparişte yazar.",
       "help2": "«Malzeme grubu» sütununda listeden seçin. ERP kodu (ör. ELK-PLC-00001) ve GS1 barkodu aktarımdan sonra otomatik verilir.",
       "help3": "Miktar ve alış fiyatı sayı olarak yazılır (ör. 12,50). Para birimi boşsa CHF sayılır.",
       "help4": "Seri numaralı ürünlerde «Seri numarası gerekli» = Evet seçin ve miktar yazmayın; parçalar seri numaralarıyla eklenir.",

@@ -205,22 +205,18 @@ export const BomRevisionView = ({ context, bom, revision }: { context: BomViewCo
                                         <tr>
                                             <th className="is-code">{t('productionBom.columns.erpCode')}</th>
                                             <th className="is-name">{t('productionBom.columns.name')}</th>
-                                            <th>{t('productionBom.columns.brand')}</th>
-                                            <th>{t('productionBom.columns.modelNumber')}</th>
                                             <th className="is-num is-accent">{t('productionBom.columns.need')}</th>
                                             <th>{t('productionBom.columns.note')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {!detail.lines.length && (
-                                            <tr className="is-empty"><td colSpan={6}>{t('productionBom.detail.empty')}</td></tr>
+                                            <tr className="is-empty"><td colSpan={4}>{t('productionBom.detail.empty')}</td></tr>
                                         )}
                                         {detail.lines.map((line) => (
                                             <tr key={line.id}>
                                                 <td className="is-code"><span className="ofi-bom-code">{line.erpCode ?? '—'}</span></td>
                                                 <td className="is-name">{line.name}</td>
-                                                <td>{line.brand ?? <Dash />}</td>
-                                                <td className="is-mono">{line.modelNumber ?? <Dash />}</td>
                                                 <td className="is-num is-accent"><span className="ofi-bom-qty">{fmtQty(line.quantity)}<small>{unitLabel(line.unit)}</small></span></td>
                                                 <td>{line.note ?? <Dash />}</td>
                                             </tr>

@@ -21,10 +21,39 @@ import { SupplierSelect, type SupplierValue } from './SupplierSelect';
  * Preisanfrage. Wer einen Lieferanten aus der Liste wählt, bekommt dessen
  * E-Mail vorgeschlagen (die leere Zelle wird gefüllt, eine getippte bleibt).
  *
+ * 01.10.2026 darunter SEINE Artikel- und Bestellnummer des Produkts («her
+ * tedarikçiye özel malların yanına ürün numarası ve sipariş numarası … fiyat
+ * listesinde ilgili tedarikçilere kendi maillerine gitmeli») — sie stehen in
+ * der Preisanfrage und Bestellung, die an DIESEN Lieferanten geht. Eine
+ * zweite, schmale Zeile unter Lieferant und E-Mail, jedes Feld mit seiner
+ * kleinen Beschriftung vorn.
+ *
  * Am Ende steht immer eine leere Zeile bereit («hep bir boş input olması
  * lazım»); sobald sie etwas trägt, kommt die nächste. Derselbe Lieferant
  * zweimal wird abgewiesen. Der erste Lieferant steht in der Liste der Karten.
  */
+/** Die zwei Nummern des Lieferanten (01.10.2026) — Schlüssel ausgeschrieben, damit die i18n-Prüfung sie findet. */
+const NUMBER_FIELDS = [
+    {
+        field: 'articleNumber',
+        keys: {
+            caption: 'warehouse.supplier.articleNumber',
+            placeholder: 'warehouse.supplier.articleNumberPlaceholder',
+            of: 'warehouse.supplier.articleNumberOf',
+            label: 'warehouse.supplier.articleNumberLabel',
+        },
+    },
+    {
+        field: 'orderNumber',
+        keys: {
+            caption: 'warehouse.supplier.orderNumber',
+            placeholder: 'warehouse.supplier.orderNumberPlaceholder',
+            of: 'warehouse.supplier.orderNumberOf',
+            label: 'warehouse.supplier.orderNumberLabel',
+        },
+    },
+] as const;
+
 export const SupplierListEditor = ({
     rows,
     onChange,
@@ -55,7 +84,7 @@ export const SupplierListEditor = ({
     const remove = (key: string) => commit(rows.filter((row) => row.key !== key));
 
     return (
-        <div className="ofi-wh-suppliers has-email">
+        <div className="ofi-wh-suppliers has-email has-numbers">
             <div className="ofi-wh-suppliers__head" aria-hidden>
                 <span>{t('warehouse.supplier.columns.name')}</span>
                 <span>{t('warehouse.supplier.columns.email')}</span>
@@ -102,6 +131,27 @@ export const SupplierListEditor = ({
                             invalid={row.key === invalidKey && !row.email.trim()}
                             disabled={disabled}
                         />
+                        <div className="ofi-wh-suppliers__nums" title={t('warehouse.supplier.numbersHint')}>
+                            {NUMBER_FIELDS.map(({ field, keys }) => (
+                                <label
+                                    key={field}
+                                    className={`ofi-wh-field ofi-wh-suppliers__num${row.key === invalidKey && !row.value && row[field].trim() ? ' is-invalid' : ''}${disabled ? ' is-disabled' : ''}`}
+                                >
+                                    <span className="ofi-wh-suppliers__cap" aria-hidden>{t(keys.caption)}</span>
+                                    <input
+                                        type="text"
+                                        autoComplete="off"
+                                        spellCheck={false}
+                                        maxLength={120}
+                                        value={row[field]}
+                                        disabled={disabled}
+                                        placeholder={t(keys.placeholder)}
+                                        aria-label={name ? t(keys.of, { name }) : t(keys.label, { index: index + 1 })}
+                                        onChange={(event) => setRow(row.key, { [field]: event.target.value })}
+                                    />
+                                </label>
+                            ))}
+                        </div>
                         {!disabled && (
                             <button
                                 type="button"

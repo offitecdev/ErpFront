@@ -54,6 +54,9 @@ export interface WarehouseSupplierEntry {
     barcode: string | null;
     /** Seine E-Mail für diese Karte — an sie geht die automatische Preisanfrage (30.09.2026). */
     email?: string | null;
+    /** Seine Artikel- und Bestellnummer für das Produkt — stehen in SEINER Anfrage/Bestellung (01.10.2026). */
+    articleNumber?: string | null;
+    orderNumber?: string | null;
 }
 
 /** Die Einheiten einer Karte — dieselben wie die BOM-Zeile. */
@@ -195,7 +198,14 @@ export interface WarehouseProductInput {
     /** false = «Kaydet» (Pflichtangaben nötig), true = «Taslak olarak kaydet»; fehlt = der Server entscheidet. */
     isDraft?: boolean;
     /** Alle Lieferanten der Karte, in ihrer Reihenfolge, jeder mit seinem Barcode und seiner E-Mail. */
-    suppliers?: Array<{ supplierId: string | null; name: string; barcode: string | null; email?: string | null }>;
+    suppliers?: Array<{
+        supplierId: string | null;
+        name: string;
+        barcode: string | null;
+        email?: string | null;
+        articleNumber?: string | null;
+        orderNumber?: string | null;
+    }>;
     description?: string | null;
     quantity?: number;
     purchasePrice?: number | null;
@@ -262,10 +272,12 @@ export interface WarehouseImportRowInput {
     name?: string | null;
     brand?: string | null;
     modelNumber?: string | null;
-    productCode?: string | null;
     unit?: string | null;
     supplierName?: string | null;
     supplierEmail?: string | null;
+    /** Artikel- und Bestellnummer DES Lieferanten der Zeile (01.10.2026). */
+    supplierArticleNumber?: string | null;
+    supplierOrderNumber?: string | null;
     description?: string | null;
     quantity?: string | number | null;
     purchasePrice?: string | number | null;
