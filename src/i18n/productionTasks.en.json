@@ -208,7 +208,7 @@
       "UNLOCK_ALREADY_REQUESTED": "An unlock has already been requested for this subtask.",
       "REQUEST_NOT_FOUND": "The request was not found or is already solved.",
       "NO_STANDARDS": "This subtask has no document standards to check against.",
-      "ANALYSIS_RUNNING": "The AI analysis is already running.",
+      "ANALYSIS_RUNNING": "The AI is checking a PDF of this subtask — upload again when it is done.",
       "STANDARDS_FILE_NOT_FOUND": "The standards PDF could not be found.",
       "BOM_DRIVEN": "The status of «BOM Creation» follows the BOM — approve, complete or revise it in the BOM window.",
       "STANDARDS_EMPTY": "A template needs text or a PDF.",
@@ -835,7 +835,9 @@
         "ANALYSIS_TOO_LARGE": "The PDF is too large for AI analysis (max. 20 MB).",
         "ANALYSIS_INTERRUPTED": "The analysis was interrupted (the server restarted).",
         "STANDARDS_FILE_NOT_FOUND": "The standards PDF could not be found — upload it again."
-      }
+      },
+      "uploadWait": "The AI is checking a PDF of this subtask — you can upload again when it is done.",
+      "analysing": "AI is checking…"
     },
     "bomTile": {
       "title": "BOM",
@@ -868,6 +870,14 @@
       "removed": "Template «{{name}}» deleted",
       "remove": "Delete this template",
       "emptyHint": "Write standards or add a PDF first"
+    },
+    "customer": {
+      "visible": "Visible to customer",
+      "visibleShort": "Customer",
+      "stageOn": "Customers see this stage — click to hide it",
+      "stageOff": "Hidden from customers — click to show this stage",
+      "taskHint": "The customer sees this task and its status in their project",
+      "subtaskHint": "The customer sees this subtask and its status"
     }
   }
 }

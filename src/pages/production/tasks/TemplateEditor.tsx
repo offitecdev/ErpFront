@@ -25,6 +25,7 @@ import {
     renameSection,
     renameStage,
     setSectionShare,
+    setStageCustomerVisible,
     setStageWeight,
     type TemplateDraft,
 } from './templateDraft';
@@ -430,6 +431,7 @@ export const TemplateEditor = ({
                                     addDisabledReason={stageFull(section.key, stage.key) ? t('productionTasks.stage.full') : undefined}
                                     // Das Gewicht der Stufe im Bereich (30.09.2026).
                                     onStageWeight={canEdit ? (weight) => onChange(setStageWeight(draft, section.key, stage.key, weight)) : undefined}
+                                    onCustomerVisible={canEdit ? (visible) => onChange(setStageCustomerVisible(draft, section.key, stage.key, visible)) : undefined}
                                     // Personen nur an den Unteraufgaben (29.09.2026); die Aufgabe zeigt ihre Summe.
                                     onAssignSubtask={canEdit ? (task, subtask, assigneeIds) => onChange({
                                         ...draft,

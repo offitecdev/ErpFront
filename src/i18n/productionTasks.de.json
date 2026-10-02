@@ -208,7 +208,7 @@
       "UNLOCK_ALREADY_REQUESTED": "Um das Entsperren dieser Unteraufgabe wurde schon gebeten.",
       "REQUEST_NOT_FOUND": "Die Anfrage gibt es nicht oder sie ist schon erledigt.",
       "NO_STANDARDS": "Diese Unteraufgabe hat keine Dokumentstandards zum Prüfen.",
-      "ANALYSIS_RUNNING": "Die KI-Analyse läuft bereits.",
+      "ANALYSIS_RUNNING": "Die KI prüft gerade ein PDF dieser Unteraufgabe — danach geht das Hochladen wieder.",
       "STANDARDS_FILE_NOT_FOUND": "Das PDF der Standards wurde nicht gefunden.",
       "BOM_DRIVEN": "Den Stand von «BOM Creation» führt die BOM — im BOM-Fenster freigeben, abschliessen oder revidieren.",
       "STANDARDS_EMPTY": "Eine Vorlage braucht Text oder ein PDF.",
@@ -835,7 +835,9 @@
         "ANALYSIS_TOO_LARGE": "Das PDF ist für die KI-Analyse zu gross (höchstens 20 MB).",
         "ANALYSIS_INTERRUPTED": "Die Analyse wurde unterbrochen (Neustart des Servers).",
         "STANDARDS_FILE_NOT_FOUND": "Das PDF der Standards wurde nicht gefunden — bitte erneut hochladen."
-      }
+      },
+      "uploadWait": "Die KI prüft gerade ein PDF dieser Unteraufgabe — danach können Sie wieder hochladen.",
+      "analysing": "KI prüft…"
     },
     "bomTile": {
       "title": "BOM",
@@ -868,6 +870,14 @@
       "removed": "Vorlage «{{name}}» gelöscht",
       "remove": "Diese Vorlage löschen",
       "emptyHint": "Zuerst Standards schreiben oder ein PDF hinzufügen"
+    },
+    "customer": {
+      "visible": "Für Kunden sichtbar",
+      "visibleShort": "Kunde",
+      "stageOn": "Kunden sehen diese Stufe — klicken zum Ausblenden",
+      "stageOff": "Für Kunden verborgen — klicken zum Anzeigen",
+      "taskHint": "Der Kunde sieht diese Aufgabe und ihren Stand in seinem Projekt",
+      "subtaskHint": "Der Kunde sieht diese Unteraufgabe und ihren Stand"
     }
   }
 }

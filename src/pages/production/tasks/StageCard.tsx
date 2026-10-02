@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { Check, ChevronDown, ChevronRight, ChevronUp, Clock3, FileText, Lock, Paperclip, Play, Plus, ShieldCheck, Square, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ChevronUp, Clock3, Eye, EyeOff, FileText, Lock, Paperclip, Play, Plus, ShieldCheck, Square, Trash2, X } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { t } from '@/i18n/translate';
@@ -258,6 +258,7 @@ export const StageCard = ({
     onClose,
     showStageWeight = false,
     onStageWeight,
+    onCustomerVisible,
     hidePending = false,
     hideStageDone = false,
     focusSubtaskId = null,
@@ -309,6 +310,8 @@ export const StageCard = ({
     showStageWeight?: boolean;
     /** Das Gewicht der Stufe im Bereich ändern (30.09.2026) — Vorlage und Tafel der Zuweisungen. */
     onStageWeight?: (weight: number) => void;
+    /** Sieht der Kunde die Stufe (02.10.2026)? Ohne: nur die Anzeige, kein Schalter. */
+    onCustomerVisible?: (visible: boolean) => void;
     /** Ohne das Zeichen «wartet auf Freigabe» (30.09.2026, «Görevlerim»: das gehört zu den Anfragen). */
     hidePending?: boolean;
     /** Ohne den grünen Haken vor dem Namen einer erledigten Stufe (30.09.2026, Startseite) — die Nummer bleibt. */
@@ -376,6 +379,23 @@ export const StageCard = ({
                 ) : (
                     <h3 className="ofi-ptk-card__title">{stageName}</h3>
                 )}
+                {/* Sichtbar für den Kunden (02.10.2026): ein Schalter für die Verwaltung, sonst nur das Zeichen. */}
+                {onCustomerVisible ? (
+                    <button
+                        type="button"
+                        className={`ofi-ptk-customerbtn ofi-nosize ${stage.customerVisible ? 'is-on' : ''}`}
+                        aria-pressed={Boolean(stage.customerVisible)}
+                        title={t(stage.customerVisible ? 'productionTasks.customer.stageOn' : 'productionTasks.customer.stageOff')}
+                        aria-label={t(stage.customerVisible ? 'productionTasks.customer.stageOn' : 'productionTasks.customer.stageOff')}
+                        onClick={() => onCustomerVisible(!stage.customerVisible)}
+                    >
+                        {stage.customerVisible ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
+                    </button>
+                ) : stage.customerVisible ? (
+                    <span className="ofi-ptk-customermark" title={t('productionTasks.customer.visible')}>
+                        <Eye aria-label={t('productionTasks.customer.visible')} />
+                    </span>
+                ) : null}
                 {pending > 0 && (
                     <span className="ofi-ptk-pendingtag" title={t('productionTasks.stage.pendingHint', { count: pending })}>
                         <Clock3 aria-hidden />
@@ -534,6 +554,11 @@ export const StageCard = ({
                                                 <span className="ofi-ptk-task__name" title={task.name}>{task.name}</span>
                                             )}
                                             {mine && <span className="ofi-ptk-mine" title={t('productionTasks.people.mine')}>{t('productionTasks.people.meShort')}</span>}
+                                            {task.customerVisible && (
+                                                <span className="ofi-ptk-customermark" title={t('productionTasks.customer.visible')}>
+                                                    <Eye aria-label={t('productionTasks.customer.visible')} />
+                                                </span>
+                                            )}
                                             {/* Heute noch keine Datei an dieser Aufgabe (02.10.2026) — der Text im Tipp. */}
                                             {onDevice && taskMissingToday(task, today) && (
                                                 <span
@@ -689,6 +714,11 @@ export const StageCard = ({
                                                     </button>
                                                 ) : (
                                                     <span className="ofi-ptk-task__name" title={subtask.name}>{subtask.name}</span>
+                                                )}
+                                                {subtask.customerVisible && (
+                                                    <span className="ofi-ptk-customermark" title={t('productionTasks.customer.visible')}>
+                                                        <Eye aria-label={t('productionTasks.customer.visible')} />
+                                                    </span>
                                                 )}
                                             </span>
                                             {onDevice && (

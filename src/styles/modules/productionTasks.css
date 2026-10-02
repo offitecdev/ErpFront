@@ -3184,3 +3184,22 @@ body > :not(#root) .ofi-ptk-btn.ofi-ptk-aireportbtn svg { width: 13px; height: 1
 .ofi-ptk-stdtemplates__select { flex: 1 1 200px; min-width: 0; }
 .ofi-ptk-stdtemplates__name { display: inline-flex; flex: 1 1 220px; align-items: center; gap: 6px; min-width: 0; }
 .ofi-ptk-stdtemplates__name > input { flex: 1; min-width: 0; }
+
+/* Sichtbar für den Kunden (02.10.2026): Schalter am Kopf der Stufe, Zeichen an Aufgaben. */
+.ofi-ptk-customerbtn {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    color: var(--ptk-secondary, #8e8e93);
+}
+.ofi-ptk-customerbtn:hover { background: rgba(120, 120, 128, 0.12); }
+.ofi-ptk-customerbtn.is-on { background: rgba(48, 176, 199, 0.14); color: #1d8ba0; }
+.ofi-ptk-customerbtn > svg { width: 15px; height: 15px; }
+.ofi-ptk-customermark { display: inline-flex; flex: none; align-items: center; margin-left: 6px; color: #1d8ba0; }
+.ofi-ptk-customermark > svg { width: 13px; height: 13px; }
+.ofi-ptk-flag.is-customer { gap: 4px; }
+.ofi-ptk-flag.is-customer > svg { color: #1d8ba0; }

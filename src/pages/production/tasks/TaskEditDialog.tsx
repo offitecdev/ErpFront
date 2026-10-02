@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
-import { ArrowDown, ArrowUp, ClipboardCheck, Info, ListChecks, Plus, ScrollText, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ClipboardCheck, Eye, Info, ListChecks, Plus, ScrollText, Trash2, X } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
@@ -132,6 +132,8 @@ export const TaskEditDialog = ({
     // «BOM» mit «BOM Creation»: Name und Unteraufgaben stehen fest, Personen und Häkchen nicht (02.10.2026).
     const bomTask = isBomTask(task);
     const [weight, setWeight] = useState(isNew && !task.weight ? '' : weightText(task.weight));
+    // Sichtbar für den Kunden (02.10.2026) — die Aufgabe; die Unteraufgaben tragen es selbst.
+    const [customerVisible, setCustomerVisible] = useState(task.customerVisible === true);
     const [startDate, setStartDate] = useState<string | null>(task.startDate);
     const [dueDate, setDueDate] = useState<string | null>(task.dueDate);
     const [subtasks, setSubtasks] = useState<TaskSubtask[]>(task.subtasks);
@@ -278,6 +280,7 @@ export const TaskEditDialog = ({
             // Personen stehen nur an den Unteraufgaben (29.09.2026) — die Aufgabe trägt ihre Summe.
             assigneeIds: taskAssigneesOf(list),
             subtasks: list,
+            customerVisible,
         });
     };
 
@@ -341,6 +344,16 @@ export const TaskEditDialog = ({
                             <span aria-hidden>%</span>
                         </span>
                         {weightInvalid && error(false, 'productionTasks.task.weightInvalid')}
+                    </label>
+                    <label className="ofi-ptk-flag is-customer" title={t('productionTasks.customer.taskHint')}>
+                        <input
+                            type="checkbox"
+                            className="ofi-ptk-check"
+                            checked={customerVisible}
+                            onChange={(event) => setCustomerVisible(event.target.checked)}
+                        />
+                        <Eye aria-hidden size={14} />
+                        {t('productionTasks.customer.visible')}
                     </label>
                     <div className="ofi-ptk-field is-overall">
                         <span className="ofi-ptk-field__label">{t('productionTasks.task.overall')}</span>
@@ -524,6 +537,16 @@ export const TaskEditDialog = ({
                                             )}
                                         </span>
                                         <span className="ofi-ptk-subedit__flags">
+                                            <label className="ofi-ptk-flag is-customer" title={t('productionTasks.customer.subtaskHint')}>
+                                                <input
+                                                    type="checkbox"
+                                                    className="ofi-ptk-check"
+                                                    checked={subtask.customerVisible === true}
+                                                    onChange={(event) => patchSubtask(subtask.id, { customerVisible: event.target.checked })}
+                                                />
+                                                <Eye aria-hidden size={13} />
+                                                {t('productionTasks.customer.visibleShort')}
+                                            </label>
                                             {FLAGS.map(({ flag, labelKey }) => (
                                                 <label key={flag} className="ofi-ptk-flag">
                                                     <input

@@ -42,6 +42,8 @@ export interface TaskSectionStage {
      * fill the weight of its stage») — die Stufen eines Bereichs ergeben 100 %.
      */
     weight: number;
+    /** Sieht der Kunde diese Stufe (02.10.2026)? Fehlt = nein. */
+    customerVisible?: boolean;
 }
 
 export interface TaskSection {
@@ -166,6 +168,8 @@ export interface TaskSubtask {
     /** Gearbeitete Sekunden (abgeschlossene Runden) und Beginn der laufenden (02.10.2026). */
     workSeconds?: number;
     workStartedAt?: string | null;
+    /** Sieht der Kunde diese Unteraufgabe (02.10.2026)? Fehlt = nein. */
+    customerVisible?: boolean;
 }
 
 /** Eine Rückgabe zur Überarbeitung (28.09.2026): wer, wann (ISO), was zu ändern war. */
@@ -193,6 +197,8 @@ export interface ProductionTask {
     createdAt: TaskDay | null;
     status: TaskStatus;
     subtasks: TaskSubtask[];
+    /** Sieht der Kunde diese Aufgabe (02.10.2026)? Fehlt = nein. */
+    customerVisible?: boolean;
 }
 
 export interface TaskPerson {

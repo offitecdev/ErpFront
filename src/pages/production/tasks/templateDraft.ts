@@ -79,7 +79,13 @@ export const draftInput = (draft: TemplateDraft): TaskTemplateInput => ({
         name: section.name.replace(/\s+/g, ' ').trim(),
         share: section.share,
         // Mit dem Gewicht der Stufe (30.09.2026) — ohne hielte der Server die Anfrage für einen älteren Stand.
-        stages: section.stages.map((stage) => ({ key: stage.key, name: stage.name.replace(/\s+/g, ' ').trim(), weight: stage.weight ?? 0 })),
+        stages: section.stages.map((stage) => ({
+            key: stage.key,
+            name: stage.name.replace(/\s+/g, ' ').trim(),
+            weight: stage.weight ?? 0,
+            // Sichtbar für den Kunden (02.10.2026) — nur mitgeschickt, wenn an.
+            ...(stage.customerVisible ? { customerVisible: true } : {}),
+        })),
     })),
     tasks: orderTasks(draft.tasks, draft.sections).map((task) => ({
         area: task.area,
@@ -94,8 +100,16 @@ export const draftInput = (draft: TemplateDraft): TaskTemplateInput => ({
         dueDate: null,
         createdAt: task.createdAt,
         subtasks: task.subtasks.map((subtask) => ({ ...subtask, startDate: null, dueDate: null })),
+        customerVisible: task.customerVisible === true,
     })),
 });
+
+/** Sieht der Kunde diese Stufe (02.10.2026)? */
+export const setStageCustomerVisible = (draft: TemplateDraft, area: TaskArea, stage: TaskStage, visible: boolean): TemplateDraft =>
+    withSection(draft, area, (section) => ({
+        ...section,
+        stages: section.stages.map((entry) => (entry.key === stage ? { ...entry, customerVisible: visible } : entry)),
+    }));
 
 /** Hat sich gegenüber dem Gespeicherten etwas geändert? */
 export const draftDirty = (draft: TemplateDraft | null, saved: TaskTemplate | null): boolean => {

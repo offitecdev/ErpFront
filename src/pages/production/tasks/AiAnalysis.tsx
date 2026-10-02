@@ -194,6 +194,15 @@ export const AiReportButton = ({
 }) => {
     const [open, setOpen] = useState(false);
     const analysis = file.analysis ?? null;
+    /* Nach der Prüfung geht der Bericht von selbst auf (02.10.2026: «this analysis result modal
+       should open automatically after analysis») — für wen die Datei hochgeladen hat, und nur,
+       wenn er die Prüfung hier laufen sah (ein alter Bericht springt beim Öffnen nicht auf). */
+    const active = isAnalysisActive(analysis);
+    const [wasActive, setWasActive] = useState(active);
+    if (wasActive !== active) {
+        setWasActive(active);
+        if (wasActive && !active && file.uploadedById === actions.meId) setOpen(true);
+    }
     if (!analysis) return null;
     const retry = actions.retryAnalysis ? () => actions.retryAnalysis!(task, subtask, file) : undefined;
     return (

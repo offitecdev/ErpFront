@@ -8,7 +8,7 @@ import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/produ
 
 import { AiReportButton } from './AiAnalysis';
 import { RevisionUploadDialog } from './RevisionUploadDialog';
-import { canRemoveFile, canReviseFile, canUploadTo, fileGroups, fileProblem, formatMoment, isPdf, type SubtaskActions } from './subtaskFileModel';
+import { canRemoveFile, canReviseFile, canUploadTo, fileGroups, fileProblem, formatMoment, isAnalysisActive, isPdf, type SubtaskActions } from './subtaskFileModel';
 import { BOM_SUBTASK_ID, hasSubtaskDocument, isSubtaskCompleted, needsPdfFirst, SUBTASK_FILE_ACCEPT } from './taskModel';
 
 /**
@@ -187,6 +187,8 @@ export const SubtaskDetail = ({
     const [removing, setRemoving] = useState<TaskSubtaskFile | null>(null);
     const completed = isSubtaskCompleted(subtask);
     const mayUpload = canUploadTo(actions, subtask);
+    // Prüft die KI gerade ein PDF hier, wartet das nächste (02.10.2026) — der Server sichert es ebenso.
+    const analysing = subtask.files.some((file) => isAnalysisActive(file.analysis));
     // «Complete the task» dürfen dieselben wie den Stand setzen: nur wer an der Unteraufgabe steht —
     // die Verwaltung nicht von Hand (29.09.2026); sie gibt frei («Approve the task»).
     // «BOM Creation» (02.10.2026): den Stand führt die BOM — hier weder abschliessen noch freigeben.
@@ -242,7 +244,7 @@ export const SubtaskDetail = ({
                                 showVersion={older.length > 0 || (latest.version || 1) > 1}
                                 onOpen={() => actions.openFile(task, subtask, latest)}
                                 onRemove={canRemoveFile(actions, subtask, latest) ? () => setRemoving(latest) : undefined}
-                                onRevise={canReviseFile(actions, subtask, { latest, older }) ? () => pickRevision(latest) : undefined}
+                                onRevise={canReviseFile(actions, subtask, { latest, older }) && !analysing ? () => pickRevision(latest) : undefined}
                                 history={older}
                                 onOpenVersion={(file) => actions.openFile(task, subtask, file)}
                                 canRemoveVersion={(file) => canRemoveFile(actions, subtask, file)}
@@ -256,11 +258,14 @@ export const SubtaskDetail = ({
                             <button
                                 type="button"
                                 className="ofi-ptk-files__add ofi-nosize"
-                                disabled={uploading}
+                                disabled={uploading || analysing}
+                                title={analysing ? t('productionTasks.ai.uploadWait') : undefined}
                                 onClick={() => inputRef.current?.click()}
                             >
-                                {uploading ? <Loader2 className="is-spinning" aria-hidden /> : <Plus aria-hidden />}
-                                {uploading ? t('productionTasks.files.adding') : t('productionTasks.files.add')}
+                                {uploading || analysing ? <Loader2 className="is-spinning" aria-hidden /> : <Plus aria-hidden />}
+                                {uploading
+                                    ? t('productionTasks.files.adding')
+                                    : analysing ? t('productionTasks.ai.analysing') : t('productionTasks.files.add')}
                             </button>
                             <input
                                 ref={inputRef}
