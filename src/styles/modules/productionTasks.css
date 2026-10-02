@@ -921,7 +921,8 @@ body > :not(#root) .ofi-ptk-card__title {
 .ofi-ptk-tablewrap { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
 .ofi-ptk-table {
     display: grid;
-    grid-template-columns: minmax(max-content, 1fr) minmax(240px, 3fr) repeat(8, minmax(max-content, 1fr));
+    /* Code, Aufgabe, dann 9 Spalten: drei Tage, Gesamtzeit (02.10.2026), Gewicht, Anteil, Stand, Personen, Pflicht. */
+    grid-template-columns: minmax(max-content, 1fr) minmax(240px, 3fr) repeat(9, minmax(max-content, 1fr));
     column-gap: 16px;
     width: 100%;
     min-width: min-content;
@@ -932,6 +933,11 @@ body > :not(#root) .ofi-ptk-card__title {
 .ofi-ptk-row,
 .ofi-ptk-group-rows,
 .ofi-ptk-subgroup { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; }
+/* Die gearbeitete Zeit (02.10.2026): läuft sie, grün mit Uhr. */
+.ofi-ptk-worktime { display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofi-ptk-worktime.is-empty { color: var(--ptk-secondary, #8e8e93); }
+.ofi-ptk-worktime.is-running { color: var(--ptk-success, #248a3d); font-weight: 600; }
+.ofi-ptk-worktime > svg { width: 13px; height: 13px; }
 .ofi-ptk-row { align-items: center; min-height: 38px; padding: 0 14px; }
 .ofi-ptk-row > * { min-width: 0; justify-self: center; text-align: center; }
 .ofi-ptk-row > :is(.is-left, .ofi-ptk-code, .ofi-ptk-cell-name, .ofi-ptk-cell-people, .ofi-ptk-cell-required) { justify-self: stretch; text-align: left; }
@@ -1462,6 +1468,25 @@ body > :not(#root) input[type="checkbox"].ofi-ptk-check:disabled { cursor: defau
     color: var(--ptk-secondary);
     font-variant-numeric: tabular-nums;
 }
+/* Die Datei des Tages fehlt (02.10.2026): rot statt blau — am Plättchen und am Reiter. */
+.ofi-ptk-float__text > small > em.is-warn { background: var(--ptk-danger, #ff3b30); }
+.ofi-ptk-seg__warn,
+.ofi-ptk-warnmark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--ptk-danger, #ff3b30);
+    color: #fff;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 1;
+}
+.ofi-ptk-warnmark { flex: none; cursor: help; }
 .ofi-ptk-float__text > small > em {
     padding: 0 5px;
     border-radius: 4px;
@@ -2996,6 +3021,8 @@ body > :not(#root) .ofi-ptk-drop__pick:hover { text-decoration: underline; }
 /* ── Anfragen an die Verwaltung: viertes Glasplättchen unter «Aktivitäten» (30.09.2026) ── */
 .ofi-ptk-float__icon.is-requests,
 .ofi-ptk-stagefiles__icon.is-requests { background: #ff9500; box-shadow: 0 1px 2px rgba(255, 149, 0, 0.35); }
+/* Die BOM der Stufe «BOM» (02.10.2026) — fünftes Plättchen unter «Anfragen». */
+.ofi-ptk-float__icon.is-bom { background: #30b0c7; box-shadow: 0 1px 2px rgba(48, 176, 199, 0.35); }
 .ofi-ptk-requests .ofi-ptk-stagefiles__bar { justify-content: flex-start; }
 .ofi-ptk-requests__list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .ofi-ptk-requests__list.is-busy { opacity: 0.55; pointer-events: none; }
@@ -3118,3 +3145,42 @@ body > :not(#root) .ofi-ptk-btn.ofi-ptk-aireportbtn svg { width: 13px; height: 1
 .ofi-ptk-standardspdf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .ofi-ptk-standardspdf > .ofi-ptk-filechip .ofi-ptk-filechip__text { max-width: 260px; }
 .ofi-ptk-review__standardspdf { max-width: 100%; margin-bottom: 8px; }
+
+/* Wer schon woran arbeitet (02.10.2026): Zahl je Person in der Auswahl, darunter die Vorschau. */
+.ofi-ptk-workcount {
+    flex: none;
+    min-width: 20px;
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: var(--ptk-accent, #0a7aff);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ptk-workcount.is-free { background: rgba(120, 120, 128, 0.16); color: var(--ptk-secondary, #6e6e73); }
+.ofi-ptk-workload {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 8px 12px;
+    border-top: 1px solid rgba(120, 120, 128, 0.2);
+    font-size: 12px;
+}
+.ofi-ptk-workload__title { font-size: 12px; font-weight: 600; }
+.ofi-ptk-workload__list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ofi-ptk-workload__list > li { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-ptk-workload__where { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-ptk-workload__what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-ptk-workload__meta, .ofi-ptk-workload__more { color: var(--ptk-secondary, #6e6e73); font-size: 11.5px; }
+
+/* Vorlagen der Dokument-Standards (02.10.2026): Auswahl, Löschen, «Als Vorlage speichern». */
+.ofi-ptk-stdtemplates { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ofi-ptk-stdtemplates__select { flex: 1 1 200px; min-width: 0; }
+.ofi-ptk-stdtemplates__name { display: inline-flex; flex: 1 1 220px; align-items: center; gap: 6px; min-width: 0; }
+.ofi-ptk-stdtemplates__name > input { flex: 1; min-width: 0; }

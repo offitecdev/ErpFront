@@ -112,6 +112,18 @@ export const areaTone = (area: TaskArea): string =>
     area === 'ELECTRICAL' ? 'is-electrical' : area === 'MECHANICAL' ? 'is-mechanical' : 'is-custom';
 
 /** Der Name eines Bereichs: eigener Name, sonst der übersetzte der festen. */
+/**
+ * Die BOM-Stufe jedes Bereichs (02.10.2026, wie der Server: `withBomStages`):
+ * Stufe «bom» mit genau einer Aufgabe «BOM» und ihrer Unteraufgabe «BOM Creation».
+ * Die Stufe lässt sich nicht löschen, die Aufgabe nicht umbenennen oder ergänzen.
+ */
+export const BOM_STAGE = 'bom';
+export const BOM_TASK_NAME = 'BOM';
+export const BOM_SUBTASK_ID = 'bom-create';
+export const BOM_SUBTASK_NAME = 'BOM Creation';
+export const isBomTask = (task: Pick<ProductionTask, 'stage' | 'subtasks'>): boolean =>
+    task.stage === BOM_STAGE && task.subtasks.some((subtask) => subtask.id === BOM_SUBTASK_ID);
+
 export const sectionLabel = (section: Pick<TaskSection, 'key' | 'name'>): string => {
     if (section.name) return section.name;
     if (section.key === 'MECHANICAL') return t('productionTasks.area.mechanical');

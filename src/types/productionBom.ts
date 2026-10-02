@@ -5,7 +5,15 @@
  */
 import type { BuiltInArea } from './productionTasks';
 
-export type BomCategory = 'MACHINE' | 'ELECTRICAL';
+/**
+ * Eigene Kategorien (02.10.2026): «c-xxxxxxxx» ist zugleich Bereich der BOM
+ * und Kategorie der Vorlage; die festen sind Makine/Mekanik und Elektrik.
+ */
+export type BomCustomCategoryId = `c-${string}`;
+export type BomBuiltInCategory = 'MACHINE' | 'ELECTRICAL';
+export type BomCategory = BomBuiltInCategory | BomCustomCategoryId;
+export type BomArea = BuiltInArea | BomCustomCategoryId;
+export const isCustomBomCategory = (value: string): value is BomCustomCategoryId => /^c-[a-z0-9]{8}$/.test(value);
 export type BomStatus = 'DRAFT' | 'APPROVED' | 'COMPLETED';
 /** MAIN = Haupt-BOM des Geräts im Bereich (BOM-MEK-00001) · SUB = Alt-BOM darunter. */
 export type BomKind = 'MAIN' | 'SUB';
@@ -13,8 +21,13 @@ export type BomUnit = 'PCS' | 'M' | 'KG' | 'SET' | 'PACK';
 export const BOM_UNITS: BomUnit[] = ['PCS', 'M', 'KG', 'SET', 'PACK'];
 
 /** Makine ↔ Mekanik, Elektrik ↔ Elektrik. */
-export const CATEGORY_OF_AREA: Record<BuiltInArea, BomCategory> = { MECHANICAL: 'MACHINE', ELECTRICAL: 'ELECTRICAL' };
-export const AREA_OF_CATEGORY: Record<BomCategory, BuiltInArea> = { MACHINE: 'MECHANICAL', ELECTRICAL: 'ELECTRICAL' };
+export const CATEGORY_OF_AREA: Record<BuiltInArea, BomBuiltInCategory> = { MECHANICAL: 'MACHINE', ELECTRICAL: 'ELECTRICAL' };
+export const AREA_OF_CATEGORY: Record<BomBuiltInCategory, BuiltInArea> = { MACHINE: 'MECHANICAL', ELECTRICAL: 'ELECTRICAL' };
+/** Wie oben, auch für eigene Kategorien (sie sind Bereich und Kategorie zugleich). */
+export const categoryOfArea = (area: BomArea): BomCategory => (area === 'MECHANICAL' ? 'MACHINE' : area);
+export const areaOfCategory = (category: BomCategory): BomArea => (category === 'MACHINE' ? 'MECHANICAL' : category);
+/** «Mekanik MEK-00001, Elektrik ELK-00001 — automatisch.» */
+export const BUILT_IN_CATEGORY_CODE: Record<BuiltInArea, string> = { MECHANICAL: 'MEK', ELECTRICAL: 'ELK' };
 
 /** Ein Alt-BOM-Kod der Einstellungen (MAK-COOL · Soğutma devresi). */
 export interface BomCode {
@@ -22,10 +35,23 @@ export interface BomCode {
     name: string;
 }
 
+/** Eine eigene BOM-Kategorie (Name, Kod der Haupt-BOM, ihre Alt-BOM-Kodes). */
+export interface BomCustomCategory {
+    id: BomCustomCategoryId;
+    name: string;
+    /** HYD → BOM-HYD-00001. */
+    code: string;
+    codes: BomCode[];
+    sortOrder: number;
+}
+
 export interface BomSettings {
     /** Höchstzahl der Alt-BOMs unter einer Haupt-BOM. */
     maxPerArea: number;
-    codes: Record<BuiltInArea, BomCode[]>;
+    /** Alt-BOM-Kodes je Bereich — die festen immer, dazu jede eigene Kategorie. */
+    codes: Record<BuiltInArea, BomCode[]> & Partial<Record<BomCustomCategoryId, BomCode[]>>;
+    /** Die eigenen Kategorien (fehlt bei einem älteren Server). */
+    categories?: BomCustomCategory[];
     canEdit: boolean;
 }
 
@@ -336,7 +362,7 @@ export interface Bom {
     templateId: string | null;
     templateName: string;
     mainCard: string | null;
-    area: BuiltInArea;
+    area: BomArea;
     status: BomStatus;
     approvedAt: string | null;
     completedAt: string | null;
@@ -382,11 +408,11 @@ export interface BomHistory {
 
 export interface BomAreaView {
     settings: { maxPerArea: number };
-    area: BuiltInArea;
+    area: BomArea;
     device: { id: string; name: string; quantity: number; positionNumber: string | null; isActive: boolean };
     project: { id: string; projectNumber: string; projectName: string; customerName: string | null; deliveryDate: string | null };
     canEdit: boolean;
-    counts: Record<BuiltInArea, number>;
+    counts: Record<string, number>;
     /** Die Haupt-BOM — `null` nur für Lesende, solange keine angelegt ist. */
     main: BomSummary | null;
     /** Die Alt-BOMs darunter. */
@@ -606,7 +632,7 @@ export interface ProcurementRequest {
     closedByName: string | null;
     /** Letzter Handgriff an Talep oder einem seiner Vorgänge — die Liste sortiert danach. */
     lastActivityAt?: string;
-    bom: { id: string; bomNumber: string; kind: BomKind; status: BomStatus; area: BuiltInArea; revision: number; templateName: string; consumed: boolean } | null;
+    bom: { id: string; bomNumber: string; kind: BomKind; status: BomStatus; area: BomArea; revision: number; templateName: string; consumed: boolean } | null;
     project: { id: string; projectNumber: string; projectName: string; customerName: string | null; deliveryDate: string | null } | null;
     device: { id: string; name: string; positionNumber: string | null } | null;
     lines: Array<{

@@ -35,6 +35,32 @@
       "MACHINE": "Maschine",
       "ELECTRICAL": "Elektrik"
     },
+    "categories": {
+      "title": "Kategorien",
+      "hint": "Mechanik (MEK) und Elektrik (ELK) gibt es immer. Der Kod einer Kategorie gibt die Nummer ihrer Haupt-BOMs (HYD → BOM-HYD-00001); ihre Unter-BOM-Kodes stehen auf der Seite BOM.",
+      "add": "Kategorie hinzufügen",
+      "edit": "{{name}} bearbeiten",
+      "builtIn": "Fest",
+      "custom": "Eigene",
+      "newTitle": "Neue Kategorie",
+      "editTitle": "Kategorie bearbeiten",
+      "dialogSub": "Kategorien gruppieren BOM-Vorlagen und die BOMs eines Geräts, wie Mechanik und Elektrik.",
+      "name": "Name",
+      "namePlaceholder": "z. B. Hydraulik",
+      "code": "Kod",
+      "codeHint": "2–8 Buchstaben oder Ziffern",
+      "preview": "Haupt-BOMs erhalten die Nummer {{number}}",
+      "codeBuiltIn": "{{code}} gehört einer festen Kategorie.",
+      "create": "Anlegen",
+      "created": "Kategorie «{{name}}» angelegt",
+      "saved": "Kategorie «{{name}}» gespeichert",
+      "deleted": "Kategorie «{{name}}» gelöscht",
+      "deleteConfirm": "Kategorie löschen",
+      "deleteText": "«{{name}}» löschen? Das geht nur, solange keine BOM und keine Vorlage sie verwendet.",
+      "menu": "Kategorien",
+      "menuSub": "Kodes der Kategorien",
+      "link": "Kategorien"
+    },
     "status": {
       "DRAFT": "Entwurf",
       "APPROVED": "Freigegeben",
@@ -541,7 +567,14 @@
       "BOM_NOT_APPROVED": "BOM {{bom}} ist noch nicht freigegeben — Preisanfragen und Bestellungen gibt es nur aus der freigegebenen BOM. Bitte zuerst freigeben.",
       "ERP_CODE_MISSING": "{{count}} Zeilen ohne ERP-Code auf der Depo-Karte ({{names}}) — die BOM lässt sich nicht freigeben. Den Karten eine Materialgruppe geben.",
       "REVISION_NEEDS_ADMIN": "Eine Revision gibt nur die Administratorrolle frei — mit «Zur Freigabe senden» einreichen.",
-      "REVISION_NOT_SUBMITTED": "Die Revision ist noch nicht eingereicht."
+      "REVISION_NOT_SUBMITTED": "Die Revision ist noch nicht eingereicht.",
+      "CATEGORY_NOT_FOUND": "Diese BOM-Kategorie gibt es nicht mehr.",
+      "CATEGORY_NAME_REQUIRED": "Die Kategorie braucht einen Namen.",
+      "CATEGORY_NAME_TAKEN": "Eine Kategorie «{{name}}» gibt es schon.",
+      "CATEGORY_CODE_INVALID": "Kod: 2–8 Buchstaben oder Ziffern (z. B. HYD).",
+      "CATEGORY_CODE_TAKEN": "Der Kod {{code}} ist schon vergeben.",
+      "CATEGORY_IN_USE": "BOMs oder Vorlagen verwenden diese Kategorie bereits.",
+      "CATEGORY_LIMIT": "Höchstens {{max}} eigene Kategorien."
     },
     "tasks": {
       "title": "Aufgaben",
@@ -1419,6 +1452,9 @@
       "checkFailed": "Posteingang nicht lesbar: {{error}}",
       "checkNone": "Kein Postfach mit Posteingang eingerichtet.",
       "readOnly": "Die Postfächer ändert nur die Administratorrolle."
+    },
+    "window": {
+      "title": "BOM · {{area}}"
     }
   },
   "notify": {

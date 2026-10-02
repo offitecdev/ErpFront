@@ -28,6 +28,7 @@ import {
     taskSectionWeight,
     subtaskWeightSum,
     TASK_LIMITS,
+    isBomTask,
     taskAssigneesOf,
 } from './taskModel';
 
@@ -128,6 +129,8 @@ export const TaskEditDialog = ({
 }) => {
     useBackDismiss(true, onClose);
     const [name, setName] = useState(task.name);
+    // «BOM» mit «BOM Creation»: Name und Unteraufgaben stehen fest, Personen und Häkchen nicht (02.10.2026).
+    const bomTask = isBomTask(task);
     const [weight, setWeight] = useState(isNew && !task.weight ? '' : weightText(task.weight));
     const [startDate, setStartDate] = useState<string | null>(task.startDate);
     const [dueDate, setDueDate] = useState<string | null>(task.dueDate);
@@ -294,7 +297,7 @@ export const TaskEditDialog = ({
             closeOnEscape={!confirmDelete && removingSubtask === null && standardsSubtask === null}
             footer={(
                 <PopupActions
-                    start={onDelete ? (
+                    start={onDelete && !bomTask ? (
                         <PopupButton variant="danger" onClick={() => setConfirmDelete(true)}>
                             <Trash2 size={14} />
                             {t('productionTasks.task.delete')}
@@ -317,7 +320,8 @@ export const TaskEditDialog = ({
                             className={`ofi-ptk-input ${tried && nameMissing ? 'is-invalid' : ''}`}
                             value={name}
                             maxLength={TASK_LIMITS.taskName}
-                            autoFocus
+                            readOnly={bomTask}
+                            autoFocus={!bomTask}
                             placeholder={t('productionTasks.task.namePlaceholder')}
                             onChange={(event) => setName(event.target.value)}
                         />
@@ -400,6 +404,7 @@ export const TaskEditDialog = ({
                                             className="ofi-ptk-input"
                                             value={subtask.name}
                                             maxLength={TASK_LIMITS.subtaskName}
+                                            readOnly={bomTask}
                                             aria-label={t('productionTasks.subtask.name')}
                                             placeholder={t('productionTasks.subtask.name')}
                                             onChange={(event) => patchSubtask(subtask.id, { name: event.target.value })}
@@ -442,7 +447,7 @@ export const TaskEditDialog = ({
                                                     : formatPercent(overallOf(subtaskSectionWeight(taskSectionWeight(stageWeight, taskWeight), subtask.weight), section?.share ?? 0), true)}
                                             </span>
                                         </span>
-                                        <span className="ofi-ptk-subedit__tools">
+                                        {!bomTask && <span className="ofi-ptk-subedit__tools">
                                             <button
                                                 type="button"
                                                 className="ofi-ptk-toolbtn ofi-nosize"
@@ -472,7 +477,7 @@ export const TaskEditDialog = ({
                                             >
                                                 <X aria-hidden />
                                             </button>
-                                        </span>
+                                        </span>}
                                     </div>
                                     <div className="ofi-ptk-subedit__meta">
                                         <span className="ofi-ptk-subedit__lead">
@@ -649,7 +654,7 @@ export const TaskEditDialog = ({
                                 </div>
                             );
                         })}
-                        {subtasks.length < TASK_LIMITS.subtasks && (
+                        {subtasks.length < TASK_LIMITS.subtasks && !bomTask && (
                             <div className="ofi-ptk-subedit__row is-new">
                                 <span className="ofi-ptk-subedit__num" aria-hidden><Plus /></span>
                                 <input

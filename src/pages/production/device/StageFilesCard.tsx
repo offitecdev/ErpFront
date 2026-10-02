@@ -50,12 +50,15 @@ export const StageFilesCard = ({
     tasks,
     names,
     actions,
+    missingNote = null,
     onClose,
 }: {
     stageName: string;
     tasks: ProductionTask[];
     names: PersonNames;
     actions: SubtaskActions;
+    /** «Heute noch keine Datei» / «N fehlen heute» (02.10.2026) — am Reiter «Dateiverlauf». */
+    missingNote?: string | null;
     onClose: () => void;
 }) => {
     const [tab, setTab] = useState<Tab>('files');
@@ -237,6 +240,8 @@ export const StageFilesCard = ({
                         >
                             <History size={14} aria-hidden />
                             {t('productionTasks.stageFiles.tabHistory')}
+                            {/* Nur ein rotes «!» (02.10.2026) — der Text steht im Tipp. */}
+                            {missingNote && <em className="ofi-ptk-seg__warn" title={missingNote} aria-label={missingNote}>!</em>}
                         </button>
                     </div>
                     {/* Der Zeitraum gilt für beide Reiter. */}

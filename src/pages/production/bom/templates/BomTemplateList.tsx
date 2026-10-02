@@ -1,16 +1,22 @@
 import { useMemo, useState } from 'react';
-import { Cpu, Plus, Search, Wrench, X } from 'lucide-react';
+import { Pencil, Plus, Search, X } from 'lucide-react';
 
+import { SelectMenu } from '@/components/ui-shared/SelectMenu';
 import { t } from '@/i18n/translate';
-import type { BomCategory, BomTemplateSummary } from '@/types/productionBom';
+import type { BomCategory, BomCustomCategory, BomTemplateSummary } from '@/types/productionBom';
+
+import { BomCategoryIcon } from '../bomCategories';
+import type { BomCategoryOption } from '../bomCategoryOptions';
 
 type Filter = 'ALL' | BomCategory;
 
 /**
  * ── DIE QUELLLISTE DER VORLAGEN (links, wie im Finder) ──────────────────────
- * Oben die Kategorie (Tümü · Makine · Elektrik) und die Suche, darunter die
- * Vorlagen, nach ihrer Ana kart gruppiert (CHILLER ▸ vier Vorlagen). Die
- * gewählte Zeile ist blau.
+ * Oben die Kategorie (Tümü · Makine · Elektrik · eigene) und die Suche,
+ * darunter die Vorlagen, nach ihrer Ana kart gruppiert (CHILLER ▸ vier
+ * Vorlagen). Die gewählte Zeile ist blau. Wer die Einstellungen ändern darf,
+ * legt hier auch eine Kategorie an (02.10.2026) — eine eigene gewählt, lässt
+ * sie sich über den Stift umbenennen oder löschen.
  */
 export const BomTemplateList = ({
     items,
@@ -18,18 +24,28 @@ export const BomTemplateList = ({
     selectedId,
     draftNew,
     canEdit,
+    categories,
     onSelect,
     onNew,
+    onNewCategory,
+    onEditCategory,
 }: {
     items: BomTemplateSummary[] | null;
     loading: boolean;
     selectedId: string | null;
     draftNew: { name: string; category: BomCategory } | null;
     canEdit: boolean;
+    categories: BomCategoryOption[];
     onSelect: (id: string) => void;
     onNew: () => void;
+    /** Nur für die Administratorrolle (Einstellungen). */
+    onNewCategory?: () => void;
+    onEditCategory?: (category: BomCustomCategory) => void;
 }) => {
-    const [filter, setFilter] = useState<Filter>('ALL');
+    const [rawFilter, setFilter] = useState<Filter>('ALL');
+    // Eine gelöschte Kategorie fällt auf «Tümü» zurück.
+    const filter: Filter = rawFilter === 'ALL' || categories.some((entry) => entry.category === rawFilter) ? rawFilter : 'ALL';
+    const editable = categories.find((entry) => entry.category === filter)?.custom ?? null;
     const [query, setQuery] = useState('');
 
     const groups = useMemo(() => {
@@ -42,22 +58,43 @@ export const BomTemplateList = ({
         return [...byCard.entries()].sort(([a], [b]) => a.localeCompare(b));
     }, [items, filter, query]);
 
-    const filters: Filter[] = ['ALL', 'MACHINE', 'ELECTRICAL'];
+    const filters: Array<{ key: Filter; label: string }> = [
+        { key: 'ALL', label: t('productionBom.templates.allCategories') },
+        ...categories.map((entry) => ({ key: entry.category, label: entry.label })),
+    ];
     return (
         <aside className="ofi-bom-side">
-            <div className="ofi-bom-seg is-full" role="tablist" aria-label={t('productionBom.editor.category')}>
-                {filters.map((key) => (
+            <div className="ofi-bom-catbar">
+                {/* Eine Auswahlliste statt der Knöpfe (02.10.2026). */}
+                <SelectMenu
+                    className="ofi-bom-catbar__select"
+                    value={filter}
+                    ariaLabel={t('productionBom.editor.category')}
+                    options={filters.map(({ key, label }) => ({ value: key, label }))}
+                    onChange={(next) => setFilter(next as Filter)}
+                />
+                {editable && onEditCategory && (
                     <button
-                        key={key}
                         type="button"
-                        role="tab"
-                        aria-selected={filter === key}
-                        className={`ofi-nosize${filter === key ? ' is-on' : ''}`}
-                        onClick={() => setFilter(key)}
+                        className="ofi-bom-iconbtn ofi-nosize"
+                        title={t('productionBom.categories.edit', { name: editable.name })}
+                        aria-label={t('productionBom.categories.edit', { name: editable.name })}
+                        onClick={() => onEditCategory(editable)}
                     >
-                        {key === 'ALL' ? t('productionBom.templates.allCategories') : t(`productionBom.category.${key}`)}
+                        <Pencil />
                     </button>
-                ))}
+                )}
+                {onNewCategory && (
+                    <button
+                        type="button"
+                        className="ofi-bom-iconbtn ofi-nosize"
+                        title={t('productionBom.categories.add')}
+                        aria-label={t('productionBom.categories.add')}
+                        onClick={onNewCategory}
+                    >
+                        <Plus />
+                    </button>
+                )}
             </div>
             <div className="ofi-bom-search__field is-side">
                 <Search className="ofi-bom-search__glass" aria-hidden />
@@ -80,7 +117,7 @@ export const BomTemplateList = ({
                 ))}
                 {draftNew && (
                     <button type="button" role="option" aria-selected className="ofi-bom-source__row is-selected is-new ofi-nosize">
-                        <span className="ofi-bom-source__icon">{draftNew.category === 'ELECTRICAL' ? <Cpu /> : <Wrench />}</span>
+                        <span className="ofi-bom-source__icon"><BomCategoryIcon category={draftNew.category} /></span>
                         <span className="ofi-bom-source__text">
                             <b>{draftNew.name.trim() || t('productionBom.templates.untitled')}</b>
                             <small>{t('productionBom.templates.new')}</small>
@@ -99,8 +136,8 @@ export const BomTemplateList = ({
                                 className={`ofi-bom-source__row ofi-nosize${item.id === selectedId && !draftNew ? ' is-selected' : ''}`}
                                 onClick={() => onSelect(item.id)}
                             >
-                                <span className={`ofi-bom-source__icon is-${item.category.toLowerCase()}`}>
-                                    {item.category === 'ELECTRICAL' ? <Cpu /> : <Wrench />}
+                                <span className={`ofi-bom-source__icon is-${item.category.startsWith('c-') ? 'custom' : item.category.toLowerCase()}`}>
+                                    <BomCategoryIcon category={item.category} />
                                 </span>
                                 <span className="ofi-bom-source__text">
                                     <b>{item.name}</b>

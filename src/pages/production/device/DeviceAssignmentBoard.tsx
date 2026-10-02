@@ -24,6 +24,7 @@ import {
     stageTaskWeight,
     TASK_LIMITS,
     tasksByStage,
+    isBomTask,
 } from '../tasks/taskModel';
 import { stageNumber, type DeviceStage } from './deviceStages';
 import { TemplateLoadDialog } from './TemplateLoadDialog';
@@ -309,7 +310,10 @@ export const DeviceAssignmentBoard = ({
                                 onAssignSubtask={(task, subtask, ids) => void assignSubtask(task, subtask, ids, known(ids))}
                                 // Den Stand setzt man auf den Stufen selbst, nicht hier beim Anpassen.
                                 onOpenTask={(task) => setTaskEdit({ task, isNew: false })}
-                                onAddTask={(area, stageKey) => setTaskEdit({ task: newTask(area, stageKey), isNew: true })}
+                                // Eine BOM-Stufe mit ihrer Aufgabe «BOM» bekommt keine weitere (02.10.2026).
+                                onAddTask={(groups.get(stage.key) ?? []).some(isBomTask)
+                                    ? undefined
+                                    : (area, stageKey) => setTaskEdit({ task: newTask(area, stageKey), isNew: true })}
                                 // Die Aufgaben einer Stufe ergeben 100 % der STUFE (30.09.2026) — voll, keine weitere.
                                 addDisabledReason={stageTaskWeight(tasksNow, section.key, stage.key) >= 100 - 0.01 ? t('productionTasks.stage.full') : undefined}
                                 onStageWeight={(weight) => saveStageWeight(section.key, stage.key, weight)}

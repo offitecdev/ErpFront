@@ -28,6 +28,7 @@ import type {
     CostingProjectSummary,
 } from '../../types/productionBom';
 import type { BuiltInArea, TaskArea } from '../../types/productionTasks';
+import { isCustomBomCategory } from '../../types/productionBom';
 
 /**
  * ── BOM DER PRODUKTION (27.09.2026) ──────────────────────────────────────────
@@ -40,13 +41,21 @@ const TAGS = ['production', 'warehouse'];
 const PAGE_CACHE = { freshMs: 15_000, staleMs: 600_000, tags: TAGS };
 const enc = encodeURIComponent;
 
-const areaParam = (area: TaskArea) => (area === 'ELECTRICAL' ? 'electrical' : 'mechanical');
+const areaParam = (area: TaskArea) =>
+    (isCustomBomCategory(area) ? area : area === 'ELECTRICAL' ? 'electrical' : 'mechanical');
 
 export const productionBomApi = {
     settings: async (): Promise<BomSettings> => (await apiClient.get('/production/bom/settings')).data,
     /** Nur Mitgeschicktes ändert sich (Zahl und Kodes getrennt speicherbar). */
     saveSettings: async (patch: { maxPerArea?: number; codes?: BomSettings['codes'] }): Promise<BomSettings> =>
         (await apiClient.put('/production/bom/settings', patch)).data,
+    /** Eigene Kategorien — die Antwort sind die ganzen Einstellungen danach. */
+    createCategory: async (input: { name: string; code: string }): Promise<BomSettings> =>
+        (await apiClient.post('/production/bom/categories', input)).data,
+    updateCategory: async (id: string, input: { name: string; code: string }): Promise<BomSettings> =>
+        (await apiClient.put(`/production/bom/categories/${enc(id)}`, input)).data,
+    deleteCategory: async (id: string): Promise<BomSettings> =>
+        (await apiClient.delete(`/production/bom/categories/${enc(id)}`)).data,
 
     templates: async (): Promise<{ items: BomTemplateSummary[]; canEdit: boolean }> =>
         (await apiClient.get('/production/bom/templates')).data,
@@ -200,6 +209,10 @@ export const readBomSettings = (
     onValue: (value: BomSettings, fresh: boolean) => void,
     onError?: (error: unknown) => void,
 ) => readQuery('production:bom-settings', productionBomApi.settings, PAGE_CACHE, onValue, onError);
+
+/** Nach einer Änderung an Kategorien: alle Leser der Einstellungen bekommen den neuen Stand. */
+export const primeBomSettings = (settings: BomSettings) =>
+    refreshQuery('production:bom-settings', async () => settings, PAGE_CACHE);
 
 /* ── Fehler ──────────────────────────────────────────────────────────────── */
 

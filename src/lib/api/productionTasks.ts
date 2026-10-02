@@ -14,10 +14,12 @@ import type {
     TaskPerson,
     TaskSection,
     TaskStandardsFile,
+    TaskStandardsTemplate,
     TaskStatus,
     TaskTemplate,
     TaskTemplateInput,
     TaskTemplateSummary,
+    TaskWorkload,
 } from '../../types/productionTasks';
 
 /**
@@ -185,6 +187,16 @@ export const productionTasksApi = {
         })).data,
     /** Projekte und Geräte mit Aufgaben, samt offener Anfragen — nur die Verwaltung (30.09.2026). */
     taskDevices: async (): Promise<TaskDeviceDirectory> => (await apiClient.get('/production/task-devices')).data,
+    /** Vorlagen der Dokument-Standards (02.10.2026): lesen alle, pflegen die Verwaltung. */
+    standardsTemplates: async (): Promise<{ items: TaskStandardsTemplate[] }> =>
+        (await apiClient.get('/production/task-standards/templates')).data,
+    createStandardsTemplate: async (input: { name: string; text: string | null; file: TaskStandardsFile | null }): Promise<{ template: TaskStandardsTemplate }> =>
+        (await apiClient.post('/production/task-standards/templates', input)).data,
+    removeStandardsTemplate: async (id: string): Promise<void> => {
+        await apiClient.delete(`/production/task-standards/templates/${encodeURIComponent(id)}`);
+    },
+    /** Wer schon woran arbeitet (02.10.2026) — nur die Verwaltung. */
+    workload: async (): Promise<TaskWorkload> => (await apiClient.get('/production/task-workload')).data,
     /** «Mark as solved» — nur die Verwaltung. */
     solveRequest: async (deviceId: string, requestId: string): Promise<{ request: TaskRequest }> =>
         (await apiClient.post(`/production/devices/${encodeURIComponent(deviceId)}/requests/${encodeURIComponent(requestId)}/solve`, {})).data,
@@ -250,3 +262,9 @@ export const productionTaskErrorText = (error: unknown, fallbackKey = 'productio
     if (key && i18n.exists(key)) return t(key, failure.params ?? undefined);
     return t(fallbackKey);
 };
+
+/** Die offenen Unteraufgaben je Person — kurz zwischengespeichert, die Auswahl öffnet oft. */
+export const readTaskWorkload = (
+    onValue: (value: TaskWorkload, fresh: boolean) => void,
+    onError?: (error: unknown) => void,
+) => readQuery('production:task-workload', productionTasksApi.workload, PAGE_CACHE, onValue, onError);

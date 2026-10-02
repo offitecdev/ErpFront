@@ -7,9 +7,11 @@ import type { StaffDirectoryRow } from '@/lib/api/directory';
 import type { ProductionTask, TaskArea, TaskSectionStage, TaskStage, TaskStatus, TaskSubtask } from '@/types/productionTasks';
 
 import { FlagGlyph } from '../device/deviceGlyphs';
+import { taskMissingToday } from '../device/stageFileModel';
 import { CompleteSubtaskDialog } from './CompleteSubtaskDialog';
 import { NameInput } from './InlineName';
 import { UnlockRequestDialog } from './UnlockRequestDialog';
+import { WorkTimeCell } from './WorkTime';
 import { PeopleCell, type PersonNames } from './PeopleCell';
 import { SubtaskDetail } from './SubtaskFiles';
 import { latestFiles, type SubtaskActions } from './subtaskFileModel';
@@ -29,6 +31,7 @@ import {
     TASK_STATUSES,
     taskProgress,
     taskSectionWeight,
+    localToday,
 } from './taskModel';
 
 type Mode = 'template' | 'device';
@@ -55,7 +58,8 @@ export interface StageTools {
     /** Die Stufen stehen untereinander — verschoben wird nach oben und unten. */
     onMoveUp?: () => void;
     onMoveDown?: () => void;
-    onRemove: () => void;
+    /** Fehlt bei der BOM-Stufe — jeder Bereich behält sie (02.10.2026). */
+    onRemove?: () => void;
 }
 
 /**
@@ -339,6 +343,7 @@ export const StageCard = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const [completing, setCompleting] = useState<{ taskId: string; subtaskId: string } | null>(null);
+    const today = localToday();
     const toggleTask = (taskId: string) => setExpanded((current) => {
         const next = new Set(current);
         if (next.has(taskId)) next.delete(taskId);
@@ -399,15 +404,17 @@ export const StageCard = ({
                         >
                             <ChevronDown aria-hidden />
                         </button>
-                        <button
-                            type="button"
-                            className="ofi-ptk-toolbtn is-danger ofi-nosize"
-                            title={t('productionTasks.template.removeStage')}
-                            aria-label={t('productionTasks.template.removeStage')}
-                            onClick={tools.onRemove}
-                        >
-                            <Trash2 aria-hidden />
-                        </button>
+                        {tools.onRemove && (
+                            <button
+                                type="button"
+                                className="ofi-ptk-toolbtn is-danger ofi-nosize"
+                                title={t('productionTasks.template.removeStage')}
+                                aria-label={t('productionTasks.template.removeStage')}
+                                onClick={tools.onRemove}
+                            >
+                                <Trash2 aria-hidden />
+                            </button>
+                        )}
                     </span>
                 )}
                 {/* Gewicht und Beitrag der Stufe ganz rechts am Rand der Karte. Auf den Arbeitsstufen
@@ -461,6 +468,8 @@ export const StageCard = ({
                                     <span role="columnheader">{t('productionTasks.table.created')}</span>
                                     <span role="columnheader">{t('productionTasks.table.start')}</span>
                                     <span role="columnheader">{t('productionTasks.table.due')}</span>
+                                    {/* Die gearbeitete Zeit (02.10.2026), gleich neben dem Termin. */}
+                                    <span role="columnheader">{t('productionTasks.table.totalTime')}</span>
                                 </>
                             )}
                             <span role="columnheader">{t('productionTasks.table.weight')}</span>
@@ -525,12 +534,24 @@ export const StageCard = ({
                                                 <span className="ofi-ptk-task__name" title={task.name}>{task.name}</span>
                                             )}
                                             {mine && <span className="ofi-ptk-mine" title={t('productionTasks.people.mine')}>{t('productionTasks.people.meShort')}</span>}
+                                            {/* Heute noch keine Datei an dieser Aufgabe (02.10.2026) — der Text im Tipp. */}
+                                            {onDevice && taskMissingToday(task, today) && (
+                                                <span
+                                                    className="ofi-ptk-warnmark"
+                                                    role="img"
+                                                    title={t('productionTasks.stageFiles.missingTask')}
+                                                    aria-label={t('productionTasks.stageFiles.missingTask')}
+                                                >
+                                                    !
+                                                </span>
+                                            )}
                                         </span>
                                         {onDevice && (
                                             <>
                                                 <span role="cell"><DayCell day={task.createdAt} /></span>
                                                 <span role="cell"><DayCell day={task.startDate} /></span>
                                                 <span role="cell"><DayCell day={task.dueDate} /></span>
+                                                <span role="cell"><WorkTimeCell clocks={task.subtasks} /></span>
                                             </>
                                         )}
                                         <span
@@ -675,6 +696,7 @@ export const StageCard = ({
                                                     <span role="cell"><DayCell day={subtask.createdAt} /></span>
                                                     <span role="cell"><DayCell day={subtask.startDate} /></span>
                                                     <span role="cell"><DayCell day={subtask.dueDate} /></span>
+                                                    <span role="cell"><WorkTimeCell clocks={[subtask]} /></span>
                                                 </>
                                             )}
                                             {/* Anteil an der Aufgabe; der Beitrag rechnet über das Gewicht der Aufgabe. */}

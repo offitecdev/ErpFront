@@ -5,15 +5,18 @@ import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/P
 import { t } from '@/i18n/translate';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
 import { fmtDateTime } from '@/pages/inventory/utils/format';
+import type { BomCategoryOption } from '@/pages/production/bom/bomCategoryOptions';
+import { isCustomBomCategory } from '@/types/productionBom';
 import type { ProductionTask, TaskArea, TaskStage, TaskTemplate, TaskTemplateSummary } from '@/types/productionTasks';
 
 import { AreaIcon, AreaSwitch } from './AreaSwitch';
 import { InlineCreate, NameInput } from './InlineName';
 import type { PersonNames } from './PeopleCell';
+import { SectionPicker } from './SectionPicker';
 import { StageCard } from './StageCard';
 import { TemplateNameField } from './TemplateNameField';
 import {
-    addSection,
+    addCategorySection,
     addStage,
     moveSection,
     moveStage,
@@ -26,6 +29,7 @@ import {
     type TemplateDraft,
 } from './templateDraft';
 import {
+    BOM_STAGE,
     areaTone,
     checkProblems,
     checkTemplate,
@@ -59,6 +63,10 @@ const shareText = (value: number) => String(value).replace('.', ',');
  * Bereich / eine eigene Stufe heisst, wie man sie tippt, und lässt sich
  * verschieben und löschen. JEDE Stufe steht als Karte da, auch ohne Aufgaben
  * (die Knöpfe «Görevsiz aşamalar» gibt es nicht mehr).
+ *
+ * Seit dem 02.10.2026 wählt «+ Bölüm ekle» eine BOM-Kategorie (Mekanik,
+ * Elektrik, eigene) statt einen Namen zu tippen; ihr Name folgt der Kategorie.
+ * Getippte Bereiche älterer Vorlagen («s-…») bleiben umbenennbar.
  */
 export const TemplateEditor = ({
     draft,
@@ -80,6 +88,7 @@ export const TemplateEditor = ({
     onOpenTask,
     onAddTask,
     isNameTaken,
+    categories,
 }: {
     draft: TemplateDraft;
     saved: TaskTemplate | null;
@@ -101,6 +110,8 @@ export const TemplateEditor = ({
     onAddTask: (area: TaskArea, stage: TaskStage) => void;
     /** Trägt schon eine ANDERE Vorlage der Firma diesen Namen? */
     isNameTaken: (name: string) => boolean;
+    /** Die BOM-Kategorien — aus ihnen entstehen die Bereiche. */
+    categories: BomCategoryOption[];
 }) => {
     // Die Anteile als Text: «6» auf dem Weg zu «60» darf stehen bleiben.
     const [shares, setShares] = useState<Record<TaskArea, string>>(() =>
@@ -124,11 +135,13 @@ export const TemplateEditor = ({
         if (value !== null) onChange(setSectionShare(draft, target, value));
     };
 
-    const createSection = (name: string) => {
-        const { draft: next, key } = addSection(draft, name);
-        onChange(next);
-        onArea(key);
+    const createSection = (option: BomCategoryOption) => {
+        onChange(addCategorySection(draft, option.area, option.custom ? option.label : ''));
+        onArea(option.area);
     };
+    /** Ein Bereich aus einer eigenen Kategorie heisst, wie die Kategorie heute heisst. */
+    const labelOf = (entry: TemplateDraft['sections'][number]) =>
+        (isCustomBomCategory(entry.key) ? categories.find((option) => option.area === entry.key)?.label : undefined) ?? sectionLabel(entry);
 
     const taskCountIn = (target: TaskArea, stage?: TaskStage) =>
         draft.tasks.filter((task) => task.area === target && (stage === undefined || task.stage === stage)).length;
@@ -250,14 +263,14 @@ export const TemplateEditor = ({
                         const areaCheck = check.areas.find((row) => row.area === entry.key);
                         const shareInput = shareOf(entry.key, entry.share);
                         const invalidShare = parsePercent(shareInput) === null;
-                        const label = sectionLabel(entry);
+                        const label = labelOf(entry);
                         return (
                             <div key={entry.key} className="ofi-ptk-arearow">
                                 <span className="ofi-ptk-arearow__name">
                                     <span className={`ofi-ptk-areaicon ${areaTone(entry.key)}`}>
                                         <AreaIcon area={entry.key} size={13} />
                                     </span>
-                                    {canEdit && !isBuiltInArea(entry.key) ? (
+                                    {canEdit && !isBuiltInArea(entry.key) && !isCustomBomCategory(entry.key) ? (
                                         <NameInput
                                             className="ofi-ptk-arearow__nameinput"
                                             value={entry.name}
@@ -346,13 +359,12 @@ export const TemplateEditor = ({
                     })}
                     {canEdit && draft.sections.length < TASK_LIMITS.sections && (
                         <div className="ofi-ptk-arearow is-add">
-                            <InlineCreate
+                            <SectionPicker
                                 className="ofi-ptk-addsection"
-                                label={t('productionTasks.template.addSection')}
-                                placeholder={t('productionTasks.template.sectionNamePlaceholder')}
-                                maxLength={TASK_LIMITS.sectionName}
-                                isTaken={(name) => sectionNameTaken(draft.sections, name)}
-                                onCreate={createSection}
+                                options={categories}
+                                usedKeys={draft.sections.map((entry) => entry.key)}
+                                canManage={canEdit}
+                                onPick={createSection}
                             />
                         </div>
                     )}
@@ -413,7 +425,8 @@ export const TemplateEditor = ({
                                     staff={staff}
                                     staffLoading={staffLoading}
                                     onOpenTask={onOpenTask}
-                                    onAddTask={onAddTask}
+                                    // Die BOM-Stufe hat genau eine Aufgabe (02.10.2026).
+                                    onAddTask={stage.key === BOM_STAGE ? undefined : onAddTask}
                                     addDisabledReason={stageFull(section.key, stage.key) ? t('productionTasks.stage.full') : undefined}
                                     // Das Gewicht der Stufe im Bereich (30.09.2026).
                                     onStageWeight={canEdit ? (weight) => onChange(setStageWeight(draft, section.key, stage.key, weight)) : undefined}
@@ -430,7 +443,7 @@ export const TemplateEditor = ({
                                         isNameTaken: (name) => stageNameTaken(section, name, stage.key),
                                         onMoveUp: index > 0 ? () => onChange(moveStage(draft, section.key, stage.key, -1)) : undefined,
                                         onMoveDown: !last ? () => onChange(moveStage(draft, section.key, stage.key, 1)) : undefined,
-                                        onRemove: () => requestRemoveStage(section.key, stage.key),
+                                        onRemove: stage.key === BOM_STAGE ? undefined : () => requestRemoveStage(section.key, stage.key),
                                     } : undefined}
                                 />
                             );

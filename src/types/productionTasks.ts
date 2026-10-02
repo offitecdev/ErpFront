@@ -118,6 +118,8 @@ export interface TaskFileAnalysis {
     model: string | null;
     /** Warum sie scheiterte (GPT_NOT_CONFIGURED, GPT_QUOTA, ANALYSIS_INTERRUPTED …). */
     errorCode: string | null;
+    /** Derselbe Bericht je Sprache der Oberfläche (02.10.2026); ältere Berichte ohne. */
+    i18n?: Partial<Record<'tr' | 'en' | 'de', { summary: string | null; checks: Array<{ standard: string; reason: string }> }>> | null;
 }
 
 /** Ein Punkt der Freigabe-Checkliste einer Unteraufgabe (28.09.2026). */
@@ -161,6 +163,9 @@ export interface TaskSubtask {
     revisionNote: string | null;
     /** Jede Rückgabe zur Überarbeitung, älteste zuerst — bleibt auch nach der Freigabe (28.09.2026). */
     revisionHistory: TaskSubtaskRevisionRequest[];
+    /** Gearbeitete Sekunden (abgeschlossene Runden) und Beginn der laufenden (02.10.2026). */
+    workSeconds?: number;
+    workStartedAt?: string | null;
 }
 
 /** Eine Rückgabe zur Überarbeitung (28.09.2026): wer, wann (ISO), was zu ändern war. */
@@ -414,4 +419,36 @@ export interface TaskDeviceDirectory {
         /** Die Einheiten mit Aufgaben: Vorlage, Zahl der Aufgaben, offene Anfragen. */
         devices: Array<{ id: string; name: string; positionNumber: string | null; templateName: string; taskCount: number; openRequests: number }>;
     }>;
+}
+
+/** Eine offene Unteraufgabe einer Person (02.10.2026) — «wer arbeitet schon woran» beim Zuweisen. */
+export interface TaskWorkloadItem {
+    projectId: string;
+    projectNumber: string;
+    projectName: string;
+    deviceId: string;
+    deviceName: string;
+    positionNumber: string | null;
+    area: string;
+    sectionName: string;
+    stage: string;
+    stageName: string;
+    taskCode: string;
+    taskName: string;
+    subtaskName: string;
+    status: TaskStatus;
+    dueDate: string | null;
+}
+
+export interface TaskWorkload {
+    people: Record<string, TaskWorkloadItem[]>;
+}
+
+/** Eine Vorlage der Dokument-Standards (02.10.2026). */
+export interface TaskStandardsTemplate {
+    id: string;
+    name: string;
+    text: string | null;
+    file: TaskStandardsFile | null;
+    updatedAt: string;
 }

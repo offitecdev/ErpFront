@@ -4,7 +4,7 @@ import { Boxes, TriangleAlert } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorOf, productionBomErrorText } from '@/lib/api/productionBom';
-import type { Bom, BomAreaView, BomSummary } from '@/types/productionBom';
+import { isCustomBomCategory, type Bom, type BomAreaView, type BomSummary } from '@/types/productionBom';
 import type { TaskArea } from '@/types/productionTasks';
 import { useNavGuardStore } from '@/store/navGuardStore';
 import '@/styles/modules/warehouse.css';
@@ -30,6 +30,8 @@ export interface BomViewContext {
     nav: NavStackHandle<BomView>;
     data: BomAreaView;
     area: TaskArea;
+    /** Mekanik / Elektrik / der Name der eigenen Kategorie. */
+    areaLabel: string;
     canEdit: boolean;
     /** Die vorige Ansicht beim Namen (für den blauen Zurück-Pfeil). */
     backTitle: string;
@@ -58,10 +60,12 @@ export interface BomViewContext {
 export const DeviceBomArea = ({
     deviceId,
     area,
+    areaLabel,
     tasks,
 }: {
     deviceId: string;
     area: TaskArea;
+    areaLabel?: string;
     tasks: BomTasksBundle | null;
 }) => {
     const [params, setParams] = useSearchParams();
@@ -156,6 +160,7 @@ export const DeviceBomArea = ({
         nav,
         data,
         area,
+        areaLabel: areaLabel ?? (isCustomBomCategory(area) ? area : t(`productionBom.area.${area}`)),
         canEdit: data.canEdit,
         backTitle: nav.previous ? viewTitle(nav.previous.view, data, boms) : '',
         bomOf,

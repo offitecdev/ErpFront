@@ -209,7 +209,10 @@
       "REQUEST_NOT_FOUND": "Talep bulunamadı ya da zaten çözüldü.",
       "NO_STANDARDS": "Bu alt görevin kontrol edilecek doküman standartları yok.",
       "ANALYSIS_RUNNING": "Yapay zekâ analizi zaten çalışıyor.",
-      "STANDARDS_FILE_NOT_FOUND": "Standartlar PDF'i bulunamadı."
+      "STANDARDS_FILE_NOT_FOUND": "Standartlar PDF'i bulunamadı.",
+      "BOM_DRIVEN": "«BOM Creation» durumu BOM'u izler — BOM penceresinde onaylayın, tamamlayın veya revize edin.",
+      "STANDARDS_EMPTY": "Şablonun metni veya PDF'i olmalı.",
+      "STANDARDS_TEMPLATE_NOT_FOUND": "Bu şablon artık yok."
     },
     "people": {
       "assign": "Kişi ata",
@@ -247,7 +250,8 @@
       "status": "Durum",
       "people": "Kişiler",
       "required": "Gerekli",
-      "subtasksDone": "{{done}}/{{total}} alt görev"
+      "subtasksDone": "{{done}}/{{total}} alt görev",
+      "totalTime": "Toplam süre"
     },
     "status": {
       "REVISION": "Revizyon istendi",
@@ -404,7 +408,9 @@
       "nameRequired": "Ad gerekli",
       "sectionFull": "Bu bölümün aşamaları zaten %100 ediyor — önce bir aşamanın ağırlığını düşürün.",
       "removeStageEmpty": "«{{name}}» aşaması bu şablondan kaldırılacak.",
-      "removeSectionEmpty": "«{{name}}» bölümü bu şablondan kaldırılacak."
+      "removeSectionEmpty": "«{{name}}» bölümü bu şablondan kaldırılacak.",
+      "manageCategories": "Kategorileri yönet",
+      "noFreeCategory": "Tüm kategoriler bu şablonda zaten bölüm olarak var."
     },
     "templates": {
       "clearSearch": "Aramayı temizle",
@@ -600,7 +606,11 @@
       "legendFree": "O gün görev yok",
       "cellFree": "Bu gün görev yok",
       "legendUpcoming": "Henüz gelmemiş görev günü",
-      "cellUpcoming": "{{name}} · {{day}} henüz gelmedi"
+      "cellUpcoming": "{{name}} · {{day}} henüz gelmedi",
+      "missingMine": "Bugün dosya yüklenmedi",
+      "missingCount_one": "Bugün {{count}} dosya eksik",
+      "missingCount_other": "Bugün {{count}} dosya eksik",
+      "missingTask": "Bugün bu göreve belge yüklenmedi"
     },
     "activity": {
       "title": "Aktiviteler",
@@ -826,6 +836,38 @@
         "ANALYSIS_INTERRUPTED": "Analiz yarıda kesildi (sunucu yeniden başladı).",
         "STANDARDS_FILE_NOT_FOUND": "Standartlar PDF'i bulunamadı — yeniden yükleyin."
       }
+    },
+    "bomTile": {
+      "title": "BOM",
+      "summary": "BOM oluştur ve düzenle",
+      "open": "{{stage}} BOM'unu aç",
+      "region": "{{stage}} BOM'u"
+    },
+    "time": {
+      "minutes": "{{m}} dk",
+      "hoursMinutes": "{{h}} sa {{m}} dk",
+      "underMinute": "< 1 dk",
+      "running": "Şu an çalışılıyor"
+    },
+    "workload": {
+      "count_one": "{{count}} açık alt görev",
+      "count_other": "{{count}} açık alt görev",
+      "title_one": "{{name}} · {{count}} açık alt görev",
+      "title_other": "{{name}} · {{count}} açık alt görev",
+      "free": "{{name}} için açık alt görev yok",
+      "due": "termin {{date}}",
+      "more": "+{{count}} daha"
+    },
+    "standardsTemplates": {
+      "label": "Şablon",
+      "choose": "Standart şablonu seçin",
+      "none": "Henüz şablon yok",
+      "saveAs": "Şablon olarak kaydet",
+      "namePlaceholder": "Şablon adı",
+      "saved": "«{{name}}» şablonu kaydedildi",
+      "removed": "«{{name}}» şablonu silindi",
+      "remove": "Bu şablonu sil",
+      "emptyHint": "Önce standart yazın veya PDF ekleyin"
     }
   }
 }

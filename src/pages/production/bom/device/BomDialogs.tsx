@@ -7,7 +7,7 @@ import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/P
 import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorText, readBomTemplates } from '@/lib/api/productionBom';
 import { LoadingState } from '../bomUi';
-import type { Bom, BomCode, BomTemplate, BomTemplateSummary } from '@/types/productionBom';
+import { categoryOfArea, type Bom, type BomCode, type BomTemplate, type BomTemplateSummary } from '@/types/productionBom';
 
 /**
  * ── «ALT BOM EKLE» (27.09.2026, Vorgabe Samet) ──────────────────────────────
@@ -138,7 +138,7 @@ export const InsertTemplateDialog = ({
         setLoading(true);
         setError(null);
         return readBomTemplates(
-            (value) => { setTemplates(value.items.filter((entry) => entry.category === (bom.area === 'ELECTRICAL' ? 'ELECTRICAL' : 'MACHINE'))); setLoading(false); },
+            (value) => { setTemplates(value.items.filter((entry) => entry.category === categoryOfArea(bom.area))); setLoading(false); },
             (failure) => { setError(productionBomErrorText(failure)); setLoading(false); },
         );
     }, [open, bom.area, retry]);

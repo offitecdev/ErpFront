@@ -9,7 +9,7 @@ import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/produ
 import { AiReportButton } from './AiAnalysis';
 import { RevisionUploadDialog } from './RevisionUploadDialog';
 import { canRemoveFile, canReviseFile, canUploadTo, fileGroups, fileProblem, formatMoment, isPdf, type SubtaskActions } from './subtaskFileModel';
-import { hasSubtaskDocument, isSubtaskCompleted, needsPdfFirst, SUBTASK_FILE_ACCEPT } from './taskModel';
+import { BOM_SUBTASK_ID, hasSubtaskDocument, isSubtaskCompleted, needsPdfFirst, SUBTASK_FILE_ACCEPT } from './taskModel';
 
 /**
  * ── DATEIEN EINER UNTERAUFGABE (28.09.2026, Vorgabe Samet) ──────────────────
@@ -189,7 +189,9 @@ export const SubtaskDetail = ({
     const mayUpload = canUploadTo(actions, subtask);
     // «Complete the task» dürfen dieselben wie den Stand setzen: nur wer an der Unteraufgabe steht —
     // die Verwaltung nicht von Hand (29.09.2026); sie gibt frei («Approve the task»).
-    const mayMark = !completed && Boolean(actions.meId && subtask.assigneeIds.includes(actions.meId));
+    // «BOM Creation» (02.10.2026): den Stand führt die BOM — hier weder abschliessen noch freigeben.
+    const bomDriven = subtask.id === BOM_SUBTASK_ID;
+    const mayMark = !completed && !bomDriven && Boolean(actions.meId && subtask.assigneeIds.includes(actions.meId));
     const [marking, setMarking] = useState(false);
     const markComplete = async () => {
         setMarking(true);
@@ -318,7 +320,7 @@ export const SubtaskDetail = ({
                             {t('productionTasks.subtask.completeTask')}
                         </button>
                     )}
-                    {subtask.requiresApproval && subtask.status === 'PENDING' && actions.isAdmin && (
+                    {subtask.requiresApproval && subtask.status === 'PENDING' && actions.isAdmin && !bomDriven && (
                         <button type="button" className="ofi-ptk-completebtn ofi-nosize" onClick={onComplete}>
                             <CheckCircle2 aria-hidden />
                             {t('productionTasks.complete.button')}

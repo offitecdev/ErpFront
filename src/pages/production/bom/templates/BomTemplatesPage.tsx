@@ -9,16 +9,19 @@ import {
     primeBomTemplate,
     productionBomApi,
     productionBomErrorText,
+    readBomSettings,
     readBomTemplate,
     readBomTemplates,
     refreshBomTemplates,
 } from '@/lib/api/productionBom';
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
-import type { BomTemplate, BomTemplateSummary } from '@/types/productionBom';
+import type { BomCustomCategory, BomSettings, BomTemplate, BomTemplateSummary } from '@/types/productionBom';
 import '@/styles/modules/warehouse.css';
 import '@/styles/modules/productionBom.css';
 
+import { BomCategoryDialog } from '../bomCategories';
+import { bomCategoryOptions } from '../bomCategoryOptions';
 import { BomSpinner, EmptyState, LoadingState } from '../bomUi';
 import { BomTemplateEditor } from './BomTemplateEditor';
 import { BomTemplateList } from './BomTemplateList';
@@ -55,6 +58,9 @@ export const BomTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [switchTo, setSwitchTo] = useState<string | null>(null);
     const [seeding, setSeeding] = useState(false);
+    // Die Kategorien (fest + eigene) und wer sie anlegen darf, aus den Einstellungen.
+    const [settings, setSettings] = useState<BomSettings | null>(null);
+    const [categoryDialog, setCategoryDialog] = useState<{ category: BomCustomCategory | null } | null>(null);
 
     const savedRef = useRef<BomTemplate | null>(null);
     const draftRef = useRef<TemplateDraft | null>(null);
@@ -79,6 +85,9 @@ export const BomTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
         (value) => { setList(value.items); setCanEdit(value.canEdit); setListError(null); },
         (error) => setListError(productionBomErrorText(error, 'productionBom.err.loadFailed')),
     ), [listTick]);
+
+    useEffect(() => readBomSettings((value) => setSettings(value), () => undefined), []);
+    const categories = bomCategoryOptions(settings);
 
     const reloadList = useCallback(() => {
         void refreshBomTemplates()
@@ -269,8 +278,11 @@ export const BomTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
                         selectedId={selectedId}
                         draftNew={wanted === NEW && shownDraft ? { name: shownDraft.name, category: shownDraft.category } : null}
                         canEdit={canEdit}
+                        categories={categories}
                         onSelect={requestSwitch}
                         onNew={() => requestSwitch(NEW)}
+                        onNewCategory={settings?.canEdit ? () => setCategoryDialog({ category: null }) : undefined}
+                        onEditCategory={settings?.canEdit ? (category) => setCategoryDialog({ category }) : undefined}
                     />
                     <div className="ofi-bom-main">
                         {shownDraft ? (
@@ -278,6 +290,7 @@ export const BomTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
                                 key={`${shownDraft.id ?? NEW}:${revision}`}
                                 draft={shownDraft}
                                 summary={summary}
+                                categories={categories}
                                 canEdit={canEdit}
                                 dirty={dirty}
                                 saving={saving}
@@ -313,6 +326,13 @@ export const BomTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
                     </div>
                 </div>
             )}
+
+            <BomCategoryDialog
+                open={categoryDialog !== null}
+                category={categoryDialog?.category ?? null}
+                onClose={() => setCategoryDialog(null)}
+                onSaved={(next) => { setSettings(next); setCategoryDialog(null); }}
+            />
 
             <PopupDialog
                 open={confirmDelete}

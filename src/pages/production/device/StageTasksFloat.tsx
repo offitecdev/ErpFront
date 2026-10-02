@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
-import { Activity, ChevronRight, FileStack, Inbox, ListChecks } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
+import { Activity, Boxes, ChevronRight, FileStack, Inbox, ListChecks } from 'lucide-react';
 
 import { productionTasksApi } from '@/lib/api/productionTasks';
 
@@ -13,8 +13,8 @@ import type { SubtaskActions } from '../tasks/subtaskFileModel';
 import { StageActivityCard } from './StageActivityCard';
 import { StageFilesCard } from './StageFilesCard';
 import { StageRequestsCard } from './StageRequestsCard';
-import { stageFilesOf } from './stageFileModel';
-import { initialsOf, personTone, stageLabel } from '../tasks/taskModel';
+import { missingUploadsToday, stageFilesOf } from './stageFileModel';
+import { initialsOf, localToday, personTone, stageLabel } from '../tasks/taskModel';
 
 /** Bleibt die Karte offen, wenn man die Stufe wechselt? — solange das Fenster lebt. */
 const OPEN_KEY = 'ofi:ptk-stage-float-open';
@@ -103,6 +103,7 @@ export const StageTasksFloat = ({
     canSetStatus,
     subtaskActions,
     stageNameOf,
+    onOpenBom,
 }: {
     /** Diese Unteraufgabe gleich zeigen (30.09.2026, «Go to subtask»): die Karte der Aufgaben öffnet sich. */
     focusSubtaskId?: string | null;
@@ -130,6 +131,8 @@ export const StageTasksFloat = ({
     subtaskActions?: SubtaskActions;
     /** Der Name einer Stufe des Geräts — der Verlauf nennt Stufen (verschoben, neu). */
     stageNameOf: (area: string | null, stage: string | null) => string;
+    /** Nur auf der Stufe BOM (02.10.2026): das Plättchen «BOM» unter «Anfragen» öffnet die BOM. */
+    onOpenBom?: () => void;
 }) => {
     // «Go to subtask»: offen, wenn die gesuchte Unteraufgabe in dieser Stufe liegt.
     const [open, setOpen] = useState(() => (focusSubtaskId && tasks.some((task) => task.subtasks.some((subtask) => subtask.id === focusSubtaskId)) ? true : readOpen()));
@@ -148,6 +151,16 @@ export const StageTasksFloat = ({
     const requestsRef = useRef<HTMLDivElement>(null);
     const requestsFromRef = useRef<DOMRect | null>(null);
     const showFiles = Boolean(subtaskActions?.isAdmin);
+    /* Die Datei des Tages (02.10.2026): wer in der Stufe steht, sieht «Dateien» auch —
+       mit dem Hinweis, dass heute noch keine Datei von ihm da ist; die Verwaltung,
+       die hier nicht selbst arbeitet, sieht, wie vielen die Datei von heute fehlt. */
+    const today = localToday();
+    const missingToday = useMemo(() => missingUploadsToday(tasks, today), [tasks, today]);
+    const responsible = Boolean(meId && tasks.some((task) => task.assigneeIds.includes(meId)));
+    const showFilesTile = Boolean(subtaskActions) && (showFiles || responsible);
+    const missingNote = responsible
+        ? (meId && missingToday.includes(meId) ? t('productionTasks.stageFiles.missingMine') : null)
+        : showFiles && missingToday.length > 0 ? t('productionTasks.stageFiles.missingCount', { count: missingToday.length }) : null;
 
     const toggle = (next: boolean) => {
         fromRef.current = boxRef.current?.getBoundingClientRect() ?? null;
@@ -234,7 +247,7 @@ export const StageTasksFloat = ({
             toggleActivity(false);
         }
     };
-    const files = showFiles ? stageFilesOf(tasks) : [];
+    const files = showFilesTile ? stageFilesOf(tasks) : [];
 
     const stageName = stageLabel(stage);
     const people = [...new Set(tasks.flatMap((task) => task.assigneeIds))];
@@ -243,7 +256,7 @@ export const StageTasksFloat = ({
 
     return (
         <div className="ofi-ptk ofi-ptk-floatwrap">
-            <div
+            {tasks.length > 0 && <div
                 ref={boxRef}
                 className={`ofi-ptk-float ${open ? 'is-open' : ''}`}
                 role="region"
@@ -309,10 +322,10 @@ export const StageTasksFloat = ({
                         <ChevronRight className="ofi-ptk-float__chevron" aria-hidden />
                     </button>
                 )}
-            </div>
+            </div>}
             {/* Dateien der Stufe — nur die Verwaltung. Die Plättchen bleiben immer in ihrer
                 Reihenfolge stehen (30.09.2026: «don't hide the other buttons»); offen ist nur eines. */}
-            {showFiles && subtaskActions && (
+            {showFilesTile && subtaskActions && (
                 <div
                     ref={filesRef}
                     className={`ofi-ptk-float is-files ${filesOpen ? 'is-open' : ''}`}
@@ -322,7 +335,7 @@ export const StageTasksFloat = ({
                 >
                     {filesOpen ? (
                         <div className="ofi-ptk-float__inner">
-                            <StageFilesCard stageName={stageName} tasks={tasks} names={names} actions={subtaskActions} onClose={() => toggleFiles(false)} />
+                            <StageFilesCard stageName={stageName} tasks={tasks} names={names} actions={subtaskActions} missingNote={missingNote} onClose={() => toggleFiles(false)} />
                         </div>
                     ) : (
                         <button
@@ -336,9 +349,11 @@ export const StageTasksFloat = ({
                             <span className="ofi-ptk-float__text">
                                 <b>{t('productionTasks.stageFiles.title')}</b>
                                 <small>
-                                    {files.length
-                                        ? t('productionTasks.stageFiles.count', { count: files.length })
-                                        : t('productionTasks.stageFiles.none')}
+                                    {missingNote
+                                        ? <em className="is-warn">{missingNote}</em>
+                                        : files.length
+                                            ? t('productionTasks.stageFiles.count', { count: files.length })
+                                            : t('productionTasks.stageFiles.none')}
                                 </small>
                             </span>
                             <ChevronRight className="ofi-ptk-float__chevron" aria-hidden />
@@ -428,6 +443,25 @@ export const StageTasksFloat = ({
                             <ChevronRight className="ofi-ptk-float__chevron" aria-hidden />
                         </button>
                     )}
+                </div>
+            )}
+            {/* Die BOM der Stufe (02.10.2026) — für alle, die die Stufe sehen; bearbeiten darf, wer an «BOM» steht. */}
+            {onOpenBom && (
+                <div className="ofi-ptk-float is-bom" role="region" aria-label={t('productionTasks.bomTile.region', { stage: stageName })}>
+                    <button
+                        type="button"
+                        className="ofi-ptk-float__summary ofi-nosize"
+                        aria-haspopup="dialog"
+                        aria-label={t('productionTasks.bomTile.open', { stage: stageName })}
+                        onClick={onOpenBom}
+                    >
+                        <span className="ofi-ptk-float__icon is-bom" aria-hidden><Boxes /></span>
+                        <span className="ofi-ptk-float__text">
+                            <b>{t('productionTasks.bomTile.title')}</b>
+                            <small>{t('productionTasks.bomTile.summary')}</small>
+                        </span>
+                        <ChevronRight className="ofi-ptk-float__chevron" aria-hidden />
+                    </button>
                 </div>
             )}
         </div>
