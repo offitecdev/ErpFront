@@ -210,6 +210,9 @@
       "NO_STANDARDS": "Diese Unteraufgabe hat keine Dokumentstandards zum Prüfen.",
       "ANALYSIS_RUNNING": "Die KI prüft gerade ein PDF dieser Unteraufgabe — danach geht das Hochladen wieder.",
       "STANDARDS_FILE_NOT_FOUND": "Das PDF der Standards wurde nicht gefunden.",
+      "FEE_REQUIRED": "Bitte zuerst den Betrag (CHF) erfassen — ohne Betrag kann diese Unteraufgabe nicht gesendet werden.",
+      "FEE_INVALID": "Der Betrag ist ungültig — z. B. 1250.00 eingeben.",
+      "PRIOR_STEPS_OPEN": "Zuerst die vorherigen Schritte abschliessen ({{count}} offen): {{steps}}",
       "BOM_DRIVEN": "Den Stand von «BOM Creation» führt die BOM — im BOM-Fenster freigeben, abschliessen oder revidieren.",
       "STANDARDS_EMPTY": "Eine Vorlage braucht Text oder ein PDF.",
       "STANDARDS_TEMPLATE_NOT_FOUND": "Diese Vorlage gibt es nicht mehr."
@@ -346,7 +349,9 @@
       "standardsPdfRemove": "Standards-PDF entfernen",
       "standardsPdfOnly": "Es lassen sich nur PDF-Dateien hochladen.",
       "standardsPdfTooLarge": "Das PDF ist zu gross (höchstens {{max}} MB).",
-      "standardsBothHint": "Ein PDF hochladen, die Standards schreiben oder beides — die KI prüft die Dokumente gegen alles hier."
+      "standardsBothHint": "Ein PDF hochladen, die Standards schreiben oder beides — die KI prüft die Dokumente gegen alles hier.",
+      "photoAllowed": "Foto genügt",
+      "photoAllowedHint": "An dieser Unteraufgabe zählt auch ein Foto (JPEG, PNG, WebP) statt eines PDFs."
     },
     "dates": {
       "from": "ab {{date}}",
@@ -471,7 +476,9 @@
       "count_one": "{{count}} Datei",
       "count_other": "{{count}} Dateien",
       "removeTitle": "Datei löschen?",
-      "removeText": "«{{name}}» wird aus «{{subtask}}» entfernt. Das lässt sich nicht rückgängig machen."
+      "removeText": "«{{name}}» wird aus «{{subtask}}» entfernt. Das lässt sich nicht rückgängig machen.",
+      "badTypePhoto": "Erlaubt sind PDF und Fotos (JPEG, PNG, WebP).",
+      "needDocument": "Ein PDF oder Foto ist Pflicht"
     },
     "review": {
       "currentShort": "aktuell",
@@ -554,7 +561,13 @@
       "subtasksRow": "Unteraufgaben erledigt",
       "subtasksAll_one": "Die {{count}} Unteraufgabe ist markiert",
       "subtasksAll_other": "Alle {{count}} Unteraufgaben sind markiert",
-      "subtasksSome": "{{done}} von {{total}} Unteraufgaben sind markiert"
+      "subtasksSome": "{{done}} von {{total}} Unteraufgaben sind markiert",
+      "documentRowPhoto": "Dokument (PDF oder Foto)",
+      "documentMissingPhoto": "Noch kein PDF und kein Foto — ohne Dokument wird sie nicht abgeschlossen",
+      "documentOkPhoto_one": "{{count}} Dokument angehängt",
+      "documentOkPhoto_other": "{{count}} Dokumente angehängt",
+      "dropTitlePhoto": "Fotos oder PDF hier ablegen",
+      "submissionNote": "Notiz beim Einsenden"
     },
     "drop": {
       "or": "oder",
@@ -607,6 +620,7 @@
       "cellFree": "An diesem Tag keine Aufgabe",
       "legendUpcoming": "Aufgabentag steht noch bevor",
       "cellUpcoming": "{{name}} · {{day}} steht noch bevor",
+      "dropTitlePhoto": "Fotos oder PDFs hier ablegen, dann Aufgabe und Unteraufgabe wählen",
       "missingMine": "Heute noch keine Datei hochgeladen",
       "missingCount_one": "Heute fehlt {{count}} Datei",
       "missingCount_other": "Heute fehlen {{count}} Dateien",
@@ -666,7 +680,8 @@
         "PLAN_REMOVED": "{{actor}} hat die Aufgaben der Vorlage {{template}} entfernt",
         "ASSIGNED_BOTH": "{{actor}} hat {{added}} {{target}} zugewiesen und {{removed}} entfernt",
         "UNLOCK_REQUESTED": "{{actor}} hat gebeten, {{target}} zu entsperren",
-        "REQUEST_SOLVED": "{{actor}} hat die Anfrage zu {{target}} als erledigt markiert"
+        "REQUEST_SOLVED": "{{actor}} hat die Anfrage zu {{target}} als erledigt markiert",
+        "DAILY_NOTE": "{{actor}} hat für {{target}} die Tagesnotiz vom {{day}} geschrieben"
       },
       "detail": {
         "yes": "Ja",
@@ -691,7 +706,10 @@
         "noSubtasks": "Keine Unteraufgaben.",
         "template": "Vorlage",
         "previousTemplate": "Ersetzt",
-        "taskCount": "Aufgaben"
+        "taskCount": "Aufgaben",
+        "submissionNote": "Notiz beim Einsenden",
+        "noteDay": "Tag",
+        "dailyNote": "Tagesnotiz"
       },
       "field": {
         "name": "Name",
@@ -702,7 +720,10 @@
         "requiresDocument": "Dokument nötig",
         "requiresApproval": "Freigabe nötig",
         "checklist": "Freigabe-Checkliste",
-        "status": "Stand"
+        "status": "Stand",
+        "photoAllowed": "Foto genügt",
+        "feeRequired": "Betrag erfassen",
+        "priorStepsRequired": "Sperre (vorherige Schritte)"
       },
       "count_one": "{{count}} Eintrag",
       "count_other": "{{count}} Einträge",
@@ -838,6 +859,39 @@
       },
       "uploadWait": "Die KI prüft gerade ein PDF dieser Unteraufgabe — danach können Sie wieder hochladen.",
       "analysing": "KI prüft…"
+    },
+    "submit": {
+      "confirm": "Zur Freigabe senden",
+      "notePlaceholder": "Messwerte, Transporteur und Termine, ausgeführte Arbeit …",
+      "noteHint": "Die KI liest die Fotos und diese Notiz zusammen; die Verwaltung sieht sie bei der Freigabe."
+    },
+    "fee": {
+      "flag": "Betrag",
+      "flagHint": "Beim Abschliessen muss ein Betrag (CHF) erfasst werden — z. B. die Transportkosten.",
+      "tag": "Betrag",
+      "tagHint": "Beim Abschliessen wird ein Betrag (CHF) erfasst.",
+      "row": "Betrag (CHF)",
+      "label": "Betrag (CHF)",
+      "placeholder": "z. B. 1250.00",
+      "hint": "Der Betrag aus der Offerte. Die KI liest ihn zusammen mit der Kurznotiz.",
+      "invalid": "Bitte einen gültigen Betrag eingeben (z. B. 1250.00).",
+      "okDetail": "Betrag erfasst",
+      "missingDetail": "Ohne Betrag kann nicht gesendet werden",
+      "okDetailReview": "Vom Absender erfasster Betrag",
+      "missingDetailReview": "Kein Betrag erfasst — Freigabe nicht möglich"
+    },
+    "priorSteps": {
+      "flag": "Sperre",
+      "flagHint": "Erst abschliessbar und freigebbar, wenn alle Schritte davor erledigt sind (frühere Stufen dieses Wegs und der ganze andere Weg) — Versandsperre.",
+      "tag": "Sperre",
+      "tagHint": "Erst nach allen vorherigen Schritten abschliessbar und freigebbar.",
+      "row": "Vorherige Schritte",
+      "okDetail": "Alle vorherigen Schritte sind erledigt",
+      "okValue": "Erledigt",
+      "openValue_one": "{{count}} offen",
+      "openValue_other": "{{count}} offen",
+      "more_one": "+{{count}} weitere",
+      "more_other": "+{{count}} weitere"
     },
     "bomTile": {
       "title": "BOM",

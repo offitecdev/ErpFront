@@ -230,6 +230,13 @@ export interface ProductionSettings {
     companies: ProductionTransferCompany[];
 }
 
+/** Modul-Einstellungen › Produktion › Produktionslieferant (02.10.2026). */
+export interface ProductionSupplierLinks {
+    /** Je Produktionsfirma im Firmenbaum: welcher eigene Lieferant sie ist. */
+    producers: Array<{ id: string; name: string; supplierId: string | null }>;
+    suppliers: Array<{ id: string; name: string; isActive: boolean }>;
+}
+
 export interface ProductionSyncResult {
     synced: boolean;
     lastSyncedAt: string | null;

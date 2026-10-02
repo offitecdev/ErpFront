@@ -1,7 +1,7 @@
 import { t } from '@/i18n/translate';
 import type { ProductionTask, TaskFileAnalysis, TaskStatus, TaskSubtask, TaskSubtaskFile, TaskSubtaskRevisionRequest } from '@/types/productionTasks';
 
-import { isSubtaskCompleted, SUBTASK_FILE_MAX_BYTES } from './taskModel';
+import { isSubtaskCompleted, isSubtaskPhotoType, SUBTASK_FILE_MAX_BYTES } from './taskModel';
 
 /* Dateien an Unteraufgaben (28.09.2026) — was die Oberflächen teilen. */
 
@@ -27,8 +27,17 @@ export interface SubtaskActions {
     complete: (task: ProductionTask, subtask: TaskSubtask, note: string, checked: string[]) => Promise<boolean>;
     /** «Request revision» beim Prüfen der Dateien — zurück in Arbeit. */
     requestRevision: (task: ProductionTask, subtask: TaskSubtask, note: string) => Promise<boolean>;
-    /** Der Stand einer Unteraufgabe — «Complete the task» setzt «wartet auf Freigabe». */
-    setStatus: (task: ProductionTask, subtask: TaskSubtask, status: TaskStatus) => Promise<void>;
+    /**
+     * Der Stand einer Unteraufgabe — «Complete the task» setzt «wartet auf Freigabe». `note`
+     * (02.10.2026): die kurze Notiz beim Einsenden; `fee`: der Betrag (CHF) mit «Ücret girilsin».
+     * Antwort: ob der Server zustimmte.
+     */
+    setStatus: (task: ProductionTask, subtask: TaskSubtask, status: TaskStatus, note?: string, fee?: number) => Promise<boolean | void>;
+    /**
+     * «Sistem kilidi» (02.10.2026): was vor dieser Unteraufgabe noch offen ist — nur wo das ganze
+     * Gerät geladen ist (Geräteseite). Fehlt es, entscheidet allein der Server.
+     */
+    openBefore?: (task: ProductionTask, subtask: TaskSubtask) => string[];
     /** Ein Punkt mehr in der Freigabe-Checkliste — aus «Approve the files»; der Stand bleibt. */
     addChecklistItem: (task: ProductionTask, subtask: TaskSubtask, text: string) => Promise<boolean>;
     /** Die Sperre aufheben (Klick auf das Schloss) — wartet danach wieder auf die Freigabe. */
@@ -134,10 +143,14 @@ export const latestFiles = (files: readonly TaskSubtaskFile[]): TaskSubtaskFile[
 export const isPdf = (file: { type: string }): boolean => file.type === 'application/pdf';
 export const isImage = (file: { type: string }): boolean => file.type.startsWith('image/');
 
-/** Vor dem Senden prüfen, was der Server ohnehin prüft — die Meldung kommt sofort. */
-export const fileProblem = (file: File): string | null => {
-    // Nur PDF (28.09.2026) — wie der Server.
-    if (!isPdf(file)) return t('productionTasks.files.badType');
+/**
+ * Vor dem Senden prüfen, was der Server ohnehin prüft — die Meldung kommt sofort. Nur PDF
+ * (28.09.2026); mit «Fotoğraf yeterli» auch JPEG, PNG, WebP (02.10.2026) — wie der Server.
+ */
+export const fileProblem = (file: File, photoAllowed = false): string | null => {
+    if (!isPdf(file) && !(photoAllowed && isSubtaskPhotoType(file.type))) {
+        return t(photoAllowed ? 'productionTasks.files.badTypePhoto' : 'productionTasks.files.badType');
+    }
     if (file.size > SUBTASK_FILE_MAX_BYTES) return t('productionTasks.files.tooLarge');
     return null;
 };

@@ -41,6 +41,13 @@ const subtaskPath = (deviceId: string, taskId: string, subtaskId: string): strin
 const mySubtaskPath = (deviceId: string, taskId: string, subtaskId: string): string =>
     `/production/my-tasks/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}`;
 
+/** Der Stand einer Unteraufgabe, dazu Notiz und Betrag beim Einsenden (02.10.2026) — nur, was gegeben ist. */
+const statusBody = (status: TaskStatus, note?: string, fee?: number) => ({
+    status,
+    ...(note === undefined ? {} : { note }),
+    ...(fee === undefined ? {} : { fee }),
+});
+
 export const productionTasksApi = {
     templates: async (): Promise<TaskTemplateSummary[]> =>
         ((await apiClient.get('/production/task-templates')).data as { items: TaskTemplateSummary[] }).items,
@@ -76,10 +83,12 @@ export const productionTasksApi = {
     addStage: async (deviceId: string, area: string, name: string): Promise<DeviceTasks> =>
         (await apiClient.post(`/production/devices/${encodeURIComponent(deviceId)}/stages`, { area, name })).data,
     /** Der Stand einer Unteraufgabe — nur wer an ihr steht (29.09.2026); die Aufgabe folgt ihren Unteraufgaben. */
-    setSubtaskStatus: async (deviceId: string, taskId: string, subtaskId: string, status: TaskStatus): Promise<{ task: ProductionTask }> =>
+    // `note` (02.10.2026): die kurze Notiz beim Einsenden — ohne bleibt die von vorher.
+    // `fee` (02.10.2026): der Betrag (CHF) mit «Ücret girilsin» — ohne bleibt der von vorher.
+    setSubtaskStatus: async (deviceId: string, taskId: string, subtaskId: string, status: TaskStatus, note?: string, fee?: number): Promise<{ task: ProductionTask }> =>
         (await apiClient.patch(
             `/production/devices/${encodeURIComponent(deviceId)}/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}/status`,
-            { status },
+            statusBody(status, note, fee),
         )).data,
     /** «Complete the task» — nur die Verwaltung; mit kurzer Notiz. */
     completeSubtask: async (deviceId: string, taskId: string, subtaskId: string, note: string, checked: string[]): Promise<{ task: ProductionTask }> =>
@@ -151,8 +160,8 @@ export const productionTasksApi = {
         })).data,
     /* ── «Görevlerim» (30.09.2026): die eigenen Aufgaben — ohne Produktionsrechte, nur Eigenes ── */
     myTasks: async (): Promise<MyProductionTasks> => (await apiClient.get('/production/my-tasks')).data,
-    mySubtaskStatus: async (deviceId: string, taskId: string, subtaskId: string, status: TaskStatus): Promise<{ task: ProductionTask }> =>
-        (await apiClient.patch(`${mySubtaskPath(deviceId, taskId, subtaskId)}/status`, { status })).data,
+    mySubtaskStatus: async (deviceId: string, taskId: string, subtaskId: string, status: TaskStatus, note?: string, fee?: number): Promise<{ task: ProductionTask }> =>
+        (await apiClient.patch(`${mySubtaskPath(deviceId, taskId, subtaskId)}/status`, statusBody(status, note, fee))).data,
     myUploadSubtaskFile: async (
         deviceId: string,
         taskId: string,

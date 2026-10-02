@@ -150,7 +150,8 @@ export const StageTasksFloat = ({
     const activityFromRef = useRef<DOMRect | null>(null);
     const requestsRef = useRef<HTMLDivElement>(null);
     const requestsFromRef = useRef<DOMRect | null>(null);
-    const showFiles = Boolean(subtaskActions?.isAdmin);
+    const isAdmin = Boolean(subtaskActions?.isAdmin);
+    const showFiles = isAdmin;
     /* Die Datei des Tages (02.10.2026): wer in der Stufe steht, sieht «Dateien» auch —
        mit dem Hinweis, dass heute noch keine Datei von ihm da ist; die Verwaltung,
        die hier nicht selbst arbeitet, sieht, wie vielen die Datei von heute fehlt. */
@@ -362,7 +363,7 @@ export const StageTasksFloat = ({
                 </div>
             )}
             {/* Der Verlauf der Stufe (30.09.2026) — unter «Dateien», ebenso nur die Verwaltung. */}
-            {showFiles && subtaskActions && (
+            {isAdmin && subtaskActions && (
                 <div
                     ref={activityRef}
                     className={`ofi-ptk-float is-activity ${activityOpen ? 'is-open' : ''}`}
@@ -403,7 +404,7 @@ export const StageTasksFloat = ({
                 </div>
             )}
             {/* Anfragen an die Verwaltung (30.09.2026) — unter «Aktivitäten», nur die Verwaltung. */}
-            {showFiles && subtaskActions && (
+            {isAdmin && subtaskActions && (
                 <div
                     ref={requestsRef}
                     className={`ofi-ptk-float is-requests ${requestsOpen ? 'is-open' : ''}`}

@@ -15,6 +15,7 @@ import {
     LayoutTemplate,
     ListPlus,
     LockOpen,
+    NotebookPen,
     Pencil,
     Play,
     Plus,
@@ -42,7 +43,7 @@ import type {
 
 import { FileCard } from '../tasks/FileCard';
 import { formatDateTime, formatMoment, type SubtaskActions } from '../tasks/subtaskFileModel';
-import { formatDay, formatPercent, initialsOf, localToday, personTone } from '../tasks/taskModel';
+import { formatDay, formatFee, formatPercent, initialsOf, localToday, personTone } from '../tasks/taskModel';
 import {
     ACTIVITY_FILTERS,
     activityEntries,
@@ -75,6 +76,8 @@ const LOOK: Record<TaskActivityKind, { icon: LucideIcon; tone: string }> = {
     CHECKLIST_ITEM_ADDED: { icon: ListPlus, tone: 'is-orange' },
     UNLOCK_REQUESTED: { icon: LockOpen, tone: 'is-orange' },
     REQUEST_SOLVED: { icon: CircleCheck, tone: 'is-green' },
+    // Tagesnotiz (02.10.2026) — wie ein Hochladen.
+    DAILY_NOTE: { icon: NotebookPen, tone: 'is-purple' },
     FILE_UPLOADED: { icon: FileUp, tone: 'is-purple' },
     FILE_DELETED: { icon: FileX, tone: 'is-red' },
     SUBTASK_ASSIGNED: { icon: UserPlus, tone: 'is-blue' },
@@ -468,10 +471,26 @@ export const StageActivityCard = ({
                         {text(details.note) && note(details.note, t('productionTasks.requests.unlockReason'))}
                     </>
                 );
-            case 'SUBTASK_STARTED':
-            case 'SUBTASK_STOPPED':
             case 'SUBTASK_SUBMITTED':
             case 'SUBTASK_DONE':
+                // Mit der kurzen Notiz der Einsendung (02.10.2026), wenn eine dabei war.
+                return (
+                    <>
+                        {statusStep(details.from, details.to)}
+                        {/* Der Betrag der Einsendung (02.10.2026, «Ücret girilsin»). */}
+                        {typeof details.fee === 'number' && facts([[t('productionTasks.fee.row'), formatFee(details.fee)]])}
+                        {text(details.note) && note(details.note, t('productionTasks.activity.detail.submissionNote'))}
+                    </>
+                );
+            case 'DAILY_NOTE':
+                return (
+                    <>
+                        {facts([[t('productionTasks.activity.detail.noteDay'), fieldValue('startDate', details.day)]])}
+                        {note(details.text, t('productionTasks.activity.detail.dailyNote'))}
+                    </>
+                );
+            case 'SUBTASK_STARTED':
+            case 'SUBTASK_STOPPED':
             case 'SUBTASK_UNLOCKED':
             case 'TASK_STATUS':
                 return statusStep(details.from, details.to);
@@ -513,6 +532,17 @@ export const StageActivityCard = ({
                             [t('productionTasks.activity.field.startDate'), fieldValue('startDate', details.startDate)],
                             [t('productionTasks.activity.field.dueDate'), fieldValue('dueDate', details.dueDate)],
                             [t('productionTasks.activity.field.requiresDocument'), fieldValue('requiresDocument', details.requiresDocument)],
+                            // «Fotoğraf yeterli» (02.10.2026) — nur, wenn angehakt.
+                            ...(details.photoAllowed === true
+                                ? [[t('productionTasks.activity.field.photoAllowed'), fieldValue('photoAllowed', true)] as [string, ReactNode]]
+                                : []),
+                            // Betrag und Sperre (02.10.2026) — nur, wenn angehakt.
+                            ...(details.feeRequired === true
+                                ? [[t('productionTasks.activity.field.feeRequired'), fieldValue('feeRequired', true)] as [string, ReactNode]]
+                                : []),
+                            ...(details.priorStepsRequired === true
+                                ? [[t('productionTasks.activity.field.priorStepsRequired'), fieldValue('priorStepsRequired', true)] as [string, ReactNode]]
+                                : []),
                             [t('productionTasks.activity.field.requiresApproval'), fieldValue('requiresApproval', details.requiresApproval)],
                         ])}
                         {list<string>(details.checklist).length > 0 && (

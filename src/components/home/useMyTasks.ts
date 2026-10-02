@@ -82,7 +82,8 @@ export const useMyTasks = (meId: string | null, isAdmin = false) => {
     }, []);
 
     /* Der Stand — sofort sichtbar, der Server entscheidet (Regeln wie auf der Geräteseite). */
-    const setSubtaskStatus = useCallback(async (deviceId: string, task: ProductionTask, subtask: TaskSubtask, status: TaskStatus) => {
+    // `note` (02.10.2026): die kurze Notiz beim Einsenden. Antwort: ob der Server zustimmte.
+    const setSubtaskStatus = useCallback(async (deviceId: string, task: ProductionTask, subtask: TaskSubtask, status: TaskStatus, note?: string, fee?: number): Promise<boolean> => {
         const optimistic = (next: TaskStatus): ProductionTask => {
             const subtasks = task.subtasks.map((item) => (item.id === subtask.id ? { ...item, status: next } : item));
             return { ...task, subtasks, status: statusOfSubtasks(subtasks) ?? task.status };
@@ -90,10 +91,12 @@ export const useMyTasks = (meId: string | null, isAdmin = false) => {
         takeTask(deviceId, optimistic(status));
         setBusyTaskId(task.id);
         try {
-            takeTask(deviceId, (await productionTasksApi.mySubtaskStatus(deviceId, task.id, subtask.id, status)).task);
+            takeTask(deviceId, (await productionTasksApi.mySubtaskStatus(deviceId, task.id, subtask.id, status, note, fee)).task);
+            return true;
         } catch (failure) {
             toast.error(productionTaskErrorText(failure, 'productionTasks.err.statusFailed'));
             takeTask(deviceId, task);
+            return false;
         } finally {
             setBusyTaskId((current) => (current === task.id ? null : current));
         }
@@ -139,7 +142,7 @@ export const useMyTasks = (meId: string | null, isAdmin = false) => {
             void openBlob(() => productionTasksApi.mySubtaskFile(deviceId, task.id, subtask.id, file.id), (failure) => productionTaskErrorText(failure));
         },
         loadFile: (task, subtask, file) => productionTasksApi.mySubtaskFile(deviceId, task.id, subtask.id, file.id),
-        setStatus: (task, subtask, status) => setSubtaskStatus(deviceId, task, subtask, status),
+        setStatus: (task, subtask, status, note, fee) => setSubtaskStatus(deviceId, task, subtask, status, note, fee),
         // Um das Entsperren bitten (30.09.2026) — das Schloss einer eigenen gesperrten Unteraufgabe.
         requestUnlock: async (task, subtask, note) => {
             try {

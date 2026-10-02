@@ -18,6 +18,9 @@ import { PersonnelHolidaysSection } from './sections/PersonnelHolidaysSection';
 import { PersonnelLeavePolicySection } from './sections/PersonnelLeavePolicySection';
 // Görev Yönetimi (15.09.2026): Uhrzeit des Gün-sonu-raporu-Fensters (war fest 16:00).
 import { TasksDailyReportSection } from './sections/TasksDailyReportSection';
+// Üretim (02.10.2026): welcher Lieferant die Produktionsfirma ist — eine
+// bestätigte Bestellung bei ihm öffnet dort das Projekt.
+import { ProductionSupplierSection } from './sections/ProductionSupplierSection';
 
 /**
  * MODULEINSTELLUNGEN — LINKS die Module, OBEN ihre Einstellungsarten.
@@ -39,8 +42,8 @@ import { TasksDailyReportSection } from './sections/TasksDailyReportSection';
  * direkt landet.
  */
 
-type CategoryKey = 'reminders' | 'osp' | 'units' | 'codes' | 'shift' | 'holidays' | 'leavePolicy' | 'dailyReport';
-type ModuleKey = 'crm' | 'sales' | 'projects' | 'inventory' | 'personnel' | 'tasks' | 'calendar';
+type CategoryKey = 'reminders' | 'osp' | 'units' | 'codes' | 'shift' | 'holidays' | 'leavePolicy' | 'dailyReport' | 'producerSupplier';
+type ModuleKey = 'crm' | 'sales' | 'projects' | 'inventory' | 'production' | 'personnel' | 'tasks' | 'calendar';
 
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
     reminders: 'settings.modules.catReminders',
@@ -51,6 +54,7 @@ const CATEGORY_LABELS: Record<CategoryKey, string> = {
     holidays: 'settings.modules.catHolidays',
     leavePolicy: 'settings.modules.catLeavePolicy',
     dailyReport: 'settings.modules.catDailyReport',
+    producerSupplier: 'settings.modules.catProducerSupplier',
 };
 
 /**
@@ -62,6 +66,7 @@ const MODULES: ReadonlyArray<{ key: ModuleKey; labelKey: string; categories: Rea
     { key: 'sales', labelKey: 'nav.sales', categories: ['reminders', 'osp'] },
     { key: 'projects', labelKey: 'nav.projects', categories: [] },
     { key: 'inventory', labelKey: 'nav.inventory', categories: ['units', 'codes'] },
+    { key: 'production', labelKey: 'nav.production', categories: ['producerSupplier'] },
     { key: 'personnel', labelKey: 'nav.personnel', categories: ['shift', 'holidays', 'leavePolicy'] },
     { key: 'tasks', labelKey: 'nav.tasksModule', categories: ['dailyReport'] },
     { key: 'calendar', labelKey: 'nav.calendar', categories: [] },
@@ -154,6 +159,7 @@ export const ModuleSettingsPage = () => {
                     {category === 'holidays' && <PersonnelHolidaysSection />}
                     {category === 'leavePolicy' && <PersonnelLeavePolicySection />}
                     {category === 'dailyReport' && <TasksDailyReportSection />}
+                    {category === 'producerSupplier' && <ProductionSupplierSection />}
                     {!category && (
                         <div className="ofi-mset-card">
                             <p className="ofi-mset-empty">{t('settings.modules.nothingHere')}</p>

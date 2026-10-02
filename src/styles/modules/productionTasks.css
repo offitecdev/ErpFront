@@ -3146,6 +3146,9 @@ body > :not(#root) .ofi-ptk-btn.ofi-ptk-aireportbtn svg { width: 13px; height: 1
 .ofi-ptk-standardspdf > .ofi-ptk-filechip .ofi-ptk-filechip__text { max-width: 260px; }
 .ofi-ptk-review__standardspdf { max-width: 100%; margin-bottom: 8px; }
 
+/* Der Betrag beim Einsenden (02.10.2026, «Ücret girilsin») — ein schmales Feld, Ziffern in einer Flucht. */
+.ofi-ptk-complete__fee { max-width: 220px; font-variant-numeric: tabular-nums; }
+
 /* Wer schon woran arbeitet (02.10.2026): Zahl je Person in der Auswahl, darunter die Vorschau. */
 .ofi-ptk-workcount {
     flex: none;

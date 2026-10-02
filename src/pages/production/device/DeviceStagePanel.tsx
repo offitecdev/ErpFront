@@ -9,7 +9,7 @@ import type { PersonNames } from '../tasks/PeopleCell';
 import { BomWindow } from '../bom/device/BomWindow';
 import type { StageCard } from '../tasks/StageCard';
 import type { SubtaskActions } from '../tasks/subtaskFileModel';
-import { isBuiltInArea, sectionLabel, stageLabel } from '../tasks/taskModel';
+import { isBuiltInArea, openPriorSteps, sectionLabel, stageLabel } from '../tasks/taskModel';
 import { DeviceAssignmentBoard } from './DeviceAssignmentBoard';
 import { isWorkStage, stageNumber, type DeviceStage } from './deviceStages';
 import { StageTasksFloat } from './StageTasksFloat';
@@ -97,6 +97,8 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
         addChecklistItem: handle.addChecklistItem,
         // Die KI-Prüfung noch einmal (01.10.2026) — nur die Verwaltung.
         retryAnalysis: isAdmin ? handle.retryAnalysis : undefined,
+        // «Sistem kilidi» (02.10.2026): hier ist das ganze Gerät geladen — die offenen Schritte davor.
+        openBefore: (task, subtask) => (plan && handle.data ? openPriorSteps(plan.sections, handle.data.tasks, task.id, subtask.id) : []),
     };
     /* Der Name einer Stufe für den Verlauf (30.09.2026): in einem anderen Bereich mit dessen Namen davor. */
     const stageNameOf = (areaKey: string | null, stageKey: string | null): string => {

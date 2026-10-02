@@ -350,9 +350,16 @@ export const taskProgress = (task: { status: TaskStatus; subtasks: ReadonlyArray
 
 /* ── Dateien und Abschluss einer Unteraufgabe (28.09.2026) — wie der Server ── */
 
-/** Mindestens ein PDF: erst dann ist das Dokument da («at least one pdf»). */
-export const hasSubtaskDocument = (subtask: Pick<TaskSubtask, 'files'>): boolean =>
-    subtask.files.some((file) => file.type === 'application/pdf');
+/** Fotos, die mit «Fotoğraf yeterli» an eine Unteraufgabe dürfen (02.10.2026) — wie der Server. */
+export const SUBTASK_PHOTO_TYPES: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
+export const isSubtaskPhotoType = (type: string): boolean => SUBTASK_PHOTO_TYPES.includes(type);
+
+/**
+ * Mindestens ein PDF: erst dann ist das Dokument da («at least one pdf») — mit «Fotoğraf yeterli»
+ * genügt auch ein Foto (02.10.2026).
+ */
+export const hasSubtaskDocument = (subtask: Pick<TaskSubtask, 'files' | 'photoAllowed'>): boolean =>
+    subtask.files.some((file) => file.type === 'application/pdf' || (subtask.photoAllowed === true && isSubtaskPhotoType(file.type)));
 
 /** Abgeschlossen: den Stand ändert niemand mehr, Dateien nur die Verwaltung. */
 export const isSubtaskCompleted = (subtask: Pick<TaskSubtask, 'completedById'>): boolean => subtask.completedById !== null;
@@ -370,11 +377,15 @@ export const needsPdfFirst = (subtask: TaskSubtask): boolean => subtask.requires
  * vorn — wortgleich mit `requirementsAdded` des Servers (28.09.2026).
  */
 export const requirementsAdded = (
-    before: Pick<TaskSubtask, 'requiresDocument' | 'requiresApproval' | 'approvalChecklist'>,
-    after: Pick<TaskSubtask, 'requiresDocument' | 'requiresApproval' | 'approvalChecklist'>,
+    before: Pick<TaskSubtask, 'requiresDocument' | 'requiresApproval' | 'approvalChecklist' | 'photoAllowed' | 'feeRequired' | 'fee'>,
+    after: Pick<TaskSubtask, 'requiresDocument' | 'requiresApproval' | 'approvalChecklist' | 'photoAllowed' | 'feeRequired'>,
 ): boolean => {
     if (after.requiresDocument && !before.requiresDocument) return true;
     if (after.requiresApproval && !before.requiresApproval) return true;
+    // «Fotoğraf yeterli» weggenommen: wieder nur ein PDF (02.10.2026).
+    if (after.requiresDocument && before.photoAllowed && !after.photoAllowed) return true;
+    // Ein Betrag wird verlangt, und es gibt noch keinen (02.10.2026).
+    if (after.feeRequired && !before.feeRequired && (before.fee ?? null) === null) return true;
     const earlier = new Map(before.approvalChecklist.map((item) => [item.id, item.text]));
     return after.approvalChecklist.some((item) => earlier.get(item.id) !== item.text.replace(/\s+/g, ' ').trim());
 };
@@ -382,6 +393,91 @@ export const requirementsAdded = (
 /** Was an eine Unteraufgabe darf — wie der Server: nur PDF, höchstens 25 MB. */
 export const SUBTASK_FILE_ACCEPT = 'application/pdf';
 export const SUBTASK_FILE_MAX_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Was der Dateiwähler einer Unteraufgabe anbietet (02.10.2026): mit «Fotoğraf yeterli» auch Fotos —
+ * `image/*` lässt das Telefon die Kamera anbieten (ohne `capture`, die Galerie bleibt offen);
+ * welche Fotos wirklich dürfen, prüft `fileProblem` wie der Server.
+ */
+export const SUBTASK_PHOTO_ACCEPT = 'application/pdf,image/jpeg,image/png,image/webp,image/*';
+
+/** So lang darf die kurze Notiz beim Einsenden sein (02.10.2026) — wie der Server. */
+export const SUBMISSION_NOTE_MAX = 1000;
+export const subtaskFileAccept = (subtask: Pick<TaskSubtask, 'photoAllowed'> | null | undefined): string =>
+    (subtask?.photoAllowed ? SUBTASK_PHOTO_ACCEPT : SUBTASK_FILE_ACCEPT);
+
+/* ── Betrag und Sperre (02.10.2026, OCC-Standard S. 7) — wie der Server ───── */
+
+/** Der höchste Betrag beim Einsenden (CHF) — wie der Server. */
+export const SUBTASK_FEE_MAX = 100_000_000;
+
+/**
+ * Ein getippter Betrag: «1'250.50», «1250,50», «1 250» … — auf Rappen gerundet. Leer → null,
+ * Unlesbares oder ausserhalb 0 … `SUBTASK_FEE_MAX` → undefined.
+ */
+export const parseFee = (value: string): number | null | undefined => {
+    const cleaned = value.replace(/['’\s]/g, '').replace(',', '.');
+    if (!cleaned) return null;
+    const raw = Number(cleaned);
+    if (!Number.isFinite(raw) || raw < 0 || raw > SUBTASK_FEE_MAX) return undefined;
+    return Math.round(raw * 100) / 100;
+};
+
+/** Ein Betrag in Franken, Schweizer Schreibweise: «CHF 1’250.00». */
+export const formatFee = (value: number): string =>
+    `CHF ${new Intl.NumberFormat('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
+
+/** «Görevi tamamla» öffnet das Fenster (Fotos, Notiz, Betrag) — sonst ein Klick wie bisher. */
+export const submitsWithDialog = (subtask: Pick<TaskSubtask, 'photoAllowed' | 'feeRequired'>): boolean =>
+    subtask.photoAllowed === true || subtask.feeRequired === true;
+
+/**
+ * «Sistem kilidi» — was VOR dieser Unteraufgabe noch offen ist, wortgleich mit `openPriorSteps` des
+ * Servers: im eigenen Bereich die früheren Stufen, in derselben Stufe die früheren Aufgaben, in
+ * derselben Aufgabe die früheren Unteraufgaben — und jeder andere Bereich ganz.
+ */
+export const openPriorSteps = (
+    sections: readonly TaskSection[],
+    tasks: readonly ProductionTask[],
+    taskId: string,
+    subtaskId: string,
+): string[] => {
+    const target = tasks.find((task) => task.id === taskId);
+    if (!target) return [];
+    const sectionAt = (area: string): number => {
+        const index = sections.findIndex((section) => section.key === area);
+        return index < 0 ? sections.length : index;
+    };
+    const stageAt = (area: string, stage: string): number => {
+        const index = sections.find((section) => section.key === area)?.stages.findIndex((entry) => entry.key === stage) ?? -1;
+        return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+    };
+    // Die Reihenfolge am Gerät ist die der Liste (der Server ordnet nach `sortOrder`).
+    const ordered = tasks
+        .map((task, index) => ({ task, index }))
+        .sort((left, right) => sectionAt(left.task.area) - sectionAt(right.task.area)
+            || stageAt(left.task.area, left.task.stage) - stageAt(right.task.area, right.task.stage)
+            || left.index - right.index)
+        .map(({ task }) => task);
+    const position = ordered.indexOf(target);
+    const targetStage = stageAt(target.area, target.stage);
+    const open: string[] = [];
+    const openSubtasks = (task: ProductionTask, count: number) => task.subtasks.slice(0, count).forEach((subtask, index) => {
+        if (subtask.status !== 'DONE') open.push(`${subtaskCode(task.code, index)} ${subtask.name}`);
+    });
+    ordered.forEach((task, at) => {
+        if (task === target) {
+            openSubtasks(task, Math.max(0, task.subtasks.findIndex((subtask) => subtask.id === subtaskId)));
+            return;
+        }
+        const stage = stageAt(task.area, task.stage);
+        const earlier = task.area !== target.area || stage < targetStage || (stage === targetStage && at < position);
+        if (!earlier) return;
+        if (task.subtasks.length) openSubtasks(task, task.subtasks.length);
+        else if (task.status !== 'DONE') open.push(`${task.code} ${task.name}`);
+    });
+    return open;
+};
 
 /** Der Stand einer Aufgabe aus dem ihrer Unteraufgaben — wortgleich mit dem Server. */
 export const statusOfSubtasks = (subtasks: ReadonlyArray<{ status: TaskStatus }>): TaskStatus | null => {

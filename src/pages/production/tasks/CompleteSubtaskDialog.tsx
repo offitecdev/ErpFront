@@ -11,10 +11,10 @@ import { FileReviewDialog } from './FileReviewDialog';
 import type { PersonNames } from './PeopleCell';
 import { FileChip } from './SubtaskFiles';
 import { fileProblem, filesLocked, isImage, isPdf, latestFiles, type SubtaskActions } from './subtaskFileModel';
-import { hasSubtaskDocument } from './taskModel';
+import { formatFee, hasSubtaskDocument, isSubtaskPhotoType, subtaskFileAccept } from './taskModel';
 
 /** Eine Zeile der Prüfliste: grüner Haken oder oranges Zeichen, Text, rechts der Wert (und ggf. ein Knopf). */
-const CheckRow = ({ ok, title, detail, value, action }: { ok: boolean; title: string; detail: string; value: string; action?: ReactNode }) => (
+export const CheckRow = ({ ok, title, detail, value, action }: { ok: boolean; title: string; detail: string; value: string; action?: ReactNode }) => (
     <li className={`ofi-ptk-checkrow ${ok ? 'is-ok' : 'is-warn'}`}>
         {/* Gefüllter Kreis: grün mit weissem Haken bzw. orange mit weissem «!». */}
         <span className="ofi-ptk-checkrow__icon" aria-hidden>{ok ? <Check strokeWidth={3} /> : <span>!</span>}</span>
@@ -25,6 +25,21 @@ const CheckRow = ({ ok, title, detail, value, action }: { ok: boolean; title: st
         <span className="ofi-ptk-checkrow__value">{value}</span>
         {action}
     </li>
+);
+
+/**
+ * «Sistem kilidi» (02.10.2026, OCC-Standard S. 7) als Zeile der Prüfliste: grün, wenn alle Schritte
+ * davor erledigt sind — sonst die ersten offenen (Kürzel und Name) und ihre Zahl.
+ */
+export const PriorStepsRow = ({ open }: { open: readonly string[] }) => (
+    <CheckRow
+        ok={open.length === 0}
+        title={t('productionTasks.priorSteps.row')}
+        detail={open.length
+            ? `${open.slice(0, 4).join(' · ')}${open.length > 4 ? ` · ${t('productionTasks.priorSteps.more', { count: open.length - 4 })}` : ''}`
+            : t('productionTasks.priorSteps.okDetail')}
+        value={open.length ? t('productionTasks.priorSteps.openValue', { count: open.length }) : t('productionTasks.priorSteps.okValue')}
+    />
 );
 
 /**
@@ -92,7 +107,16 @@ export const CompleteSubtaskDialog = ({
     const docCount = current.length;
     const pdfs = current.filter(isPdf);
     const images = current.filter(isImage);
+    // «Fotoğraf yeterli» (02.10.2026): Fotos zählen als Dokument — gezeigt und gezählt wie die PDFs.
+    const photoAllowed = subtask.photoAllowed === true;
+    const documents = photoAllowed ? current.filter((file) => isPdf(file) || isSubtaskPhotoType(file.type)) : pdfs;
     const documentOk = !subtask.requiresDocument || hasSubtaskDocument(subtask);
+    // Der Betrag der Einsendung (02.10.2026) — mit «Ücret girilsin» ohne ihn keine Freigabe.
+    const feeRequired = subtask.feeRequired === true;
+    const feeOk = !feeRequired || (subtask.fee ?? null) !== null;
+    // «Sistem kilidi» (02.10.2026): mit «Kilit» erst, wenn die Schritte davor erledigt sind.
+    const openBefore = subtask.priorStepsRequired ? actions.openBefore?.(task, subtask) ?? null : null;
+    const priorOk = !openBefore?.length;
     // Die Personen DIESER Unteraufgabe (29.09.2026: Personen stehen nur an Unteraufgaben).
     const people = subtask.assigneeIds.map((id) => {
         const name = names.get(id)?.name ?? '—';
@@ -102,7 +126,7 @@ export const CompleteSubtaskDialog = ({
     const upload = async (files: File[]) => {
         setUploading(true);
         for (const file of files) {
-            const problem = fileProblem(file);
+            const problem = fileProblem(file, photoAllowed);
             if (problem) { toast.error(`${file.name}: ${problem}`); continue; }
             if (!(await actions.upload(task, subtask, file))) break;
         }
@@ -126,7 +150,7 @@ export const CompleteSubtaskDialog = ({
     ) : null;
 
     const submit = async () => {
-        if (!documentOk || !checklistOk || saving) return;
+        if (!documentOk || !checklistOk || !feeOk || !priorOk || saving) return;
         setSaving(true);
         const done = await actions.complete(task, subtask, note, [...ticked]);
         setSaving(false);
@@ -154,7 +178,7 @@ export const CompleteSubtaskDialog = ({
                     )}
                 >
                     <PopupButton onClick={onClose}>{t('productionTasks.actions.cancel')}</PopupButton>
-                    <PopupButton variant="primary" disabled={!documentOk || !checklistOk || uploading} loading={saving} onClick={() => void submit()}>
+                    <PopupButton variant="primary" disabled={!documentOk || !checklistOk || !feeOk || !priorOk || uploading} loading={saving} onClick={() => void submit()}>
                         {t('productionTasks.complete.confirm')}
                     </PopupButton>
                 </PopupActions>
@@ -175,16 +199,20 @@ export const CompleteSubtaskDialog = ({
                         <CheckRow
                             // Mit Dateien erst grün, wenn sie freigegeben sind.
                             ok={documentOk && (!hasFiles || filesApproved)}
-                            title={t('productionTasks.complete.documentRow')}
+                            title={t(photoAllowed ? 'productionTasks.complete.documentRowPhoto' : 'productionTasks.complete.documentRow')}
                             detail={!documentOk
-                                ? images.length
-                                    ? t('productionTasks.complete.documentMissingImages', { count: images.length })
-                                    : t('productionTasks.complete.documentMissing')
+                                ? photoAllowed
+                                    ? t('productionTasks.complete.documentMissingPhoto')
+                                    : images.length
+                                        ? t('productionTasks.complete.documentMissingImages', { count: images.length })
+                                        : t('productionTasks.complete.documentMissing')
                                 : hasFiles && !filesApproved
                                     ? t('productionTasks.review.approveFirst', { count: docCount })
                                     : filesApproved
                                         ? t('productionTasks.review.approvedDetail', { count: docCount })
-                                        : t('productionTasks.complete.documentOk', { count: pdfs.length })}
+                                        : photoAllowed
+                                            ? t('productionTasks.complete.documentOkPhoto', { count: documents.length })
+                                            : t('productionTasks.complete.documentOk', { count: pdfs.length })}
                             value={!documentOk
                                 ? t('productionTasks.complete.missing')
                                 : hasFiles && !filesApproved
@@ -195,6 +223,15 @@ export const CompleteSubtaskDialog = ({
                             action={reviewButton}
                         />
                     )}
+                    {feeRequired && (
+                        <CheckRow
+                            ok={feeOk}
+                            title={t('productionTasks.fee.row')}
+                            detail={feeOk ? t('productionTasks.fee.okDetailReview') : t('productionTasks.fee.missingDetailReview')}
+                            value={subtask.fee != null ? formatFee(subtask.fee) : t('productionTasks.complete.missing')}
+                        />
+                    )}
+                    {openBefore && <PriorStepsRow open={openBefore} />}
                     <CheckRow
                         ok={people.length > 0}
                         title={t('productionTasks.complete.peopleRow')}
@@ -202,6 +239,14 @@ export const CompleteSubtaskDialog = ({
                         value={t('productionTasks.complete.peopleCount', { count: people.length })}
                     />
                 </ul>
+
+                {/* Die kurze Notiz der Einsendung (02.10.2026) — Messwerte, Nakliye-Preis; nur zu lesen. */}
+                {subtask.submissionNote && (
+                    <section className="ofi-ptk-complete__block">
+                        <h3 className="ofi-ptk-complete__label">{t('productionTasks.complete.submissionNote')}</h3>
+                        <p className="ofi-ptk-review__standards">{subtask.submissionNote}</p>
+                    </section>
+                )}
 
                 {checklistHere && (
                     <section className="ofi-ptk-complete__block">
@@ -242,16 +287,16 @@ export const CompleteSubtaskDialog = ({
                     {/* Wartet sie auf die Freigabe, sind die Dateien zu (28.09.2026) — nichts hochzuladen. */}
                     {!filesLocked(subtask) && (
                         <FileDropZone
-                            title={t('productionTasks.complete.dropTitle')}
-                            accept="application/pdf"
+                            title={t(photoAllowed ? 'productionTasks.complete.dropTitlePhoto' : 'productionTasks.complete.dropTitle')}
+                            accept={subtaskFileAccept(subtask)}
                             multiple
                             busy={uploading}
                             onFiles={(files) => void upload(files)}
                         />
                     )}
-                    {pdfs.length > 0 && (
+                    {documents.length > 0 && (
                         <div className="ofi-ptk-files__list is-dialog">
-                            {pdfs.map((file) => (
+                            {documents.map((file) => (
                                 <FileChip
                                     key={file.id}
                                     file={file}

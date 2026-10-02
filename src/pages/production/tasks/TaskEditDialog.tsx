@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type KeyboardEvent } from 'react';
+import { Fragment, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, ClipboardCheck, Eye, Info, ListChecks, Plus, ScrollText, Trash2, X } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
@@ -73,6 +73,9 @@ const emptySubtask = (name: string): TaskSubtask => ({
     dueDate: null,
     assigneeIds: [],
     requiresDocument: false,
+    photoAllowed: false,
+    feeRequired: false,
+    priorStepsRequired: false,
     requiresApproval: false,
     approvalChecklist: [],
     documentStandards: null,
@@ -258,7 +261,8 @@ export const TaskEditDialog = ({
                         .map((item) => ({ ...item, text: item.text.replace(/\s+/g, ' ').trim() }))
                         .filter((item) => item.text)
                     : [],
-                // Ohne «Document» keine Standards.
+                // Ohne «Document» keine Standards — und kein «Fotoğraf yeterli» (02.10.2026).
+                photoAllowed: entry.requiresDocument ? entry.photoAllowed === true : false,
                 documentStandards: entry.requiresDocument ? entry.documentStandards?.trim() || null : null,
                 documentStandardsFile: entry.requiresDocument ? entry.documentStandardsFile ?? null : null,
             }))
@@ -548,18 +552,51 @@ export const TaskEditDialog = ({
                                                 {t('productionTasks.customer.visibleShort')}
                                             </label>
                                             {FLAGS.map(({ flag, labelKey }) => (
-                                                <label key={flag} className="ofi-ptk-flag">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="ofi-ptk-check"
-                                                        checked={subtask[flag]}
-                                                        onChange={(event) => patchSubtask(subtask.id, flag === 'requiresDocument'
-                                                            ? { requiresDocument: event.target.checked }
-                                                            : { requiresApproval: event.target.checked })}
-                                                    />
-                                                    {t(labelKey)}
-                                                </label>
+                                                <Fragment key={flag}>
+                                                    <label className="ofi-ptk-flag">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="ofi-ptk-check"
+                                                            checked={subtask[flag]}
+                                                            onChange={(event) => patchSubtask(subtask.id, flag === 'requiresDocument'
+                                                                ? { requiresDocument: event.target.checked }
+                                                                : { requiresApproval: event.target.checked })}
+                                                        />
+                                                        {t(labelKey)}
+                                                    </label>
+                                                    {/* «Fotoğraf yeterli» (02.10.2026) — nur mit «Document»: dann zählt auch ein Foto. */}
+                                                    {flag === 'requiresDocument' && subtask.requiresDocument && (
+                                                        <label className="ofi-ptk-flag" title={t('productionTasks.subtask.photoAllowedHint')}>
+                                                            <input
+                                                                type="checkbox"
+                                                                className="ofi-ptk-check"
+                                                                checked={subtask.photoAllowed === true}
+                                                                onChange={(event) => patchSubtask(subtask.id, { photoAllowed: event.target.checked })}
+                                                            />
+                                                            {t('productionTasks.subtask.photoAllowed')}
+                                                        </label>
+                                                    )}
+                                                </Fragment>
                                             ))}
+                                            {/* OCC-Standard S. 7 (02.10.2026): ein Betrag beim Einsenden — und die Sperre bis alles davor erledigt ist. */}
+                                            <label className="ofi-ptk-flag" title={t('productionTasks.fee.flagHint')}>
+                                                <input
+                                                    type="checkbox"
+                                                    className="ofi-ptk-check"
+                                                    checked={subtask.feeRequired === true}
+                                                    onChange={(event) => patchSubtask(subtask.id, { feeRequired: event.target.checked })}
+                                                />
+                                                {t('productionTasks.fee.flag')}
+                                            </label>
+                                            <label className="ofi-ptk-flag" title={t('productionTasks.priorSteps.flagHint')}>
+                                                <input
+                                                    type="checkbox"
+                                                    className="ofi-ptk-check"
+                                                    checked={subtask.priorStepsRequired === true}
+                                                    onChange={(event) => patchSubtask(subtask.id, { priorStepsRequired: event.target.checked })}
+                                                />
+                                                {t('productionTasks.priorSteps.flag')}
+                                            </label>
                                             {/* «Approval» gewählt: daneben die Checkliste (28.09.2026). */}
                                             {subtask.requiresApproval && (
                                                 <button
