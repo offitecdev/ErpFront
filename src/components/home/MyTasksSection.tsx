@@ -86,7 +86,8 @@ export const MyTasksSection = () => {
        be able to go to that page») — sie arbeiten hier auf der Startseite. */
     const canOpenDevice = useAuthStore((state) => state.isSystemAdmin || state.permissions.includes('production.view'));
     const navigate = useNavigate();
-    const my = useMyTasks(meId);
+    const isAdmin = useAuthStore((state) => state.isSystemAdmin);
+    const my = useMyTasks(meId, isAdmin);
     // Projekt UND Gerät umschalten (30.09.2026: «switch between both projects and devices in the project»).
     const [choice, setChoice] = useState<Choice>(() => readChoice(meId));
 

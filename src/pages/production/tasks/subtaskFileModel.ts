@@ -8,6 +8,12 @@ import { isSubtaskCompleted, SUBTASK_FILE_MAX_BYTES } from './taskModel';
 /** Was die Geräteseite für Dateien und Abschluss bereitstellt. */
 export interface SubtaskActions {
     isAdmin: boolean;
+    /**
+     * «Approve the task» zeigen — fehlt es, gilt `isAdmin`. Die Startseite (02.10.2026, Samet:
+     * «I just want this button to be visible to admins on their dashboard also») setzt es für die
+     * Verwaltung, ohne sonst als Verwaltung zu handeln (Dateien laufen dort über /my-tasks).
+     */
+    canApprove?: boolean;
     meId: string | null;
     /** Für die Unterzeile des Abschlussfensters. */
     deviceName: string;

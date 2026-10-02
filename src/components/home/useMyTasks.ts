@@ -24,7 +24,7 @@ const NONE: MyProductionTasks = { projects: [], people: [] };
  * Produktionsrechte. Kommt das Fenster wieder nach vorn, wird still nachgeladen
  * (die Verwaltung kann inzwischen freigegeben oder zurückgegeben haben).
  */
-export const useMyTasks = (meId: string | null) => {
+export const useMyTasks = (meId: string | null, isAdmin = false) => {
     const [data, setData] = useState<MyProductionTasks | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
@@ -99,9 +99,24 @@ export const useMyTasks = (meId: string | null) => {
         }
     }, [takeTask]);
 
-    /** Was die Tabellen der Stufen für EIN Gerät brauchen — als Person an der Unteraufgabe, nie als Verwaltung. */
+    /* «Approve the task» auch hier (02.10.2026, Samet: «I just want this button to be visible to
+       admins on their dashboard also») — dieselben Wege wie auf der Geräteseite; der Server prüft
+       die Verwaltung. Sonst handelt die Verwaltung hier wie jede Person an der Unteraufgabe. */
+    const adminCall = useCallback(async (deviceId: string, call: () => Promise<{ task: ProductionTask }>, successKey?: string): Promise<boolean> => {
+        try {
+            takeTask(deviceId, (await call()).task);
+            if (successKey) toast.success(t(successKey));
+            return true;
+        } catch (failure) {
+            toast.error(productionTaskErrorText(failure));
+            return false;
+        }
+    }, [takeTask]);
+
+    /** Was die Tabellen der Stufen für EIN Gerät brauchen — als Person an der Unteraufgabe; die Verwaltung gibt zusätzlich frei. */
     const actionsFor = useCallback((deviceId: string, deviceName: string): SubtaskActions => ({
         isAdmin: false,
+        canApprove: isAdmin,
         meId,
         deviceName,
         upload: async (task, subtask, file, revisionOf, revisionNote) => {
@@ -136,12 +151,26 @@ export const useMyTasks = (meId: string | null) => {
                 return false;
             }
         },
-        // Freigeben, zurückgeben, entsperren und die Checkliste ergänzen tut nur die Verwaltung.
-        complete: async () => false,
-        requestRevision: async () => false,
+        // Freigeben, zurückgeben und die Checkliste ergänzen tut nur die Verwaltung; entsperren bleibt auf der Geräteseite.
+        complete: isAdmin
+            ? (task, subtask, note, checked) => adminCall(
+                deviceId,
+                () => productionTasksApi.completeSubtask(deviceId, task.id, subtask.id, note, checked),
+                'productionTasks.complete.done',
+            )
+            : async () => false,
+        requestRevision: isAdmin
+            ? (task, subtask, note) => adminCall(
+                deviceId,
+                () => productionTasksApi.requestSubtaskRevision(deviceId, task.id, subtask.id, note),
+                'productionTasks.review.revisionSent',
+            )
+            : async () => false,
         unlock: async () => false,
-        addChecklistItem: async () => false,
-    }), [meId, takeTask, setSubtaskStatus]);
+        addChecklistItem: isAdmin
+            ? (task, subtask, text) => adminCall(deviceId, () => productionTasksApi.addChecklistItem(deviceId, task.id, subtask.id, text))
+            : async () => false,
+    }), [meId, isAdmin, takeTask, setSubtaskStatus, adminCall]);
 
     return {
         data,

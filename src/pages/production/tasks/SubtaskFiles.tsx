@@ -325,7 +325,7 @@ export const SubtaskDetail = ({
                             {t('productionTasks.subtask.completeTask')}
                         </button>
                     )}
-                    {subtask.requiresApproval && subtask.status === 'PENDING' && actions.isAdmin && !bomDriven && (
+                    {subtask.requiresApproval && subtask.status === 'PENDING' && (actions.canApprove ?? actions.isAdmin) && !bomDriven && (
                         <button type="button" className="ofi-ptk-completebtn ofi-nosize" onClick={onComplete}>
                             <CheckCircle2 aria-hidden />
                             {t('productionTasks.complete.button')}
