@@ -37,7 +37,7 @@ import {
 } from './supplierPdfKit';
 import { localizePurchaseCode } from '@/utils/purchaseCode';
 import { isProductionColumns, localizeProductionCells } from '@/utils/standardOrderColumns';
-import { purchaseCommissionOf, purchaseProjectOf } from '@/utils/purchaseProject';
+import { purchaseNotesReference, purchaseProjectCardRows, purchaseShowsProjectName } from '@/utils/purchaseProject';
 
 export type PriceRequestPdfLang = 'tr' | 'de' | 'en';
 
@@ -50,9 +50,9 @@ interface PriceRequestPdfStrings {
     project: string;
     /** Die Projektnummer — eine eigene Zeile neben der Kommission (29.09.2026). */
     projectNumber: string;
+    /** PROJE/SATIŞ ŞİRKETİ (01.10.2026): «Kommission» yerine proje adının etiketi. */
+    projectName: string;
     supplier: string;
-    /** Vor dem Namen des Empfängers in der Anschrift («z. Hd.»). */
-    attention: string;
     /** Standard-Anschreiben = `greeting` + ' ' + `intro` — EIN Absatz. */
     greeting: string;
     intro: string;
@@ -63,6 +63,8 @@ interface PriceRequestPdfStrings {
     notesCommission: string;
     /** Statt der Kommission: die Projektnummer (29.09.2026) — `{p}`. */
     notesProject: string;
+    /** Proje/satış şirketinde, proje numarası yoksa: proje adı — `{c}`. */
+    notesProjectName: string;
     /** Der Gruss am Schluss («Freundliche Grüsse»). */
     regards: string;
     /** Überschrift des Informationsblocks links («Anfrageangaben»). */
@@ -88,8 +90,8 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         orderedBy: 'Talep eden',
         project: 'Komisyon',
         projectNumber: 'Proje No',
+        projectName: 'Proje',
         supplier: 'Tedarikçi',
-        attention: 'Dikkatine:',
         greeting: 'Sayın Yetkili,',
         intro: 'aşağıda listelenen kalemler için fiyat teklifinizi rica ederiz.',
         notesTitle: 'Bilgilendirme',
@@ -100,6 +102,7 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         ],
         notesCommission: ' ve «{c}» komisyonunu',
         notesProject: ' ve {p} proje numaramızı',
+        notesProjectName: ' ve «{c}» projesini',
         regards: 'Saygılarımızla',
         infoCaption: 'Talep bilgileri',
         colPos: 'Poz.',
@@ -118,8 +121,8 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         orderedBy: 'Ansprechpartner',
         project: 'Kommission',
         projectNumber: 'Projekt-Nr.',
+        projectName: 'Projekt',
         supplier: 'Lieferant',
-        attention: 'z. Hd.',
         greeting: 'Sehr geehrte Damen und Herren,',
         intro: 'wir bitten Sie um ein Angebot für die nachstehenden Positionen.',
         notesTitle: 'Hinweise',
@@ -130,6 +133,7 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         ],
         notesCommission: ' sowie die Kommission «{c}»',
         notesProject: ' sowie die Projektnummer {p}',
+        notesProjectName: ' sowie das Projekt «{c}»',
         regards: 'Freundliche Grüsse',
         infoCaption: 'Anfrageangaben',
         colPos: 'Pos.',
@@ -148,8 +152,8 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         orderedBy: 'Contact',
         project: 'Commission',
         projectNumber: 'Project no.',
+        projectName: 'Project',
         supplier: 'Supplier',
-        attention: 'Attn.',
         greeting: 'Dear Sir or Madam,',
         intro: 'we kindly ask for your quotation for the positions listed below.',
         notesTitle: 'Notes',
@@ -160,6 +164,7 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         ],
         notesCommission: ' and the commission “{c}”',
         notesProject: ' and the project number {p}',
+        notesProjectName: ' and the project “{c}”',
         regards: 'Kind regards',
         infoCaption: 'Request details',
         colPos: 'Pos.',
@@ -685,11 +690,7 @@ export async function exportPriceRequestPdf(
    numarası olması gerekiyor»): auf Lieferschein, Rechnung und Offerte soll der Lieferant
    unsere Projektnummer angeben; ohne Projekt bleibt die Kommission (freier Text). */
 function requestNotes(order: PurchaseOrderRow, L: PriceRequestPdfStrings): string[] {
-    const project = purchaseProjectOf(order);
-    const commission = purchaseCommissionOf(order, project);
-    const reference = project?.number
-        ? L.notesProject.replace('{p}', project.number)
-        : commission ? L.notesCommission.replace('{c}', commission) : '';
+    const reference = purchaseNotesReference(order, L);
     return L.notes.map((note) => note
         .replace('{number}', order.referenceNumber)
         .replace('{commission}', reference));
@@ -701,21 +702,20 @@ function requestNotes(order: PurchaseOrderRow, L: PriceRequestPdfStrings): strin
  * ohne Anschreiben, gleich unter dem Titel.
  */
 function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySettings, L: PriceRequestPdfStrings): number {
-    // Projektnummer statt Kommission, wo es ein Projekt gibt (29.09.2026).
-    const project = purchaseProjectOf(order);
+    // Projektnummer statt Kommission, wo es ein Projekt gibt (29.09.2026);
+    // proje/satış şirketinde proje adı «Projekt» satırında (01.10.2026).
     const cardBottom = drawOfferInfoCard(doc, [
         { label: L.requestNumber, value: order.referenceNumber, emphasize: true },
-        project?.number
-            ? { label: L.projectNumber, value: project.number }
-            : { label: L.project, value: purchaseCommissionOf(order, null) },
+        ...purchaseProjectCardRows(order, L),
+        { label: L.recipient, value: oneLine(order.recipientName || '') },
         { label: L.requestDate, value: fmtDocDate(order.createdAt) },
-        { label: L.orderedBy, value: oneLine(order.orderedByName || '') },
+        // Gönderen: kayıttaki ad; proje/satış şirketinde boşsa talep eden (01.10.2026).
+        { label: L.orderedBy, value: oneLine(order.orderedByName || (purchaseShowsProjectName(order) ? order.requestedBy?.name ?? '' : '')) },
     ]);
-    const attention = oneLine(order.recipientName || '');
+    // Der Empfänger steht in der Belegkarte (01.10.2026), nicht unter der Anschrift.
     const addrBottom = drawOfferRecipient(doc, {
         sender: companySenderLine(s, ' · '),
         name: order.supplierName || '',
-        attention: attention ? `${L.attention} ${attention}` : '',
         address: order.supplierAddress,
     });
     const titleBase = Math.max(cardBottom, addrBottom) + 16;

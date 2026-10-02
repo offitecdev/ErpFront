@@ -2,18 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { File05, Plus, Save01, Send01, Trash01, X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
-import i18n from '@/i18n';
+import { getReportTranslator } from '@/i18n/reportLanguage';
 import { inventoryApi, purchaseOrdersApi } from '@/lib/api/inventory';
 import { isRequestTimeout } from '@/lib/axios';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
 import type { PurchaseOrderMailDraft, PurchaseOrderRow } from '@/types/inventory';
 import { PeoplePickerModal } from '@/pages/calendar/components/PeoplePickerModal';
 import { personKey, type PickedPerson } from '@/pages/calendar/calendarShared';
+import type { OrderPdfLang } from '@/utils/pdf/orderPdf';
 import { localizePurchaseCode } from '@/utils/purchaseCode';
 import { fmtDateTime } from '../utils/format';
 import { stageMailState } from '../utils/orderStatus';
 import { orderForSupplier, requestSuppliersOf, supplierPdfFileName } from '../utils/requestSuppliers';
 import '@/styles/orderDetails.css';
+import { readDocLang, writeDocLang } from '../utils/docLang';
+import { DocLangSwitch } from './DocLangSwitch';
 import { MailTemplatePicker } from './MailTemplatePicker';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,9 +44,16 @@ const errorText = (err: unknown): string =>
  * gesendet». Neu ist nur, WO es steht — als eigener Reiter derselben Seite,
  * und seine Entwürfe werden ERST GEHOLT, wenn man ihn öffnet.
  */
-export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
+export const MailPanel = ({ order, priceRequest, lang, onLangChange, onOrderChanged }: {
     order: PurchaseOrderRow;
     priceRequest: boolean;
+    /**
+     * BELGE DİLİ (01.10.2026, Samet: «İngilizce seçtiysem İngilizce PDF gitmek
+     * zorundadır»): PDF reiteriyle ORTAK. Ekteki PDF, dosya adı, konu, standart
+     * metin ve sunucunun mail kartı bu dilde gider — arayüz dilinde değil.
+     */
+    lang?: OrderPdfLang;
+    onLangChange?: (lang: OrderPdfLang) => void;
     onOrderChanged: (next: PurchaseOrderRow) => void;
 }) => {
     const settings = usePdfSettings();
@@ -68,7 +78,10 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
     const active = suppliers[activeIndex];
     const target = orderForSupplier(order, active);
 
-    const pdfLang = 'de' as const;
+    // Ohne Vorgabe von aussen (Produktion · manuell senden) merkt sich das Fenster die Sprache selbst.
+    const [ownLang, setOwnLang] = useState<OrderPdfLang>(() => readDocLang(order.id));
+    const pdfLang = lang ?? ownLang;
+    const changeLang = onLangChange ?? ((next: OrderPdfLang) => { setOwnLang(next); writeDocLang(order.id, next); });
     const fileName = supplierPdfFileName(localizePurchaseCode(order.referenceNumber, pdfLang), active, multi);
     /* EINE REVIDIERTE BESTELLUNG IST EIN PDF (29.09.2026, Samet: «bilgilendirme yazısına
        gerek yok … revize PDF'de belirtilecek, altta şu şu oldu tablosu, üstte açıklama;
@@ -106,20 +119,49 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
     /* Die Felder werden EINMAL je Vorgang und Belegart gefüllt, damit ein selbst
        geschriebener Text nicht bei jeder Antwort des Servers verschwindet. */
     const seededFor = useRef<string>('');
-    const seed = () => {
-        const number = localizePurchaseCode(order.referenceNumber, pdfLang);
-        setRecipient();
+    /** Der zuletzt eingesetzte Standardtext — nur er wird beim Sprachwechsel ersetzt. */
+    const seededText = useRef<{ subject: string; message: string }>({ subject: '', message: '' });
+    const seedRun = useRef(0);
+    /** Betreff + Standardtext in der Sprache des BELEGS (nicht der Oberfläche). */
+    const defaultText = async (lng: OrderPdfLang) => {
+        const { t: tr } = await getReportTranslator(lng);
+        const number = localizePurchaseCode(order.referenceNumber, lng);
         if (revisionNumber) {
-            setSubject(t('inv.orders.mail.subjectRevised', { number, revision: revisionNumber }));
-            setMessage(t('inv.orders.mail.defaultMessageRevised', { number, revision: revisionNumber }));
-            return;
+            return {
+                subject: tr('inv.orders.mail.subjectRevised', { number, revision: revisionNumber }),
+                message: tr('inv.orders.mail.defaultMessageRevised', { number, revision: revisionNumber }),
+            };
         }
         const base = priceRequest
-            ? t('inv.orders.mail.subjectPriceRequest', { number })
-            : t('inv.orders.mail.subject', { number });
-        setSubject(order.revision > 0 && order.emailSentAt ? `${base} (${t('inv.orders.updatedTag')})` : base);
-        setMessage(t(priceRequest ? 'inv.orders.mail.defaultMessagePriceRequest' : 'inv.orders.mail.defaultMessage'));
+            ? tr('inv.orders.mail.subjectPriceRequest', { number })
+            : tr('inv.orders.mail.subject', { number });
+        return {
+            subject: order.revision > 0 && order.emailSentAt ? `${base} (${tr('inv.orders.updatedTag')})` : base,
+            message: tr(priceRequest ? 'inv.orders.mail.defaultMessagePriceRequest' : 'inv.orders.mail.defaultMessage'),
+        };
     };
+    /** `replaceAll`: neue Mail — alles neu; sonst (Sprachwechsel) nur, was noch der Standard ist. */
+    const applyDefaultText = (lng: OrderPdfLang, replaceAll: boolean) => {
+        const run = ++seedRun.current;
+        void defaultText(lng).then((next) => {
+            if (run !== seedRun.current) return;
+            const previous = seededText.current;
+            seededText.current = next;
+            setSubject((current) => (replaceAll || current === previous.subject ? next.subject : current));
+            setMessage((current) => (replaceAll || current === previous.message ? next.message : current));
+        });
+    };
+    const seed = () => {
+        setRecipient();
+        applyDefaultText(pdfLang, true);
+    };
+    // Sprache gewechselt: der unberührte Standardtext folgt, ein eigener Text bleibt.
+    const textLang = useRef(pdfLang);
+    useEffect(() => {
+        if (textLang.current === pdfLang) return;
+        textLang.current = pdfLang;
+        applyDefaultText(pdfLang, false);
+    }, [pdfLang]); // eslint-disable-line react-hooks/exhaustive-deps
     /** An wen die Mail geht (+ CC-Startliste) — folgt dem gewählten Lieferanten. */
     const setRecipient = () => {
         setTo(target.supplierEmail ?? '');
@@ -249,8 +291,8 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
                 subject: subject.trim(),
                 message,
                 ...(active ? { supplierIndex: activeIndex } : {}),
-                // Die Mailkarte (Server): Wörter in der Sprache des Textes, Code wie im PDF.
-                lang: (i18n.resolvedLanguage || i18n.language || 'de').split('-')[0],
+                // Die Mailkarte (Server): Wörter in der Sprache des BELEGS — wie Text und PDF.
+                lang: pdfLang,
                 documentLang: pdfLang,
                 ...(revisionNumber ? { revision: revisionNumber } : {}),
                 attachments: [
@@ -476,6 +518,7 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
                         <span>{fileName}</span>
                         {revisionNumber > 0 && <em className="ofi-mail-file-rev">Rev. {revisionNumber}</em>}
                     </span>
+                    <DocLangSwitch value={pdfLang} onChange={changeLang} disabled={busy !== null} />
                 </div>
 
                 <footer className="ofi-mail-foot">

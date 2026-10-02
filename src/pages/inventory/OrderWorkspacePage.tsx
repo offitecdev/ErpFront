@@ -10,6 +10,7 @@ import { BotLoadingPanel } from '@/components/ui-shared/OffitecBot';
 import { MacLoading } from '@/components/ui-shared/MacLoading';
 import { t } from '@/i18n/translate';
 import { canPickRequestSuppliers } from '@/lib/access';
+import { companyRequiresPurchaseRecipientAndProject, useCurrentCompanyType } from '@/lib/companyType';
 import { inventoryApi, purchaseOrdersApi, supplyApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
@@ -102,6 +103,8 @@ import { PdfPanel } from './workspace/PdfPanel';
 /* Die Wegleiste links neben den Einstellungen. */
 import { FlowRail, type FlowStep } from './workspace/FlowRail';
 import { MailPanel } from './workspace/MailPanel';
+import { readDocLang, writeDocLang } from './utils/docLang';
+import type { OrderPdfLang } from '@/utils/pdf/orderPdf';
 import { ForwardPanel } from './workspace/ForwardPanel';
 /* MAL KABUL geri döndü (29.09.2026): siparişin aynısı + alttaki tek bar. */
 import { ReceivePanel } from './workspace/ReceivePanel';
@@ -331,6 +334,9 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
         return (wanted === 'settings' || wanted === 'template' || wanted === 'receive'
             || wanted === 'pdf' || wanted === 'mail') ? wanted : 'lines';
     });
+    /* BELGE DİLİ (01.10.2026): PDF ve Mail reiterleri aynı dili kullanır —
+       İngilizce seçildiyse mail de İngilizce PDF ile gider. Kayıt başına hatırlanır. */
+    const [docLangState, setDocLangState] = useState<{ id: string | null; lang: OrderPdfLang } | null>(null);
     /** Die Anschrift des Lieferanten, wie sie in der Bestellung steht (nur lesen). */
     const [supplierAddress, setSupplierAddress] = useState<string | null>(null);
     /* DER NUMMERNKREIS steht in den EINSTELLUNGEN (Vorgabe Samet, 22.09.2026:
@@ -444,6 +450,11 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
        komisyon, teklif no — bunlar olmayacak»; yerine talebin kimden geldiği.
        BOM talebi kendi kurallarıyla kalır. */
     const stockRequest = priceless && !bomRecord;
+    /* ALICI ADI + PROJE ADI (01.10.2026, Samet): proje ve satış şirketlerinde
+       stok siparişi ve stok fiyat talebi ikisini de taşır ve PDF'e basar —
+       zorunlu değil, girilirse. Üretim şirketi ve BOM belgeleri eskisi gibi. */
+    const companyType = useCurrentCompanyType();
+    const needsRecipientProject = !bomRecord && companyRequiresPurchaseRecipientAndProject(companyType);
     const templateDocumentType = priceless ? 'PRICE_REQUEST' : 'ORDER';
     const preferredTemplateId = usePurchaseTemplateStore((state) => state.selected[templateDocumentType]);
     const selectPreferredTemplate = usePurchaseTemplateStore((state) => state.select);
@@ -1129,10 +1140,15 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
        fuer die Bestellung wie fuer die Preisanfrage. Ohne gueltige Vorlage
        nicht: dann ist auch der Import-Knopf aus. Ein BOM-Beleg öffnet statt
        dessen «Tabloyu yapay zekâ ile doldur» — seine Zeilen bleiben stehen. */
-    /* 29.09.2026: in der Stok-Bestellung gibt es keinen KI-Import mehr — Strg+V
-       öffnet nur noch im BOM-Beleg die KI-Füllung. */
-    usePasteToImport(templateReady && !aiOpen && !templatesOpen && !bomFill && bomRecord && bomFillReady, (files) => {
-        void openBomFill(files);
+    /* 01.10.2026 (Samet: «stok kısmında siparişlerde yapay zekâ vardı … geri
+       yükleyin»): der KI-Import der Stok-Bestellung/-Preisanfrage ist zurück. */
+    usePasteToImport(templateReady && !aiOpen && !templatesOpen && !bomFill && (!bomRecord || bomFillReady), (files) => {
+        if (bomRecord) {
+            void openBomFill(files);
+            return;
+        }
+        setPastedFiles(files);
+        setAiOpen(true);
     });
     /* Eine geladene Bestellung, deren eigene Angabe in der Vorlage unter
        demselben Namen steht: der Wert wandert unter den Schluessel der
@@ -1556,6 +1572,23 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
         setSupplierDraft('');
     };
 
+    /* Alıcı adı + proje adı satırları — sipariş kartında her zaman, stok fiyat
+       talebinde yalnızca proje/satış şirketinde (01.10.2026). İkisi de serbest. */
+    const recipientRow = (
+        <label className="ofi-ord-row">
+            <span className="ofi-ord-label">{t('inv.orders.columns.recipientName')}</span>
+            <input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} maxLength={120} />
+        </label>
+    );
+    const projectNameRow = (
+        <label className="ofi-ord-row">
+            <span className="ofi-ord-label">
+                {t(needsRecipientProject ? 'inv.orders.columns.projectName' : 'inv.orders.columns.commission')}
+            </span>
+            <input value={projectName} onChange={(event) => setProjectName(event.target.value)} maxLength={160} />
+        </label>
+    );
+
     const save = async (): Promise<string | null> => {
         if (!filledRows.length) return null;
         /* Ohne gueltige Vorlage gibt es keine Tabelle — und nichts zu speichern. */
@@ -1607,13 +1640,18 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
                den Artikel an und vergibt den fehlenden Code. */
             const items = filledRows.map((row) => rowToItem(row));
             /* Stok fiyat talebi bu dört alanı taşımaz (30.09.2026) — eski kayıtta
-               kalmış değerler de ilk kaydetmede silinir, PDF onları basmaz. */
+               kalmış değerler de ilk kaydetmede silinir, PDF onları basmaz.
+               Proje/satış şirketinde alıcı adı ve proje adı talepte de kalır (01.10.2026). */
+            const dropRequestHeader = stockRequest && !needsRecipientProject;
             const header = {
                 quoteNumber: stockRequest ? null : quoteNumber.trim() || null,
-                orderedByName: stockRequest ? null : orderedByName.trim() || null,
-                projectName: stockRequest ? null : projectName.trim() || null,
+                // Proje/satış şirketinin talebinde gönderen kalır; boşsa talep eden (01.10.2026).
+                orderedByName: dropRequestHeader
+                    ? null
+                    : orderedByName.trim() || (stockRequest ? loadedOrder?.requestedBy?.name || requesterName || null : null),
+                projectName: dropRequestHeader ? null : projectName.trim() || null,
                 // Alıcı adı boşsa null gider: PDF alıcı bloğuna satır eklenmez.
-                recipientName: stockRequest ? null : recipientName.trim() || null,
+                recipientName: dropRequestHeader ? null : recipientName.trim() || null,
                 // Dokunulmamış şablon ve boş alan null gider: sunucu NULL yazar,
                 // PDF kendi dilindeki standart metni basar.
                 coverLetter: coverCustom?.trim() || null,
@@ -2239,6 +2277,14 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
     ];
     /* Verschwindet ein Reiter unter den Füssen (ein neuer Vorgang hat noch
        kein PDF), steht man wieder bei den Positionen. */
+    // Die Wahl gilt für DIESEN Vorgang; ein anderer liest seine eigene.
+    const docLang: OrderPdfLang = docLangState && docLangState.id === (loadedOrder?.id ?? null)
+        ? docLangState.lang
+        : readDocLang(loadedOrder?.id);
+    const changeDocLang = (lang: OrderPdfLang) => {
+        setDocLangState({ id: loadedOrder?.id ?? null, lang });
+        if (loadedOrder?.id) writeDocLang(loadedOrder.id, lang);
+    };
     const activeTab: WorkspaceTab = tabs.some((entry) => entry.key === tab) ? tab : 'lines';
     /* Rechnen und Beleg-Import gehören zur Positionstabelle. */
     const showTools = activeTab === 'lines';
@@ -2646,7 +2692,7 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
                             aber er füllt die Tabelle, statt sie zu ersetzen. Seit dem
                             29.09.2026 auch in der BOM-Preisanfrage (Modell und die
                             weiteren Spalten ihrer Vorlage). */}
-                        {bomRecord && ((
+                        {bomRecord ? ((
                             <button
                                 type="button"
                                 className="ofi-poi-launch is-alive"
@@ -2663,10 +2709,20 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
                                 <Zap size={14} />
                                 {t('productionBom.ai.fillButton')}
                             </button>
-                        ))}
-                        {/* Stok siparişinde/talebinde yapay zekâ ile belge içe
-                            aktarma YOK (29.09.2026, Samet: «yapay zekâ şeyini
-                            kaldır siparişlerden») — satırlar elle girilir. */}
+                        )) : (
+                            /* Stok siparişi/talebi: «Beleg importieren» geri
+                               (01.10.2026) — belge, pozisyon listesini değiştirir. */
+                            <button
+                                type="button"
+                                className="ofi-poi-launch is-alive"
+                                disabled={!templateReady}
+                                title={templateReady ? undefined : t('inv.aiImport.templateRequiredTitle')}
+                                onClick={() => setAiOpen(true)}
+                            >
+                                <Zap size={14} />
+                                {t('inv.aiImport.importButton')}
+                            </button>
+                        )}
                     </span>
                 </div>
             )}
@@ -2692,6 +2748,8 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
                             Eine Lager-Preisanfrage hat keine Bestell-/Angebotsnummer,
                             keinen Besteller, keinen Empfänger, keine Kommission — sie
                             sagt nur, von wem sie kommt und ob sie beim Einkauf liegt. */}
+                        {/* PROJE/SATIŞ ŞİRKETİ (01.10.2026): alıcı adı ve proje adı —
+                            siparişte ve stok fiyat talebinde aynı iki satır, ikisi de serbest. */}
                         {stockRequest ? (
                         <section className="ofi-ows-card" data-flow-step="details">
                             <h3>{t('inv.orders.requestInfo.title')}</h3>
@@ -2708,6 +2766,21 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
                                         <span className="min-w-0 flex-1 truncate">{fmtDateTime(loadedOrder.createdAt)}</span>
                                     </div>
                                 )}
+                                {/* GÖNDEREN (01.10.2026, Samet: «gönderici ismi de olması lazım»):
+                                    PDF kartında «Ansprechpartner» — boşsa talep eden. */}
+                                {needsRecipientProject && (
+                                    <label className="ofi-ord-row">
+                                        <span className="ofi-ord-label">{t('inv.orders.requestInfo.sender')}</span>
+                                        <input
+                                            value={orderedByName}
+                                            onChange={(event) => setOrderedByName(event.target.value)}
+                                            placeholder={loadedOrder?.requestedBy?.name || requesterName || undefined}
+                                            maxLength={120}
+                                        />
+                                    </label>
+                                )}
+                                {needsRecipientProject && recipientRow}
+                                {needsRecipientProject && projectNameRow}
                                 {(loadedOrder?.forwarding || !canPickSuppliers) && (
                                     <div className="ofi-ord-row">
                                         <span className="ofi-ord-label">{t('inv.orders.requestInfo.purchasing')}</span>
@@ -2732,16 +2805,11 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
                                     <span className="ofi-ord-label">{t('inv.orders.columns.orderedBy')}</span>
                                     <input value={orderedByName} onChange={(event) => setOrderedByName(event.target.value)} />
                                 </label>
-                                <label className="ofi-ord-row">
-                                    <span className="ofi-ord-label">{t('inv.orders.columns.recipientName')}</span>
-                                    <input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} maxLength={120} />
-                                </label>
+                                {recipientRow}
                                 {/* KOMMISSION (29.09.2026, Samet): jede Rolle schreibt sie
-                                    als freien Text — keine Projekt-/Geräteverknüpfung mehr. */}
-                                <label className="ofi-ord-row">
-                                    <span className="ofi-ord-label">{t('inv.orders.columns.commission')}</span>
-                                    <input value={projectName} onChange={(event) => setProjectName(event.target.value)} maxLength={160} />
-                                </label>
+                                    als freien Text — keine Projekt-/Geräteverknüpfung mehr.
+                                    Proje/satış şirketinde «Proje adı» (01.10.2026). */}
+                                {projectNameRow}
                                 {/* Eine BOM-Preisanfrage kennt keine Angebots-/Bestellnummer
                                     (27.09.2026: «sipariş numarası ekleme gibi şeyler olmayacak»). */}
                                 {!(bomRecord && !bomOrder) && (
@@ -3161,6 +3229,8 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
                 <PdfPanel
                     order={loadedOrder}
                     priceRequest={priceless}
+                    lang={docLang}
+                    onLangChange={changeDocLang}
                     // Ohne Einkaufsrolle: das Blatt für den Einkauf — ohne Lieferanten, mit der anfragenden Person.
                     internalRequester={canPickSuppliers ? null : requesterName}
                 />
@@ -3169,6 +3239,8 @@ export const OrderWorkspacePage = ({ workspaceId, workspaceKind, workspaceTab, o
                 <MailPanel
                     order={loadedOrder}
                     priceRequest={priceless}
+                    lang={docLang}
+                    onLangChange={changeDocLang}
                     onOrderChanged={(next) => {
                         setLoadedOrder({
                             ...next,
