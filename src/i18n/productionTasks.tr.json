@@ -209,7 +209,10 @@
       "REQUEST_NOT_FOUND": "Talep bulunamadı ya da zaten çözüldü.",
       "NO_STANDARDS": "Bu alt görevin kontrol edilecek doküman standartları yok.",
       "ANALYSIS_RUNNING": "Yapay zekâ analizi zaten çalışıyor.",
-      "STANDARDS_FILE_NOT_FOUND": "Standartlar PDF'i bulunamadı."
+      "STANDARDS_FILE_NOT_FOUND": "Standartlar PDF'i bulunamadı.",
+      "FEE_REQUIRED": "Önce ücreti (CHF) girin — bu alt görev tutarsız gönderilemez.",
+      "FEE_INVALID": "Tutar geçersiz — örn. 1250.00 yazın.",
+      "PRIOR_STEPS_OPEN": "Önce önceki adımlar tamamlanmalı ({{count}} açık): {{steps}}"
     },
     "people": {
       "assign": "Kişi ata",
@@ -342,7 +345,9 @@
       "standardsPdfRemove": "Standartlar PDF'ini kaldır",
       "standardsPdfOnly": "Yalnızca PDF dosyaları yüklenebilir.",
       "standardsPdfTooLarge": "PDF çok büyük (en fazla {{max}} MB).",
-      "standardsBothHint": "PDF yükleyin, standartları yazın ya da ikisini birden — yapay zekâ dokümanları buradaki her şeye göre kontrol eder."
+      "standardsBothHint": "PDF yükleyin, standartları yazın ya da ikisini birden — yapay zekâ dokümanları buradaki her şeye göre kontrol eder.",
+      "photoAllowed": "Fotoğraf yeterli",
+      "photoAllowedHint": "Bu alt görevde PDF yerine fotoğraf da yüklenebilir (JPEG, PNG, WebP)."
     },
     "dates": {
       "from": "{{date}} itibarıyla",
@@ -465,7 +470,9 @@
       "count_one": "{{count}} dosya",
       "count_other": "{{count}} dosya",
       "removeTitle": "Dosya silinsin mi?",
-      "removeText": "«{{name}}», «{{subtask}}» alt görevinden kaldırılacak. Bu işlem geri alınamaz."
+      "removeText": "«{{name}}», «{{subtask}}» alt görevinden kaldırılacak. Bu işlem geri alınamaz.",
+      "badTypePhoto": "Yalnızca PDF ya da fotoğraf (JPEG, PNG, WebP) eklenebilir.",
+      "needDocument": "PDF ya da fotoğraf zorunlu"
     },
     "review": {
       "currentShort": "güncel",
@@ -548,7 +555,13 @@
       "subtasksRow": "Alt görevler tamamlandı",
       "subtasksAll_one": "{{count}} alt görev işaretli",
       "subtasksAll_other": "{{count}} alt görevin hepsi işaretli",
-      "subtasksSome": "{{total}} alt görevden {{done}} tanesi işaretli"
+      "subtasksSome": "{{total}} alt görevden {{done}} tanesi işaretli",
+      "documentRowPhoto": "Belge (PDF veya fotoğraf)",
+      "documentMissingPhoto": "Henüz PDF ya da fotoğraf yok — alt görev belgesiz kapanmaz",
+      "documentOkPhoto_one": "{{count}} belge ekli",
+      "documentOkPhoto_other": "{{count}} belge ekli",
+      "dropTitlePhoto": "Fotoğrafları ya da PDF dosyasını buraya bırakın",
+      "submissionNote": "Gönderim notu"
     },
     "drop": {
       "or": "veya",
@@ -600,7 +613,8 @@
       "legendFree": "O gün görev yok",
       "cellFree": "Bu gün görev yok",
       "legendUpcoming": "Henüz gelmemiş görev günü",
-      "cellUpcoming": "{{name}} · {{day}} henüz gelmedi"
+      "cellUpcoming": "{{name}} · {{day}} henüz gelmedi",
+      "dropTitlePhoto": "Fotoğrafları ya da PDF dosyalarını buraya bırakın, sonra görevi ve alt görevi seçin"
     },
     "activity": {
       "title": "Aktiviteler",
@@ -656,7 +670,8 @@
         "PLAN_REMOVED": "{{actor}}, {{template}} görevlerini kaldırdı",
         "ASSIGNED_BOTH": "{{actor}}, {{target}} alt görevine {{added}} atadı ve {{removed}} çıkardı",
         "UNLOCK_REQUESTED": "{{actor}}, {{target}} kilidinin açılmasını istedi",
-        "REQUEST_SOLVED": "{{actor}}, {{target}} talebini çözüldü olarak işaretledi"
+        "REQUEST_SOLVED": "{{actor}}, {{target}} talebini çözüldü olarak işaretledi",
+        "DAILY_NOTE": "{{actor}}, {{target}} için {{day}} günlük notunu yazdı"
       },
       "detail": {
         "yes": "Evet",
@@ -681,7 +696,10 @@
         "noSubtasks": "Alt görev yok.",
         "template": "Şablon",
         "previousTemplate": "Yerine geçtiği",
-        "taskCount": "Görevler"
+        "taskCount": "Görevler",
+        "submissionNote": "Gönderim notu",
+        "noteDay": "Gün",
+        "dailyNote": "Günlük not"
       },
       "field": {
         "name": "Ad",
@@ -692,7 +710,10 @@
         "requiresDocument": "Doküman gerekli",
         "requiresApproval": "Onay gerekli",
         "checklist": "Onay kontrol listesi",
-        "status": "Durum"
+        "status": "Durum",
+        "photoAllowed": "Fotoğraf yeterli",
+        "feeRequired": "Ücret girilsin",
+        "priorStepsRequired": "Kilit (önceki adımlar)"
       },
       "count_one": "{{count}} kayıt",
       "count_other": "{{count}} kayıt",
@@ -826,6 +847,39 @@
         "ANALYSIS_INTERRUPTED": "Analiz yarıda kesildi (sunucu yeniden başladı).",
         "STANDARDS_FILE_NOT_FOUND": "Standartlar PDF'i bulunamadı — yeniden yükleyin."
       }
+    },
+    "submit": {
+      "confirm": "Onaya gönder",
+      "notePlaceholder": "Ölçülen değerler, nakliyeci ve tarihler, yapılan iş …",
+      "noteHint": "Yapay zekâ fotoğrafları ve bu notu birlikte okur; yönetici onayda görür."
+    },
+    "fee": {
+      "flag": "Ücret",
+      "flagHint": "Görevi tamamlarken bir tutar (CHF) girilmesi zorunlu — örn. nakliye ücreti.",
+      "tag": "Ücret",
+      "tagHint": "Görevi tamamlarken tutar (CHF) girilir.",
+      "row": "Ücret (CHF)",
+      "label": "Ücret (CHF)",
+      "placeholder": "Örn. 1250.00",
+      "hint": "Teklifteki tutar. Yapay zekâ bu tutarı kısa notla birlikte okur.",
+      "invalid": "Geçerli bir tutar yazın (örn. 1250.00).",
+      "okDetail": "Tutar girildi",
+      "missingDetail": "Tutar girilmeden gönderilemez",
+      "okDetailReview": "Gönderen kişinin girdiği tutar",
+      "missingDetailReview": "Tutar girilmemiş — onaylanamaz"
+    },
+    "priorSteps": {
+      "flag": "Kilit",
+      "flagHint": "Önceki tüm adımlar (bu yoldaki önceki aşamalar ve diğer yolun tamamı) bitmeden tamamlanamaz ve onaylanamaz — sevkiyat kilidi.",
+      "tag": "Kilit",
+      "tagHint": "Önceki tüm adımlar bitmeden tamamlanamaz ve onaylanamaz.",
+      "row": "Önceki adımlar",
+      "okDetail": "Önceki tüm adımlar tamamlandı",
+      "okValue": "Tamam",
+      "openValue_one": "{{count}} açık",
+      "openValue_other": "{{count}} açık",
+      "more_one": "+{{count}} daha",
+      "more_other": "+{{count}} daha"
     }
   }
 }

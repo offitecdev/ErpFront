@@ -11,7 +11,7 @@ import { FileDropZone } from '../tasks/FileDropZone';
 import type { PersonNames } from '../tasks/PeopleCell';
 import { FileCard } from '../tasks/FileCard';
 import { fileProblem, formatMoment, type SubtaskActions } from '../tasks/subtaskFileModel';
-import { formatDay, localToday, SUBTASK_FILE_ACCEPT, subtaskCode } from '../tasks/taskModel';
+import { formatDay, localToday, SUBTASK_FILE_ACCEPT, SUBTASK_PHOTO_ACCEPT, subtaskCode } from '../tasks/taskModel';
 import {
     dayDiff,
     daysBetween,
@@ -137,10 +137,12 @@ export const StageFilesCard = ({
     const targets = tasks.filter((task) => task.subtasks.length > 0);
     const targetTask = targets.find((task) => task.id === targetTaskId);
     const targetSubtask = targetTask?.subtasks.find((subtask) => subtask.id === targetSubtaskId);
+    // Fotos (02.10.2026): nur, wenn eine Unteraufgabe der Stufe «Fotoğraf yeterli» trägt — das Ziel prüft beim Hochladen.
+    const photoTargets = targets.some((task) => task.subtasks.some((subtask) => subtask.photoAllowed));
 
     const stage = (files: File[]) => {
         const accepted = files.filter((file) => {
-            const problem = fileProblem(file);
+            const problem = fileProblem(file, photoTargets);
             if (problem) toast.error(`${file.name}: ${problem}`);
             return !problem;
         });
@@ -158,6 +160,9 @@ export const StageFilesCard = ({
         setUploading(true);
         let left = [...pending];
         for (const file of pending) {
+            // Ein Foto an eine Unteraufgabe ohne «Fotoğraf yeterli»: bleibt liegen, ein anderes Ziel wählen.
+            const problem = fileProblem(file, targetSubtask.photoAllowed);
+            if (problem) { toast.error(`${file.name}: ${problem}`); continue; }
             if (!(await actions.upload(targetTask, targetSubtask, file))) break;
             left = left.filter((entry) => entry !== file);
         }
@@ -273,8 +278,8 @@ export const StageFilesCard = ({
                                 <FileDropZone
                                     compact
                                     multiple
-                                    title={t('productionTasks.stageFiles.dropTitle')}
-                                    accept={SUBTASK_FILE_ACCEPT}
+                                    title={t(photoTargets ? 'productionTasks.stageFiles.dropTitlePhoto' : 'productionTasks.stageFiles.dropTitle')}
+                                    accept={photoTargets ? SUBTASK_PHOTO_ACCEPT : SUBTASK_FILE_ACCEPT}
                                     busy={uploading}
                                     disabled={!targets.length}
                                     onFiles={stage}

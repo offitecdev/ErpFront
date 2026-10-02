@@ -9,7 +9,7 @@ import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/produ
 import { AiReportButton } from './AiAnalysis';
 import { RevisionUploadDialog } from './RevisionUploadDialog';
 import { canRemoveFile, canReviseFile, canUploadTo, fileGroups, fileProblem, formatMoment, isPdf, type SubtaskActions } from './subtaskFileModel';
-import { hasSubtaskDocument, isSubtaskCompleted, needsPdfFirst, SUBTASK_FILE_ACCEPT } from './taskModel';
+import { hasSubtaskDocument, isSubtaskCompleted, needsPdfFirst, submitsWithDialog, subtaskFileAccept } from './taskModel';
 
 /**
  * ── DATEIEN EINER UNTERAUFGABE (28.09.2026, Vorgabe Samet) ──────────────────
@@ -175,11 +175,14 @@ export const SubtaskDetail = ({
     subtask,
     actions,
     onComplete,
+    onSubmit,
 }: {
     task: ProductionTask;
     subtask: TaskSubtask;
     actions: SubtaskActions;
     onComplete: () => void;
+    /** «Görevi tamamla» mit Fotos, kurzer Notiz und Betrag (02.10.2026, «Fotoğraf yeterli» / «Ücret») — öffnet das Fenster. */
+    onSubmit?: () => void;
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
@@ -191,7 +194,10 @@ export const SubtaskDetail = ({
     // die Verwaltung nicht von Hand (29.09.2026); sie gibt frei («Approve the task»).
     const mayMark = !completed && Boolean(actions.meId && subtask.assigneeIds.includes(actions.meId));
     const [marking, setMarking] = useState(false);
+    const withDialog = submitsWithDialog(subtask) && Boolean(onSubmit);
     const markComplete = async () => {
+        // «Fotoğraf yeterli» / «Ücret girilsin» (02.10.2026): ein Fenster mit Fotos, Notiz und Betrag — sonst wie bisher.
+        if (withDialog) { onSubmit?.(); return; }
         setMarking(true);
         // Mit «Approval» wartet sie dann auf die Freigabe, sonst ist sie erledigt.
         await actions.setStatus(task, subtask, subtask.requiresApproval ? 'PENDING' : 'DONE');
@@ -204,7 +210,7 @@ export const SubtaskDetail = ({
         if (!picked.length) return;
         setUploading(true);
         for (const file of picked) {
-            const problem = fileProblem(file);
+            const problem = fileProblem(file, subtask.photoAllowed);
             if (problem) { toast.error(`${file.name}: ${problem}`); continue; }
             if (!(await actions.upload(task, subtask, file))) break;
         }
@@ -265,13 +271,13 @@ export const SubtaskDetail = ({
                                 type="file"
                                 hidden
                                 multiple
-                                accept={SUBTASK_FILE_ACCEPT}
+                                accept={subtaskFileAccept(subtask)}
                                 onChange={(event) => void onPick(event)}
                             />
                         </>
                     )}
                     {revisionOf && (
-                        <RevisionUploadDialog file={revisionOf} onUpload={uploadRevision} onClose={() => setRevisionOf(null)} />
+                        <RevisionUploadDialog file={revisionOf} photoAllowed={subtask.photoAllowed} onUpload={uploadRevision} onClose={() => setRevisionOf(null)} />
                     )}
                 </div>
             </div>
@@ -297,7 +303,7 @@ export const SubtaskDetail = ({
                 )}
                 <div className="ofi-ptk-subdetail__foot">
                     {subtask.requiresDocument && !hasSubtaskDocument(subtask) && (
-                        <span className="ofi-ptk-subdetail__need">{t('productionTasks.files.needPdf')}</span>
+                        <span className="ofi-ptk-subdetail__need">{t(subtask.photoAllowed ? 'productionTasks.files.needDocument' : 'productionTasks.files.needPdf')}</span>
                     )}
                     {/* Der Weg (28.09.2026) — den Stand setzt niemand von Hand: offen — kein
                         Knopf (▶ vorne startet); in Arbeit oder zur Überarbeitung zurück —
@@ -308,8 +314,9 @@ export const SubtaskDetail = ({
                         <button
                             type="button"
                             className="ofi-ptk-completebtn is-submit ofi-nosize"
-                            disabled={marking || needsPdfFirst(subtask)}
-                            title={needsPdfFirst(subtask)
+                            // Mit dem Fenster kommen Fotos/PDF dort dazu — der Knopf ist dann nie gesperrt.
+                            disabled={marking || (needsPdfFirst(subtask) && !withDialog)}
+                            title={needsPdfFirst(subtask) && !withDialog
                                 ? t('productionTasks.files.needPdf')
                                 : subtask.requiresApproval ? t('productionTasks.subtask.completeHint') : undefined}
                             onClick={() => void markComplete()}

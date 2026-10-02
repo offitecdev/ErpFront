@@ -22,7 +22,7 @@ import {
     type ReviewEntry,
     type SubtaskActions,
 } from './subtaskFileModel';
-import { hasSubtaskDocument, TASK_LIMITS } from './taskModel';
+import { formatFee, hasSubtaskDocument, TASK_LIMITS } from './taskModel';
 
 /** Die Stufen der Vergrösserung; 1 = so breit wie die Fläche. */
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3] as const;
@@ -470,6 +470,14 @@ export const FileReviewDialog = ({
                                     count: versions.length,
                                 })}
                             />
+                        )}
+                        {/* Der Betrag der Einsendung (02.10.2026, «Ücret girilsin»). */}
+                        {subtask.feeRequired && subtask.fee != null && (
+                            <InfoRow label={t('productionTasks.fee.row')} value={formatFee(subtask.fee)} />
+                        )}
+                        {/* Die kurze Notiz der Einsendung (02.10.2026) — Messwerte, Nakliye-Preis. */}
+                        {subtask.submissionNote && (
+                            <InfoRow label={t('productionTasks.complete.submissionNote')} value={subtask.submissionNote} />
                         )}
                         {/* Die Notiz der Fassung (28.09.2026): was sich geändert hat. */}
                         {file?.revisionNote && (

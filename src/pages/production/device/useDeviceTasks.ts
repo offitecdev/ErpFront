@@ -144,9 +144,10 @@ export const useDeviceTasks = (deviceId: string) => {
     }, [deviceId, commit]);
 
     /* Der Stand einer Unteraufgabe — sofort sichtbar (die Aufgabe folgt ihr), der Server folgt. */
-    const setSubtaskStatus = useCallback(async (task: ProductionTask, subtask: TaskSubtask, status: TaskStatus) => {
+    // `note` (02.10.2026): die kurze Notiz beim Einsenden. Antwort: ob der Server zustimmte.
+    const setSubtaskStatus = useCallback(async (task: ProductionTask, subtask: TaskSubtask, status: TaskStatus, note?: string, fee?: number): Promise<boolean> => {
         const before = dataRef.current;
-        if (!before) return;
+        if (!before) return false;
         const withSubtask = (base: DeviceTasks, next: TaskStatus): DeviceTasks => ({
             ...base,
             tasks: base.tasks.map((entry) => {
@@ -161,14 +162,16 @@ export const useDeviceTasks = (deviceId: string) => {
         setState({ deviceId, data: optimistic, error: null });
         setBusyTaskId(task.id);
         try {
-            const result = await productionTasksApi.setSubtaskStatus(deviceId, task.id, subtask.id, status);
+            const result = await productionTasksApi.setSubtaskStatus(deviceId, task.id, subtask.id, status, note, fee);
             const latest = dataRef.current ?? optimistic;
             commit({ ...latest, tasks: latest.tasks.map((entry) => (entry.id === result.task.id ? result.task : entry)) });
+            return true;
         } catch (error) {
             toast.error(productionTaskErrorText(error, 'productionTasks.err.statusFailed'));
             const restored = withSubtask(dataRef.current ?? before, previous);
             dataRef.current = restored;
             setState({ deviceId, data: restored, error: null });
+            return false;
         } finally {
             setBusyTaskId((current) => (current === task.id ? null : current));
         }

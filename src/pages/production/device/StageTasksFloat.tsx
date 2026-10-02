@@ -147,7 +147,8 @@ export const StageTasksFloat = ({
     const activityFromRef = useRef<DOMRect | null>(null);
     const requestsRef = useRef<HTMLDivElement>(null);
     const requestsFromRef = useRef<DOMRect | null>(null);
-    const showFiles = Boolean(subtaskActions?.isAdmin);
+    const isAdmin = Boolean(subtaskActions?.isAdmin);
+    const showFiles = isAdmin;
 
     const toggle = (next: boolean) => {
         fromRef.current = boxRef.current?.getBoundingClientRect() ?? null;
@@ -347,7 +348,7 @@ export const StageTasksFloat = ({
                 </div>
             )}
             {/* Der Verlauf der Stufe (30.09.2026) — unter «Dateien», ebenso nur die Verwaltung. */}
-            {showFiles && subtaskActions && (
+            {isAdmin && subtaskActions && (
                 <div
                     ref={activityRef}
                     className={`ofi-ptk-float is-activity ${activityOpen ? 'is-open' : ''}`}
@@ -388,7 +389,7 @@ export const StageTasksFloat = ({
                 </div>
             )}
             {/* Anfragen an die Verwaltung (30.09.2026) — unter «Aktivitäten», nur die Verwaltung. */}
-            {showFiles && subtaskActions && (
+            {isAdmin && subtaskActions && (
                 <div
                     ref={requestsRef}
                     className={`ofi-ptk-float is-requests ${requestsOpen ? 'is-open' : ''}`}

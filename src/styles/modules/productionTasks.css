@@ -3118,3 +3118,6 @@ body > :not(#root) .ofi-ptk-btn.ofi-ptk-aireportbtn svg { width: 13px; height: 1
 .ofi-ptk-standardspdf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .ofi-ptk-standardspdf > .ofi-ptk-filechip .ofi-ptk-filechip__text { max-width: 260px; }
 .ofi-ptk-review__standardspdf { max-width: 100%; margin-bottom: 8px; }
+
+/* Der Betrag beim Einsenden (02.10.2026, «Ücret girilsin») — ein schmales Feld, Ziffern in einer Flucht. */
+.ofi-ptk-complete__fee { max-width: 220px; font-variant-numeric: tabular-nums; }

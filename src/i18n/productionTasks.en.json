@@ -209,7 +209,10 @@
       "REQUEST_NOT_FOUND": "The request was not found or is already solved.",
       "NO_STANDARDS": "This subtask has no document standards to check against.",
       "ANALYSIS_RUNNING": "The AI analysis is already running.",
-      "STANDARDS_FILE_NOT_FOUND": "The standards PDF could not be found."
+      "STANDARDS_FILE_NOT_FOUND": "The standards PDF could not be found.",
+      "FEE_REQUIRED": "Enter the amount (CHF) first — this subtask cannot be sent without it.",
+      "FEE_INVALID": "The amount is invalid — enter e.g. 1250.00.",
+      "PRIOR_STEPS_OPEN": "Finish the earlier steps first ({{count}} open): {{steps}}"
     },
     "people": {
       "assign": "Assign person",
@@ -342,7 +345,9 @@
       "standardsPdfRemove": "Remove standards PDF",
       "standardsPdfOnly": "Only PDF files can be uploaded.",
       "standardsPdfTooLarge": "The PDF is too large (max. {{max}} MB).",
-      "standardsBothHint": "Upload a PDF, write the standards, or both — the AI checks the documents against everything here."
+      "standardsBothHint": "Upload a PDF, write the standards, or both — the AI checks the documents against everything here.",
+      "photoAllowed": "Photo is enough",
+      "photoAllowedHint": "A photo (JPEG, PNG, WebP) also counts as the document for this subtask."
     },
     "dates": {
       "from": "from {{date}}",
@@ -465,7 +470,9 @@
       "count_one": "{{count}} file",
       "count_other": "{{count}} files",
       "removeTitle": "Delete the file?",
-      "removeText": "“{{name}}” will be removed from “{{subtask}}”. This cannot be undone."
+      "removeText": "“{{name}}” will be removed from “{{subtask}}”. This cannot be undone.",
+      "badTypePhoto": "Only PDF files or photos (JPEG, PNG, WebP) can be added.",
+      "needDocument": "A PDF or photo is required"
     },
     "review": {
       "currentShort": "current",
@@ -548,7 +555,13 @@
       "subtasksRow": "Subtasks completed",
       "subtasksAll_one": "The {{count}} subtask is marked",
       "subtasksAll_other": "All {{count}} subtasks are marked",
-      "subtasksSome": "{{done}} of {{total}} subtasks are marked"
+      "subtasksSome": "{{done}} of {{total}} subtasks are marked",
+      "documentRowPhoto": "Document (PDF or photo)",
+      "documentMissingPhoto": "No PDF or photo yet — the subtask cannot close without a document",
+      "documentOkPhoto_one": "{{count}} document attached",
+      "documentOkPhoto_other": "{{count}} documents attached",
+      "dropTitlePhoto": "Drop photos or a PDF here",
+      "submissionNote": "Submission note"
     },
     "drop": {
       "or": "or",
@@ -600,7 +613,8 @@
       "legendFree": "No task that day",
       "cellFree": "No task on this day",
       "legendUpcoming": "Task day still to come",
-      "cellUpcoming": "{{name}} · {{day}} is still to come"
+      "cellUpcoming": "{{name}} · {{day}} is still to come",
+      "dropTitlePhoto": "Drop photos or PDFs here, then choose the task and subtask"
     },
     "activity": {
       "title": "Activities",
@@ -656,7 +670,8 @@
         "PLAN_REMOVED": "{{actor}} removed the tasks of {{template}}",
         "ASSIGNED_BOTH": "{{actor}} assigned {{added}} and removed {{removed}} on {{target}}",
         "UNLOCK_REQUESTED": "{{actor}} asked to unlock {{target}}",
-        "REQUEST_SOLVED": "{{actor}} marked the request for {{target}} as solved"
+        "REQUEST_SOLVED": "{{actor}} marked the request for {{target}} as solved",
+        "DAILY_NOTE": "{{actor}} wrote the daily note for {{day}} on {{target}}"
       },
       "detail": {
         "yes": "Yes",
@@ -681,7 +696,10 @@
         "noSubtasks": "No subtasks.",
         "template": "Template",
         "previousTemplate": "Replaced",
-        "taskCount": "Tasks"
+        "taskCount": "Tasks",
+        "submissionNote": "Submission note",
+        "noteDay": "Day",
+        "dailyNote": "Daily note"
       },
       "field": {
         "name": "Name",
@@ -692,7 +710,10 @@
         "requiresDocument": "Document required",
         "requiresApproval": "Approval required",
         "checklist": "Approval checklist",
-        "status": "Status"
+        "status": "Status",
+        "photoAllowed": "Photo is enough",
+        "feeRequired": "Amount required",
+        "priorStepsRequired": "Lock (earlier steps)"
       },
       "count_one": "{{count}} entry",
       "count_other": "{{count}} entries",
@@ -826,6 +847,39 @@
         "ANALYSIS_INTERRUPTED": "The analysis was interrupted (the server restarted).",
         "STANDARDS_FILE_NOT_FOUND": "The standards PDF could not be found — upload it again."
       }
+    },
+    "submit": {
+      "confirm": "Send for approval",
+      "notePlaceholder": "Measured values, carrier and dates, work done …",
+      "noteHint": "The AI reads the photos together with this note; the admin sees it when approving."
+    },
+    "fee": {
+      "flag": "Amount",
+      "flagHint": "An amount (CHF) must be entered when completing — e.g. the shipping cost.",
+      "tag": "Amount",
+      "tagHint": "An amount (CHF) is entered when completing.",
+      "row": "Amount (CHF)",
+      "label": "Amount (CHF)",
+      "placeholder": "e.g. 1250.00",
+      "hint": "The amount from the quote. The AI reads it together with the short note.",
+      "invalid": "Enter a valid amount (e.g. 1250.00).",
+      "okDetail": "Amount entered",
+      "missingDetail": "Cannot be sent without an amount",
+      "okDetailReview": "Amount entered by the sender",
+      "missingDetailReview": "No amount entered — cannot be approved"
+    },
+    "priorSteps": {
+      "flag": "Lock",
+      "flagHint": "Can only be completed and approved once every earlier step is done (earlier stages of this path and the whole other path) — shipping lock.",
+      "tag": "Lock",
+      "tagHint": "Can only be completed and approved after all earlier steps.",
+      "row": "Earlier steps",
+      "okDetail": "All earlier steps are done",
+      "okValue": "Done",
+      "openValue_one": "{{count}} open",
+      "openValue_other": "{{count}} open",
+      "more_one": "+{{count}} more",
+      "more_other": "+{{count}} more"
     }
   }
 }

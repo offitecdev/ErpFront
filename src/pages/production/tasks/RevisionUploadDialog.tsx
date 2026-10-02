@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History } from 'lucide-react';
+import { History, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
@@ -7,8 +7,8 @@ import { t } from '@/i18n/translate';
 import type { TaskSubtaskFile } from '@/types/productionTasks';
 
 import { FileDropZone } from './FileDropZone';
-import { fileProblem } from './subtaskFileModel';
-import { SUBTASK_FILE_ACCEPT } from './taskModel';
+import { fileProblem, isPdf } from './subtaskFileModel';
+import { SUBTASK_FILE_ACCEPT, SUBTASK_PHOTO_ACCEPT } from './taskModel';
 
 /**
  * ── «UPLOAD A REVISION» (28.09.2026, Vorgabe Samet) ──────────────────────────
@@ -20,11 +20,14 @@ import { SUBTASK_FILE_ACCEPT } from './taskModel';
  */
 export const RevisionUploadDialog = ({
     file,
+    photoAllowed = false,
     onUpload,
     onClose,
 }: {
     /** Die aktuelle Fassung, zu der eine neue kommt. */
     file: TaskSubtaskFile;
+    /** «Fotoğraf yeterli» an der Unteraufgabe (02.10.2026): auch ein Foto als neue Fassung. */
+    photoAllowed?: boolean;
     onUpload: (picked: File, note: string) => Promise<boolean>;
     onClose: () => void;
 }) => {
@@ -37,7 +40,7 @@ export const RevisionUploadDialog = ({
     const choose = (files: File[]) => {
         const first = files[0];
         if (!first) return;
-        const problem = fileProblem(first);
+        const problem = fileProblem(first, photoAllowed);
         if (problem) { toast.error(`${first.name}: ${problem}`); return; }
         setPicked(first);
     };
@@ -72,14 +75,16 @@ export const RevisionUploadDialog = ({
                 <section className="ofi-ptk-complete__block">
                     <h3 className="ofi-ptk-complete__label">{t('productionTasks.files.reviseFile')}</h3>
                     <FileDropZone
-                        title={t('productionTasks.complete.dropTitle')}
-                        accept={SUBTASK_FILE_ACCEPT}
+                        title={t(photoAllowed ? 'productionTasks.complete.dropTitlePhoto' : 'productionTasks.complete.dropTitle')}
+                        accept={photoAllowed ? SUBTASK_PHOTO_ACCEPT : SUBTASK_FILE_ACCEPT}
                         busy={saving}
                         onFiles={choose}
                     />
                     {picked && (
                         <span className="ofi-ptk-revision__picked">
-                            <span className="ofi-ptk-fileglyph is-pdf" aria-hidden>PDF</span>
+                            {isPdf(picked)
+                                ? <span className="ofi-ptk-fileglyph is-pdf" aria-hidden>PDF</span>
+                                : <span className="ofi-ptk-fileglyph is-image" aria-hidden><ImageIcon /></span>}
                             <b>{picked.name}</b>
                         </span>
                     )}

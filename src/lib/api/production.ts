@@ -18,6 +18,7 @@ import type {
     ProductionPurchaseAssignment,
     ProductionSelection,
     ProductionSettings,
+    ProductionSupplierLinks,
     ProductionSyncResult,
 } from '../../types/production';
 
@@ -60,6 +61,11 @@ export const productionApi = {
     settings: () => get<ProductionSettings>('/production/settings'),
     saveSettings: async (sourceTenantIds: string[]): Promise<{ settings: ProductionSettings; sync: ProductionSyncResult }> =>
         (await apiClient.put('/production/settings', { sourceTenantIds }, { headers: itGateHeaders() })).data,
+
+    /** Modul-Einstellungen › Produktion › Produktionslieferant (02.10.2026). */
+    supplierLinks: () => get<ProductionSupplierLinks>('/production/supplier-links'),
+    saveSupplierLinks: async (links: Array<{ producerTenantId: string; supplierId: string | null }>): Promise<ProductionSupplierLinks> =>
+        (await apiClient.put('/production/supplier-links', { links }, { headers: itGateHeaders() })).data,
 
     /**
      * Projekt und Geräte an einer bestehenden Bestellung setzen (Bestellseite,

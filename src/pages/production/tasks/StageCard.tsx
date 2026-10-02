@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { Check, ChevronDown, ChevronRight, ChevronUp, Clock3, FileText, Lock, Paperclip, Play, Plus, ShieldCheck, Square, Trash2, X } from 'lucide-react';
+import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, Clock3, FileText, Lock, Paperclip, Play, Plus, ShieldCheck, Square, Trash2, X } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { t } from '@/i18n/translate';
@@ -8,6 +8,7 @@ import type { ProductionTask, TaskArea, TaskSectionStage, TaskStage, TaskStatus,
 
 import { FlagGlyph } from '../device/deviceGlyphs';
 import { CompleteSubtaskDialog } from './CompleteSubtaskDialog';
+import { SubmitSubtaskDialog } from './SubmitSubtaskDialog';
 import { NameInput } from './InlineName';
 import { UnlockRequestDialog } from './UnlockRequestDialog';
 import { PeopleCell, type PersonNames } from './PeopleCell';
@@ -15,6 +16,7 @@ import { SubtaskDetail } from './SubtaskFiles';
 import { latestFiles, type SubtaskActions } from './subtaskFileModel';
 import {
     formatDay,
+    formatFee,
     formatPercent,
     isSubtaskCompleted,
     overallOf,
@@ -67,7 +69,7 @@ const DayCell = ({ day }: { day: string | null }) =>
     (day ? <span className="ofi-ptk-day">{formatDay(day)}</span> : <span className="ofi-ptk-day is-empty">-</span>);
 
 /** Die Pflichtfelder einer Unteraufgabe — nur zu lesen, in der letzten Spalte. */
-const RequiredCell = ({ flags }: { flags: typeof FLAGS }) => (
+const RequiredCell = ({ flags, subtask }: { flags: typeof FLAGS; subtask?: TaskSubtask }) => (
     <span role="cell" className="ofi-ptk-cell-required">
         {flags.map(({ flag, labelKey, Icon }) => (
             <span key={flag} className="ofi-ptk-flagtag" title={t('productionTasks.subtask.requiredHint', { field: t(labelKey) })}>
@@ -75,6 +77,19 @@ const RequiredCell = ({ flags }: { flags: typeof FLAGS }) => (
                 {t(labelKey)}
             </span>
         ))}
+        {/* Betrag und Sperre (02.10.2026, OCC-Standard S. 7) — am Gerät steht der eingegebene Betrag. */}
+        {subtask?.feeRequired && (
+            <span className="ofi-ptk-flagtag" title={t('productionTasks.fee.tagHint')}>
+                <Banknote aria-hidden />
+                {subtask.fee != null ? formatFee(subtask.fee) : t('productionTasks.fee.tag')}
+            </span>
+        )}
+        {subtask?.priorStepsRequired && (
+            <span className="ofi-ptk-flagtag" title={t('productionTasks.priorSteps.tagHint')}>
+                <Lock aria-hidden />
+                {t('productionTasks.priorSteps.tag')}
+            </span>
+        )}
     </span>
 );
 
@@ -339,6 +354,8 @@ export const StageCard = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const [completing, setCompleting] = useState<{ taskId: string; subtaskId: string } | null>(null);
+    // «Görevi tamamla» mit Fotos und kurzer Notiz (02.10.2026) — nur «Fotoğraf yeterli».
+    const [submitting, setSubmitting] = useState<{ taskId: string; subtaskId: string } | null>(null);
     const toggleTask = (taskId: string) => setExpanded((current) => {
         const next = new Set(current);
         if (next.has(taskId)) next.delete(taskId);
@@ -351,6 +368,8 @@ export const StageCard = ({
     const [requestingUnlock, setRequestingUnlock] = useState<{ task: ProductionTask; subtask: TaskSubtask; label: string; awaiting: boolean } | null>(null);
     const completingTask = completing ? tasks.find((task) => task.id === completing.taskId) : undefined;
     const completingIndex = completingTask ? completingTask.subtasks.findIndex((subtask) => subtask.id === completing?.subtaskId) : -1;
+    const submittingTask = submitting ? tasks.find((task) => task.id === submitting.taskId) : undefined;
+    const submittingIndex = submittingTask ? submittingTask.subtasks.findIndex((subtask) => subtask.id === submitting?.subtaskId) : -1;
 
     return (
         <section className={`ofi-ptk-card ${tasks.length ? '' : 'is-empty'}`} aria-label={stageName} data-stage={stage.key}>
@@ -716,7 +735,7 @@ export const StageCard = ({
                                                     onCommit={onAssignSubtask ? (next) => onAssignSubtask(task, subtask, next) : undefined}
                                                 />
                                             </span>
-                                            <RequiredCell flags={FLAGS.filter(({ flag }) => subtask[flag])} />
+                                            <RequiredCell flags={FLAGS.filter(({ flag }) => subtask[flag])} subtask={subtask} />
                                         </div>
                                         {shown && subtaskActions && (
                                             <div className="ofi-ptk-row is-detail" role="row">
@@ -726,6 +745,7 @@ export const StageCard = ({
                                                         subtask={subtask}
                                                         actions={subtaskActions}
                                                         onComplete={() => setCompleting({ taskId: task.id, subtaskId: subtask.id })}
+                                                        onSubmit={() => setSubmitting({ taskId: task.id, subtaskId: subtask.id })}
                                                     />
                                                 </div>
                                             </div>
@@ -764,6 +784,17 @@ export const StageCard = ({
                     names={names}
                     actions={subtaskActions}
                     onClose={() => setCompleting(null)}
+                />
+            )}
+            {submittingTask && submittingIndex >= 0 && subtaskActions && (
+                <SubmitSubtaskDialog
+                    task={submittingTask}
+                    subtask={submittingTask.subtasks[submittingIndex]}
+                    code={subtaskCode(submittingTask.code, submittingIndex)}
+                    stageName={stageName}
+                    names={names}
+                    actions={subtaskActions}
+                    onClose={() => setSubmitting(null)}
                 />
             )}
             <ConfirmDialog

@@ -118,6 +118,10 @@ export interface TaskFileAnalysis {
     model: string | null;
     /** Warum sie scheiterte (GPT_NOT_CONFIGURED, GPT_QUOTA, ANALYSIS_INTERRUPTED …). */
     errorCode: string | null;
+    /** Die kurze Notiz der Einsendung, die mitgelesen wurde (02.10.2026). */
+    note?: string | null;
+    /** Fotos, die ZUSAMMEN geprüft wurden (02.10.2026) — derselbe Bericht an jedem; leer bei einem PDF. */
+    groupFileIds?: string[];
 }
 
 /** Ein Punkt der Freigabe-Checkliste einer Unteraufgabe (28.09.2026). */
@@ -140,6 +144,21 @@ export interface TaskSubtask {
     /** Wer an der Unteraufgabe arbeitet (29.09.2026) — Personen stehen nur hier, nicht an der Aufgabe. */
     assigneeIds: string[];
     requiresDocument: boolean;
+    /**
+     * «Fotoğraf yeterli» (02.10.2026, OCC-Standard): nur mit «Document» — dann zählt auch ein Foto
+     * (JPEG, PNG, WebP) als Dokument. Fehlt es (älterer Server), gilt false: nur PDF.
+     */
+    photoAllowed?: boolean;
+    /**
+     * «Ücret girilsin» (02.10.2026, OCC-Standard S. 7): beim Einsenden ist ein Betrag (CHF) Pflicht —
+     * etwa der Nakliye-Preis. Fehlt es (älterer Server), gilt false.
+     */
+    feeRequired?: boolean;
+    /**
+     * «Kilit» (02.10.2026, OCC-Standard S. 7 «sistem kilidi»): fertig melden und freigeben erst,
+     * wenn alle Schritte davor erledigt sind — siehe `openPriorSteps`.
+     */
+    priorStepsRequired?: boolean;
     requiresApproval: boolean;
     /** Die Freigabe-Checkliste (nur mit «Approval», sonst leer). */
     approvalChecklist: TaskSubtaskChecklistItem[];
@@ -154,6 +173,10 @@ export interface TaskSubtask {
     completedByName: string | null;
     completedAt: string | null;
     completionNote: string | null;
+    /** Die kurze Notiz beim Einsenden («Görevi tamamla», 02.10.2026) — die KI liest sie mit. */
+    submissionNote?: string | null;
+    /** Der Betrag beim Einsenden (CHF, 02.10.2026) — nur mit «Ücret girilsin»; gehört dem Server. */
+    fee?: number | null;
     /** Zurück zur Überarbeitung («Request revision», die Verwaltung) — der Abschluss leert es. */
     revisionById: string | null;
     revisionByName: string | null;
@@ -308,6 +331,8 @@ export type TaskActivityKind =
     | 'STAGE_ADDED'
     | 'UNLOCK_REQUESTED'
     | 'REQUEST_SOLVED'
+    /** Tagesnotiz (02.10.2026, am selben Tag wieder abgeschafft) — nur noch ältere Zeilen im Verlauf. */
+    | 'DAILY_NOTE'
     | 'PLAN_LOADED'
     | 'PLAN_REMOVED';
 

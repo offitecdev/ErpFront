@@ -1,7 +1,7 @@
 import { t } from '@/i18n/translate';
 import type { TaskActivity, TaskActivityKind, TaskStatus } from '@/types/productionTasks';
 
-import { localToday } from '../tasks/taskModel';
+import { formatDay, localToday } from '../tasks/taskModel';
 
 /**
  * ── DER VERLAUF EINER STUFE · WAS DIE OBERFLÄCHE DARAUS MACHT (30.09.2026) ──
@@ -29,6 +29,8 @@ const FILTER_OF: Record<TaskActivityKind, Exclude<ActivityFilter, 'all'>> = {
     CHECKLIST_ITEM_ADDED: 'approval',
     UNLOCK_REQUESTED: 'approval',
     REQUEST_SOLVED: 'approval',
+    // Tagesnotiz (02.10.2026) — Arbeit wie ein Schritt der Unteraufgabe.
+    DAILY_NOTE: 'work',
     FILE_UPLOADED: 'files',
     FILE_DELETED: 'files',
     SUBTASK_ASSIGNED: 'changes',
@@ -178,6 +180,8 @@ export const entrySentence = (
             return sentence(key, { actor, target, status: statusName(details.to) });
         case 'CHECKLIST_ITEM_ADDED':
             return sentence(key, { actor, target, text: str(details.text) });
+        case 'DAILY_NOTE':
+            return sentence(key, { actor, target, day: str(details.day) ? formatDay(str(details.day)) : '—' });
         case 'TASK_MOVED':
             return sentence(key, { actor, target, stage: stageNameOf(str(details.toArea), str(details.toStage)) });
         case 'STAGE_ADDED':
