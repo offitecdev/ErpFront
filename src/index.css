@@ -5438,6 +5438,15 @@ body > :not(#root) .ofi-cal-mailtoggle:hover { background: var(--ofi-cal-hover);
     color: var(--ofi-cal-text);
 }
 .ofi-tp-dialog__foot { padding: 8px 16px 16px; }
+/* Ganzer Bildschirm (PopupDialog `fullScreen`, das BOM-Fenster): keine Luft, keine Kante. */
+.ofi-tp-scrim.is-fullscreen { padding: 0; }
+.ofi-tp-dialog.is-fullscreen {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+}
 .ofi-tp-dialog__spacer { height: 18px; flex: none; }
 .ofi-tp-iconbadge {
     display: flex;

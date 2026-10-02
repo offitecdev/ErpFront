@@ -82,6 +82,15 @@ export const AiAnalysisDialog = ({
     onClose: () => void;
 }) => {
     const [retrying, setRetrying] = useState(false);
+    // Der Bericht in der Sprache, die gerade eingestellt ist (02.10.2026) — sonst wie gespeichert.
+    const lang = (i18n.resolvedLanguage || i18n.language || 'en').slice(0, 2) as 'tr' | 'en' | 'de';
+    const localized = analysis.i18n?.[lang] ?? null;
+    const summary = localized?.summary ?? analysis.summary;
+    const checks = analysis.checks.map((check, index) => ({
+        ...check,
+        standard: localized?.checks[index]?.standard || check.standard,
+        reason: localized?.checks[index]?.reason || check.reason,
+    }));
     const active = isAnalysisActive(analysis);
     const outdated = analysis.status === 'DONE' && Boolean(currentStandards) && ((currentStandards?.text ?? '') !== analysis.standards
         || (currentStandards?.fileRef ?? null) !== (analysis.standardsFileRef ?? null));
@@ -135,16 +144,16 @@ export const AiAnalysisDialog = ({
                 )}
                 {analysis.status === 'DONE' && (
                     <>
-                        {analysis.summary && (
+                        {summary && (
                             <section className="ofi-ptk-complete__block">
                                 <h3 className="ofi-ptk-complete__label">{t('productionTasks.ai.summary')}</h3>
-                                <p className="ofi-ptk-aireport__summary">{analysis.summary}</p>
+                                <p className="ofi-ptk-aireport__summary">{summary}</p>
                             </section>
                         )}
                         <section className="ofi-ptk-complete__block">
                             <h3 className="ofi-ptk-complete__label">{t('productionTasks.ai.checks')}</h3>
                             <ul className="ofi-ptk-aireport__checks">
-                                {analysis.checks.map((check, index) => {
+                                {checks.map((check, index) => {
                                     const Icon = RESULT_ICON[check.result];
                                     return (
                                         <li key={`${index}-${check.standard}`} className={`is-${check.result.toLowerCase()}`}>
@@ -185,6 +194,15 @@ export const AiReportButton = ({
 }) => {
     const [open, setOpen] = useState(false);
     const analysis = file.analysis ?? null;
+    /* Nach der Prüfung geht der Bericht von selbst auf (02.10.2026: «this analysis result modal
+       should open automatically after analysis») — für wen die Datei hochgeladen hat, und nur,
+       wenn er die Prüfung hier laufen sah (ein alter Bericht springt beim Öffnen nicht auf). */
+    const active = isAnalysisActive(analysis);
+    const [wasActive, setWasActive] = useState(active);
+    if (wasActive !== active) {
+        setWasActive(active);
+        if (wasActive && !active && file.uploadedById === actions.meId) setOpen(true);
+    }
     if (!analysis) return null;
     const retry = actions.retryAnalysis ? () => actions.retryAnalysis!(task, subtask, file) : undefined;
     return (

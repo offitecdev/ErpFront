@@ -208,11 +208,14 @@
       "UNLOCK_ALREADY_REQUESTED": "An unlock has already been requested for this subtask.",
       "REQUEST_NOT_FOUND": "The request was not found or is already solved.",
       "NO_STANDARDS": "This subtask has no document standards to check against.",
-      "ANALYSIS_RUNNING": "The AI analysis is already running.",
+      "ANALYSIS_RUNNING": "The AI is checking a PDF of this subtask — upload again when it is done.",
       "STANDARDS_FILE_NOT_FOUND": "The standards PDF could not be found.",
       "FEE_REQUIRED": "Enter the amount (CHF) first — this subtask cannot be sent without it.",
       "FEE_INVALID": "The amount is invalid — enter e.g. 1250.00.",
-      "PRIOR_STEPS_OPEN": "Finish the earlier steps first ({{count}} open): {{steps}}"
+      "PRIOR_STEPS_OPEN": "Finish the earlier steps first ({{count}} open): {{steps}}",
+      "BOM_DRIVEN": "The status of «BOM Creation» follows the BOM — approve, complete or revise it in the BOM window.",
+      "STANDARDS_EMPTY": "A template needs text or a PDF.",
+      "STANDARDS_TEMPLATE_NOT_FOUND": "This template no longer exists."
     },
     "people": {
       "assign": "Assign person",
@@ -250,7 +253,8 @@
       "status": "Status",
       "people": "People",
       "required": "Required",
-      "subtasksDone": "{{done}}/{{total}} subtasks"
+      "subtasksDone": "{{done}}/{{total}} subtasks",
+      "totalTime": "Total time"
     },
     "status": {
       "REVISION": "Revision requested",
@@ -409,7 +413,9 @@
       "nameRequired": "Name required",
       "sectionFull": "The stages of this section already weigh 100% — lower a stage’s weight first.",
       "removeStageEmpty": "The stage “{{name}}” will be removed from this template.",
-      "removeSectionEmpty": "The section “{{name}}” will be removed from this template."
+      "removeSectionEmpty": "The section “{{name}}” will be removed from this template.",
+      "manageCategories": "Manage categories",
+      "noFreeCategory": "Every category is already a section of this template."
     },
     "templates": {
       "clearSearch": "Clear search",
@@ -614,7 +620,11 @@
       "cellFree": "No task on this day",
       "legendUpcoming": "Task day still to come",
       "cellUpcoming": "{{name}} · {{day}} is still to come",
-      "dropTitlePhoto": "Drop photos or PDFs here, then choose the task and subtask"
+      "dropTitlePhoto": "Drop photos or PDFs here, then choose the task and subtask",
+      "missingMine": "No file uploaded today",
+      "missingCount_one": "{{count}} missing file today",
+      "missingCount_other": "{{count}} missing files today",
+      "missingTask": "No document uploaded to this task today"
     },
     "activity": {
       "title": "Activities",
@@ -846,7 +856,9 @@
         "ANALYSIS_TOO_LARGE": "The PDF is too large for AI analysis (max. 20 MB).",
         "ANALYSIS_INTERRUPTED": "The analysis was interrupted (the server restarted).",
         "STANDARDS_FILE_NOT_FOUND": "The standards PDF could not be found — upload it again."
-      }
+      },
+      "uploadWait": "The AI is checking a PDF of this subtask — you can upload again when it is done.",
+      "analysing": "AI is checking…"
     },
     "submit": {
       "confirm": "Send for approval",
@@ -880,6 +892,46 @@
       "openValue_other": "{{count}} open",
       "more_one": "+{{count}} more",
       "more_other": "+{{count}} more"
+    },
+    "bomTile": {
+      "title": "BOM",
+      "summary": "Create and edit the BOM",
+      "open": "Open the BOM of {{stage}}",
+      "region": "BOM of {{stage}}"
+    },
+    "time": {
+      "minutes": "{{m}} min",
+      "hoursMinutes": "{{h}} h {{m}} min",
+      "underMinute": "< 1 min",
+      "running": "Running now"
+    },
+    "workload": {
+      "count_one": "{{count}} open subtask",
+      "count_other": "{{count}} open subtasks",
+      "title_one": "{{name}} · {{count}} open subtask",
+      "title_other": "{{name}} · {{count}} open subtasks",
+      "free": "{{name}} has no open subtasks",
+      "due": "due {{date}}",
+      "more": "+{{count}} more"
+    },
+    "standardsTemplates": {
+      "label": "Template",
+      "choose": "Choose a standards template",
+      "none": "No templates yet",
+      "saveAs": "Save as template",
+      "namePlaceholder": "Template name",
+      "saved": "Template «{{name}}» saved",
+      "removed": "Template «{{name}}» deleted",
+      "remove": "Delete this template",
+      "emptyHint": "Write standards or add a PDF first"
+    },
+    "customer": {
+      "visible": "Visible to customer",
+      "visibleShort": "Customer",
+      "stageOn": "Customers see this stage — click to hide it",
+      "stageOff": "Hidden from customers — click to show this stage",
+      "taskHint": "The customer sees this task and its status in their project",
+      "subtaskHint": "The customer sees this subtask and its status"
     }
   }
 }

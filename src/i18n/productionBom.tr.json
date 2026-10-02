@@ -35,6 +35,32 @@
       "MACHINE": "Makine",
       "ELECTRICAL": "Elektrik"
     },
+    "categories": {
+      "title": "Kategoriler",
+      "hint": "Mekanik (MEK) ve Elektrik (ELK) her zaman vardır. Kategorinin kodu ana BOM numarasını verir (HYD → BOM-HYD-00001); alt BOM kodları BOM sayfasında belirlenir.",
+      "add": "Kategori ekle",
+      "edit": "{{name}} düzenle",
+      "builtIn": "Sabit",
+      "custom": "Özel",
+      "newTitle": "Yeni kategori",
+      "editTitle": "Kategoriyi düzenle",
+      "dialogSub": "Kategoriler, Mekanik ve Elektrik gibi, BOM şablonlarını ve cihazın BOM'larını gruplar.",
+      "name": "Ad",
+      "namePlaceholder": "ör. Hidrolik",
+      "code": "Kod",
+      "codeHint": "2–8 harf veya rakam",
+      "preview": "Ana BOM numarası {{number}} olacak",
+      "codeBuiltIn": "{{code}} sabit bir kategoriye ait.",
+      "create": "Oluştur",
+      "created": "«{{name}}» kategorisi oluşturuldu",
+      "saved": "«{{name}}» kategorisi kaydedildi",
+      "deleted": "«{{name}}» kategorisi silindi",
+      "deleteConfirm": "Kategoriyi sil",
+      "deleteText": "«{{name}}» silinsin mi? Yalnızca hiçbir BOM veya şablon kullanmıyorsa silinebilir.",
+      "menu": "Kategoriler",
+      "menuSub": "Kategorilerin kodları",
+      "link": "Kategoriler"
+    },
     "status": {
       "DRAFT": "Taslak",
       "APPROVED": "Onaylandı",
@@ -541,7 +567,14 @@
       "BOM_NOT_APPROVED": "BOM {{bom}} henüz onaylanmadı — fiyat talebi ve sipariş yalnız onaylanmış BOM'dan yapılır. Önce BOM'u onaylayın.",
       "ERP_CODE_MISSING": "{{count}} satırın Depo kartında ERP kodu yok ({{names}}) — BOM onaylanamaz. Kartlara malzeme grubu verin.",
       "REVISION_NEEDS_ADMIN": "Revizyonu yalnız admin onaylayabilir — «Onaya gönder» ile admin'e iletin.",
-      "REVISION_NOT_SUBMITTED": "Revizyon henüz onaya gönderilmedi."
+      "REVISION_NOT_SUBMITTED": "Revizyon henüz onaya gönderilmedi.",
+      "CATEGORY_NOT_FOUND": "Bu BOM kategorisi artık yok.",
+      "CATEGORY_NAME_REQUIRED": "Kategorinin bir adı olmalı.",
+      "CATEGORY_NAME_TAKEN": "«{{name}}» adlı bir kategori zaten var.",
+      "CATEGORY_CODE_INVALID": "Kod: 2–8 harf veya rakam (ör. HYD).",
+      "CATEGORY_CODE_TAKEN": "{{code}} kodu zaten kullanılıyor.",
+      "CATEGORY_IN_USE": "Bu kategoriyi kullanan BOM veya şablonlar var.",
+      "CATEGORY_LIMIT": "En fazla {{max}} özel kategori."
     },
     "tasks": {
       "title": "Görevler",
@@ -1417,6 +1450,9 @@
       "checkFailed": "Gelen kutusu okunamadı: {{error}}",
       "checkNone": "Gelen kutusu olan bir posta kutusu yok.",
       "readOnly": "Posta kutularını yalnızca yönetici değiştirebilir."
+    },
+    "window": {
+      "title": "BOM · {{area}}"
     }
   },
   "notify": {

@@ -1,6 +1,18 @@
 import type { ProductionTask, TaskArea, TaskSection, TaskStage, TaskTemplate, TaskTemplateInput } from '@/types/productionTasks';
 
-import { localToday, newSectionKey, newStageKey, numberTasks, orderTasks, roundPercent, taskAssigneesOf } from './taskModel';
+import {
+    BOM_STAGE,
+    BOM_SUBTASK_ID,
+    BOM_SUBTASK_NAME,
+    BOM_TASK_NAME,
+    localToday,
+    newSectionKey,
+    newStageKey,
+    numberTasks,
+    orderTasks,
+    roundPercent,
+    taskAssigneesOf,
+} from './taskModel';
 
 /**
  * ── DER ENTWURF EINER VORLAGE (26.09.2026) ──────────────────────────────────
@@ -67,7 +79,13 @@ export const draftInput = (draft: TemplateDraft): TaskTemplateInput => ({
         name: section.name.replace(/\s+/g, ' ').trim(),
         share: section.share,
         // Mit dem Gewicht der Stufe (30.09.2026) — ohne hielte der Server die Anfrage für einen älteren Stand.
-        stages: section.stages.map((stage) => ({ key: stage.key, name: stage.name.replace(/\s+/g, ' ').trim(), weight: stage.weight ?? 0 })),
+        stages: section.stages.map((stage) => ({
+            key: stage.key,
+            name: stage.name.replace(/\s+/g, ' ').trim(),
+            weight: stage.weight ?? 0,
+            // Sichtbar für den Kunden (02.10.2026) — nur mitgeschickt, wenn an.
+            ...(stage.customerVisible ? { customerVisible: true } : {}),
+        })),
     })),
     tasks: orderTasks(draft.tasks, draft.sections).map((task) => ({
         area: task.area,
@@ -82,8 +100,16 @@ export const draftInput = (draft: TemplateDraft): TaskTemplateInput => ({
         dueDate: null,
         createdAt: task.createdAt,
         subtasks: task.subtasks.map((subtask) => ({ ...subtask, startDate: null, dueDate: null })),
+        customerVisible: task.customerVisible === true,
     })),
 });
+
+/** Sieht der Kunde diese Stufe (02.10.2026)? */
+export const setStageCustomerVisible = (draft: TemplateDraft, area: TaskArea, stage: TaskStage, visible: boolean): TemplateDraft =>
+    withSection(draft, area, (section) => ({
+        ...section,
+        stages: section.stages.map((entry) => (entry.key === stage ? { ...entry, customerVisible: visible } : entry)),
+    }));
 
 /** Hat sich gegenüber dem Gespeicherten etwas geändert? */
 export const draftDirty = (draft: TemplateDraft | null, saved: TaskTemplate | null): boolean => {
@@ -106,6 +132,57 @@ export const addSection = (draft: TemplateDraft, name: string): { draft: Templat
     const section: TaskSection = { key: newSectionKey(), name: name.trim(), share: Math.max(0, roundPercent(100 - used)), stages: [] };
     return { draft: { ...draft, sections: [...draft.sections, section] }, key: section.key };
 };
+
+/**
+ * Einen Bereich aus einer BOM-Kategorie anlegen (02.10.2026): seine Kennung ist
+ * die der Kategorie (MECHANICAL / ELECTRICAL / «c-…»), der Name der ihre —
+ * leer bei den festen, sie übersetzt die Oberfläche.
+ */
+export const addCategorySection = (draft: TemplateDraft, key: TaskArea, name: string): TemplateDraft => {
+    if (draft.sections.some((section) => section.key === key)) return draft;
+    const used = roundPercent(draft.sections.reduce((sum, section) => sum + section.share, 0));
+    // Die BOM-Stufe zählt 0 % — die nächste Stufe bekommt so die vollen 100 %.
+    const section: TaskSection = {
+        key,
+        name: name.trim(),
+        share: Math.max(0, roundPercent(100 - used)),
+        stages: [{ key: BOM_STAGE, name: '', weight: 0 }],
+    };
+    return renumbered({ ...draft, sections: [...draft.sections, section], tasks: [...draft.tasks, newBomTask(key)] });
+};
+
+/** Die eine Aufgabe der BOM-Stufe: «BOM» mit «BOM Creation» (100 % der Stufe). */
+const newBomTask = (area: TaskArea): ProductionTask => ({
+    ...newTask(area, BOM_STAGE),
+    name: BOM_TASK_NAME,
+    weight: 100,
+    createdAt: null,
+    subtasks: [{
+        id: BOM_SUBTASK_ID,
+        name: BOM_SUBTASK_NAME,
+        createdAt: null,
+        weight: null,
+        startDate: null,
+        dueDate: null,
+        assigneeIds: [],
+        requiresDocument: false,
+        requiresApproval: false,
+        approvalChecklist: [],
+        documentStandards: null,
+        documentStandardsFile: null,
+        status: 'TODO',
+        files: [],
+        completedById: null,
+        completedByName: null,
+        completedAt: null,
+        completionNote: null,
+        revisionById: null,
+        revisionByName: null,
+        revisionAt: null,
+        revisionNote: null,
+        revisionHistory: [],
+    }],
+});
 
 export const renameSection = (draft: TemplateDraft, key: TaskArea, name: string): TemplateDraft =>
     // Der Name gibt das Präfix der Kürzel («Hidrolik» → H-01).

@@ -1,10 +1,12 @@
 import { Copy, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { SelectMenu } from '@/components/ui-shared/SelectMenu';
 import { t } from '@/i18n/translate';
-import { AREA_OF_CATEGORY, type BomCategory, type BomProduct, type BomTemplateSummary, type BomUnit } from '@/types/productionBom';
+import { AREA_OF_CATEGORY, isCustomBomCategory, type BomProduct, type BomTemplateSummary, type BomUnit } from '@/types/productionBom';
 
 import { BomLinesTable } from '../BomLinesTable';
+import { bomCategoryLabel, type BomCategoryOption } from '../bomCategoryOptions';
 import { BomSpinner, Note } from '../bomUi';
 import { ProductSearch } from '../ProductSearch';
 import { addProduct, draftRows, type TemplateDraft } from './templateDraft';
@@ -17,13 +19,14 @@ import { addProduct, draftRows, type TemplateDraft } from './templateDraft';
  *  ürünün tüm satırı eklenir.»
  *
  * Oben der Name wie ein Fenstertitel, darunter EINE Tafel mit Kategorie
- * (Makine | Elektrik), Ana kart (CHILLER), BOM-Nummer (Vorsatz + Vorschau
+ * (Makine | Elektrik | eigene), Ana kart (CHILLER), BOM-Nummer (Vorsatz + Vorschau
  * ELK-PANO-00001) und Beschreibung; dann das Material: die Suche und die
  * Zeilen, jede wie im Depo.
  */
 export const BomTemplateEditor = ({
     draft,
     summary,
+    categories,
     canEdit,
     dirty,
     saving,
@@ -35,6 +38,7 @@ export const BomTemplateEditor = ({
 }: {
     draft: TemplateDraft;
     summary: BomTemplateSummary | null;
+    categories: BomCategoryOption[];
     canEdit: boolean;
     dirty: boolean;
     saving: boolean;
@@ -54,7 +58,10 @@ export const BomTemplateEditor = ({
     const patchLine = (key: string, patch: Partial<TemplateDraft['lines'][number]>) =>
         onChange({ ...draft, lines: draft.lines.map((line) => (line.key === key ? { ...line, ...patch } : line)) });
 
-    const categories: BomCategory[] = ['MACHINE', 'ELECTRICAL'];
+    // Die Kategorie der Vorlage steht immer zur Wahl — auch eine, die es nicht mehr gibt.
+    const shown = categories.some((entry) => entry.category === draft.category)
+        ? categories
+        : [...categories, { category: draft.category, area: draft.category, code: '', label: bomCategoryLabel(draft.category, null), custom: null }];
     return (
         <div className="ofi-bom-editor">
             <div className="ofi-bom-editor__head">
@@ -100,21 +107,15 @@ export const BomTemplateEditor = ({
                     <div className="ofi-bom-row">
                         <span className="ofi-bom-row__label">{t('productionBom.editor.category')}</span>
                         <div className="ofi-bom-row__control">
-                            <div className="ofi-bom-seg" role="radiogroup" aria-label={t('productionBom.editor.category')}>
-                                {categories.map((category) => (
-                                    <button
-                                        key={category}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={draft.category === category}
-                                        disabled={!canEdit}
-                                        className={`ofi-nosize${draft.category === category ? ' is-on' : ''}`}
-                                        onClick={() => set('category', category)}
-                                    >
-                                        {t(`productionBom.category.${category}`)}
-                                    </button>
-                                ))}
-                            </div>
+                            {/* Eine Auswahlliste statt der Knöpfe (02.10.2026). */}
+                            <SelectMenu
+                                className="ofi-bom-catselect"
+                                value={draft.category}
+                                disabled={!canEdit}
+                                ariaLabel={t('productionBom.editor.category')}
+                                options={shown.map((entry) => ({ value: entry.category, label: entry.label, hint: entry.code || undefined }))}
+                                onChange={(next) => set('category', next as TemplateDraft['category'])}
+                            />
                         </div>
                     </div>
                     <div className="ofi-bom-row">
@@ -155,7 +156,7 @@ export const BomTemplateEditor = ({
                         <span className="ofi-bom-group__meta">{t('productionBom.templates.usedBy', { count: summary.usedBy })}</span>
                     )}
                 </h3>
-                {canEdit && <ProductSearch area={AREA_OF_CATEGORY[draft.category]} onPick={pick} />}
+                {canEdit && <ProductSearch area={isCustomBomCategory(draft.category) ? undefined : AREA_OF_CATEGORY[draft.category]} onPick={pick} />}
                 <BomLinesTable
                     rows={draftRows(draft.lines)}
                     mode="template"

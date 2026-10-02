@@ -8,8 +8,8 @@ import type { ProductionTask, TaskSubtask, TaskSubtaskFile } from '@/types/produ
 
 import { AiReportButton } from './AiAnalysis';
 import { RevisionUploadDialog } from './RevisionUploadDialog';
-import { canRemoveFile, canReviseFile, canUploadTo, fileGroups, fileProblem, formatMoment, isPdf, type SubtaskActions } from './subtaskFileModel';
-import { hasSubtaskDocument, isSubtaskCompleted, needsPdfFirst, submitsWithDialog, subtaskFileAccept } from './taskModel';
+import { canRemoveFile, canReviseFile, canUploadTo, fileGroups, fileProblem, formatMoment, isAnalysisActive, isPdf, type SubtaskActions } from './subtaskFileModel';
+import { BOM_SUBTASK_ID, hasSubtaskDocument, isSubtaskCompleted, needsPdfFirst, submitsWithDialog, subtaskFileAccept } from './taskModel';
 
 /**
  * ── DATEIEN EINER UNTERAUFGABE (28.09.2026, Vorgabe Samet) ──────────────────
@@ -190,9 +190,13 @@ export const SubtaskDetail = ({
     const [removing, setRemoving] = useState<TaskSubtaskFile | null>(null);
     const completed = isSubtaskCompleted(subtask);
     const mayUpload = canUploadTo(actions, subtask);
+    // Prüft die KI gerade ein PDF hier, wartet das nächste (02.10.2026) — der Server sichert es ebenso.
+    const analysing = subtask.files.some((file) => isAnalysisActive(file.analysis));
     // «Complete the task» dürfen dieselben wie den Stand setzen: nur wer an der Unteraufgabe steht —
     // die Verwaltung nicht von Hand (29.09.2026); sie gibt frei («Approve the task»).
-    const mayMark = !completed && Boolean(actions.meId && subtask.assigneeIds.includes(actions.meId));
+    // «BOM Creation» (02.10.2026): den Stand führt die BOM — hier weder abschliessen noch freigeben.
+    const bomDriven = subtask.id === BOM_SUBTASK_ID;
+    const mayMark = !completed && !bomDriven && Boolean(actions.meId && subtask.assigneeIds.includes(actions.meId));
     const [marking, setMarking] = useState(false);
     const withDialog = submitsWithDialog(subtask) && Boolean(onSubmit);
     const markComplete = async () => {
@@ -246,7 +250,7 @@ export const SubtaskDetail = ({
                                 showVersion={older.length > 0 || (latest.version || 1) > 1}
                                 onOpen={() => actions.openFile(task, subtask, latest)}
                                 onRemove={canRemoveFile(actions, subtask, latest) ? () => setRemoving(latest) : undefined}
-                                onRevise={canReviseFile(actions, subtask, { latest, older }) ? () => pickRevision(latest) : undefined}
+                                onRevise={canReviseFile(actions, subtask, { latest, older }) && !analysing ? () => pickRevision(latest) : undefined}
                                 history={older}
                                 onOpenVersion={(file) => actions.openFile(task, subtask, file)}
                                 canRemoveVersion={(file) => canRemoveFile(actions, subtask, file)}
@@ -260,11 +264,14 @@ export const SubtaskDetail = ({
                             <button
                                 type="button"
                                 className="ofi-ptk-files__add ofi-nosize"
-                                disabled={uploading}
+                                disabled={uploading || analysing}
+                                title={analysing ? t('productionTasks.ai.uploadWait') : undefined}
                                 onClick={() => inputRef.current?.click()}
                             >
-                                {uploading ? <Loader2 className="is-spinning" aria-hidden /> : <Plus aria-hidden />}
-                                {uploading ? t('productionTasks.files.adding') : t('productionTasks.files.add')}
+                                {uploading || analysing ? <Loader2 className="is-spinning" aria-hidden /> : <Plus aria-hidden />}
+                                {uploading
+                                    ? t('productionTasks.files.adding')
+                                    : analysing ? t('productionTasks.ai.analysing') : t('productionTasks.files.add')}
                             </button>
                             <input
                                 ref={inputRef}
@@ -325,7 +332,7 @@ export const SubtaskDetail = ({
                             {t('productionTasks.subtask.completeTask')}
                         </button>
                     )}
-                    {subtask.requiresApproval && subtask.status === 'PENDING' && actions.isAdmin && (
+                    {subtask.requiresApproval && subtask.status === 'PENDING' && actions.isAdmin && !bomDriven && (
                         <button type="button" className="ofi-ptk-completebtn ofi-nosize" onClick={onComplete}>
                             <CheckCircle2 aria-hidden />
                             {t('productionTasks.complete.button')}

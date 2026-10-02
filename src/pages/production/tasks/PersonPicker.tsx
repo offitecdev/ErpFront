@@ -1,12 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import { MacSelectionCheck } from '@/components/ui-shared/MacSelectionParts';
 import { t } from '@/i18n/translate';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
+import { readTaskWorkload } from '@/lib/api/productionTasks';
+import type { TaskWorkload } from '@/types/productionTasks';
 
-import { staffName } from './taskModel';
+import { sectionLabel, staffName, stageLabel } from './taskModel';
+
+/** So viele offene Unteraufgaben zeigt die Vorschau einer Person; der Rest als «+N». */
+const WORKLOAD_SHOWN = 6;
 
 /**
  * ── KİŞİ ATA (26.09.2026) ───────────────────────────────────────────────────
@@ -34,6 +39,17 @@ export const PersonPicker = ({
     onClose: () => void;
 }) => {
     const [query, setQuery] = useState('');
+    /* Wer schon woran arbeitet (02.10.2026: «when admins assign people show which tasks that
+       employee has on which projects and devices»): je Zeile die Zahl der offenen Unteraufgaben,
+       unten die der Person unter der Maus (oder im Fokus). Nur die Verwaltung bekommt sie. */
+    const [workload, setWorkload] = useState<TaskWorkload | null>(null);
+    const [previewId, setPreviewId] = useState<string | null>(null);
+    const open = Boolean(anchorEl);
+    useEffect(() => (open ? readTaskWorkload((value) => setWorkload(value), () => undefined) : undefined), [open]);
+    const itemsOf = (id: string) => workload?.people[id] ?? [];
+    const preview = previewId ? itemsOf(previewId) : [];
+    const previewRow = previewId ? staff.find((row) => row.id === previewId) ?? null : null;
+    const previewName = previewRow ? staffName(previewRow) || previewRow.email || '' : '';
 
     const rows = useMemo(() => {
         const needle = query.trim().toLocaleLowerCase('tr-TR');
@@ -95,6 +111,7 @@ export const PersonPicker = ({
                 {!loading && !rows.length && <div className="ofi-ptk-picker__state">{t('productionTasks.people.noneFound')}</div>}
                 {rows.map(({ row, name }) => {
                     const active = selected.includes(row.id);
+                    const count = itemsOf(row.id).length;
                     return (
                         <button
                             key={row.id}
@@ -103,14 +120,54 @@ export const PersonPicker = ({
                             aria-selected={active}
                             className="ofi-gv-picker__row"
                             onClick={() => toggle(row.id)}
+                            onMouseEnter={() => setPreviewId(row.id)}
+                            onFocus={() => setPreviewId(row.id)}
                         >
                             <MacSelectionCheck selected={active} />
                             <span className="ofi-gv-picker__name">{name || row.email || row.id}</span>
                             {(row.roleName || row.title) && <span className="ofi-gv-picker__hint">{row.roleName || row.title}</span>}
+                            {workload && (
+                                <span
+                                    className={`ofi-ptk-workcount ${count ? '' : 'is-free'}`}
+                                    title={t('productionTasks.workload.count', { count })}
+                                >
+                                    {count}
+                                </span>
+                            )}
                         </button>
                     );
                 })}
             </div>
+            {workload && previewId && (
+                <div className="ofi-ptk-workload" aria-live="polite">
+                    <b className="ofi-ptk-workload__title">
+                        {preview.length
+                            ? t('productionTasks.workload.title', { name: previewName, count: preview.length })
+                            : t('productionTasks.workload.free', { name: previewName })}
+                    </b>
+                    {preview.length > 0 && (
+                        <ul className="ofi-ptk-workload__list">
+                            {preview.slice(0, WORKLOAD_SHOWN).map((item, index) => (
+                                <li key={`${item.deviceId}-${item.taskCode}-${index}`}>
+                                    <span className="ofi-ptk-workload__where">
+                                        {item.projectNumber} · {item.positionNumber ? `${item.positionNumber} · ` : ''}{item.deviceName}
+                                    </span>
+                                    <span className="ofi-ptk-workload__what">
+                                        {sectionLabel({ key: item.area, name: item.sectionName })} › {stageLabel({ key: item.stage, name: item.stageName, weight: 0 })} · {item.taskCode} {item.subtaskName}
+                                    </span>
+                                    <span className="ofi-ptk-workload__meta">
+                                        {t(`productionTasks.status.${item.status}`)}
+                                        {item.dueDate ? ` · ${t('productionTasks.workload.due', { date: item.dueDate.split('-').reverse().join('.') })}` : ''}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {preview.length > WORKLOAD_SHOWN && (
+                        <small className="ofi-ptk-workload__more">{t('productionTasks.workload.more', { count: preview.length - WORKLOAD_SHOWN })}</small>
+                    )}
+                </div>
+            )}
         </AnchoredPicker>
     );
 };

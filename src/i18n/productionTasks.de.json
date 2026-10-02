@@ -208,11 +208,14 @@
       "UNLOCK_ALREADY_REQUESTED": "Um das Entsperren dieser Unteraufgabe wurde schon gebeten.",
       "REQUEST_NOT_FOUND": "Die Anfrage gibt es nicht oder sie ist schon erledigt.",
       "NO_STANDARDS": "Diese Unteraufgabe hat keine Dokumentstandards zum Prüfen.",
-      "ANALYSIS_RUNNING": "Die KI-Analyse läuft bereits.",
+      "ANALYSIS_RUNNING": "Die KI prüft gerade ein PDF dieser Unteraufgabe — danach geht das Hochladen wieder.",
       "STANDARDS_FILE_NOT_FOUND": "Das PDF der Standards wurde nicht gefunden.",
       "FEE_REQUIRED": "Bitte zuerst den Betrag (CHF) erfassen — ohne Betrag kann diese Unteraufgabe nicht gesendet werden.",
       "FEE_INVALID": "Der Betrag ist ungültig — z. B. 1250.00 eingeben.",
-      "PRIOR_STEPS_OPEN": "Zuerst die vorherigen Schritte abschliessen ({{count}} offen): {{steps}}"
+      "PRIOR_STEPS_OPEN": "Zuerst die vorherigen Schritte abschliessen ({{count}} offen): {{steps}}",
+      "BOM_DRIVEN": "Den Stand von «BOM Creation» führt die BOM — im BOM-Fenster freigeben, abschliessen oder revidieren.",
+      "STANDARDS_EMPTY": "Eine Vorlage braucht Text oder ein PDF.",
+      "STANDARDS_TEMPLATE_NOT_FOUND": "Diese Vorlage gibt es nicht mehr."
     },
     "people": {
       "assign": "Person zuweisen",
@@ -250,7 +253,8 @@
       "status": "Stand",
       "people": "Personen",
       "required": "Erforderlich",
-      "subtasksDone": "{{done}}/{{total}} Unteraufgaben"
+      "subtasksDone": "{{done}}/{{total}} Unteraufgaben",
+      "totalTime": "Gesamtzeit"
     },
     "status": {
       "REVISION": "Überarbeitung angefordert",
@@ -409,7 +413,9 @@
       "nameRequired": "Name fehlt",
       "sectionFull": "Die Stufen dieses Bereichs wiegen schon 100 % — zuerst das Gewicht einer Stufe senken.",
       "removeStageEmpty": "Die Stufe «{{name}}» wird aus dieser Vorlage entfernt.",
-      "removeSectionEmpty": "Der Bereich «{{name}}» wird aus dieser Vorlage entfernt."
+      "removeSectionEmpty": "Der Bereich «{{name}}» wird aus dieser Vorlage entfernt.",
+      "manageCategories": "Kategorien verwalten",
+      "noFreeCategory": "Jede Kategorie ist schon ein Bereich dieser Vorlage."
     },
     "templates": {
       "clearSearch": "Suche leeren",
@@ -614,7 +620,11 @@
       "cellFree": "An diesem Tag keine Aufgabe",
       "legendUpcoming": "Aufgabentag steht noch bevor",
       "cellUpcoming": "{{name}} · {{day}} steht noch bevor",
-      "dropTitlePhoto": "Fotos oder PDFs hier ablegen, dann Aufgabe und Unteraufgabe wählen"
+      "dropTitlePhoto": "Fotos oder PDFs hier ablegen, dann Aufgabe und Unteraufgabe wählen",
+      "missingMine": "Heute noch keine Datei hochgeladen",
+      "missingCount_one": "Heute fehlt {{count}} Datei",
+      "missingCount_other": "Heute fehlen {{count}} Dateien",
+      "missingTask": "Heute noch kein Dokument zu dieser Aufgabe hochgeladen"
     },
     "activity": {
       "title": "Aktivitäten",
@@ -846,7 +856,9 @@
         "ANALYSIS_TOO_LARGE": "Das PDF ist für die KI-Analyse zu gross (höchstens 20 MB).",
         "ANALYSIS_INTERRUPTED": "Die Analyse wurde unterbrochen (Neustart des Servers).",
         "STANDARDS_FILE_NOT_FOUND": "Das PDF der Standards wurde nicht gefunden — bitte erneut hochladen."
-      }
+      },
+      "uploadWait": "Die KI prüft gerade ein PDF dieser Unteraufgabe — danach können Sie wieder hochladen.",
+      "analysing": "KI prüft…"
     },
     "submit": {
       "confirm": "Zur Freigabe senden",
@@ -880,6 +892,46 @@
       "openValue_other": "{{count}} offen",
       "more_one": "+{{count}} weitere",
       "more_other": "+{{count}} weitere"
+    },
+    "bomTile": {
+      "title": "BOM",
+      "summary": "BOM anlegen und bearbeiten",
+      "open": "BOM von {{stage}} öffnen",
+      "region": "BOM von {{stage}}"
+    },
+    "time": {
+      "minutes": "{{m}} Min.",
+      "hoursMinutes": "{{h}} Std. {{m}} Min.",
+      "underMinute": "< 1 Min.",
+      "running": "Läuft gerade"
+    },
+    "workload": {
+      "count_one": "{{count}} offene Unteraufgabe",
+      "count_other": "{{count}} offene Unteraufgaben",
+      "title_one": "{{name}} · {{count}} offene Unteraufgabe",
+      "title_other": "{{name}} · {{count}} offene Unteraufgaben",
+      "free": "{{name}} hat keine offenen Unteraufgaben",
+      "due": "fällig {{date}}",
+      "more": "+{{count}} weitere"
+    },
+    "standardsTemplates": {
+      "label": "Vorlage",
+      "choose": "Vorlage der Standards wählen",
+      "none": "Noch keine Vorlagen",
+      "saveAs": "Als Vorlage speichern",
+      "namePlaceholder": "Name der Vorlage",
+      "saved": "Vorlage «{{name}}» gespeichert",
+      "removed": "Vorlage «{{name}}» gelöscht",
+      "remove": "Diese Vorlage löschen",
+      "emptyHint": "Zuerst Standards schreiben oder ein PDF hinzufügen"
+    },
+    "customer": {
+      "visible": "Für Kunden sichtbar",
+      "visibleShort": "Kunde",
+      "stageOn": "Kunden sehen diese Stufe — klicken zum Ausblenden",
+      "stageOff": "Für Kunden verborgen — klicken zum Anzeigen",
+      "taskHint": "Der Kunde sieht diese Aufgabe und ihren Stand in seinem Projekt",
+      "subtaskHint": "Der Kunde sieht diese Unteraufgabe und ihren Stand"
     }
   }
 }

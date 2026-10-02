@@ -1,11 +1,13 @@
+import { useState, type ComponentProps } from 'react';
+import { useSearchParams } from 'react-router-dom';
+
 import type { StaffDirectoryRow } from '@/lib/api/directory';
+import { isCustomBomCategory, type BomArea } from '@/types/productionBom';
 import type { TaskSection } from '@/types/productionTasks';
 
 import type { PersonNames } from '../tasks/PeopleCell';
-import { DeviceBomArea, type BomTasksBundle } from '../bom/device/DeviceBomArea';
-import type { ComponentProps } from 'react';
-
-import { StageCard } from '../tasks/StageCard';
+import { BomWindow } from '../bom/device/BomWindow';
+import type { StageCard } from '../tasks/StageCard';
 import type { SubtaskActions } from '../tasks/subtaskFileModel';
 import { isBuiltInArea, openPriorSteps, sectionLabel, stageLabel } from '../tasks/taskModel';
 import { DeviceAssignmentBoard } from './DeviceAssignmentBoard';
@@ -46,10 +48,15 @@ type Props = {
  *     sağa sola doğru açılmalı, içeriğin önüne geçmeli ama pop-up değil») —
  *     nur, wenn an dieser Stufe Aufgaben hängen. Es liegt ÜBER der Fläche;
  *     der Inhalt der Stufe folgt Schritt für Schritt darunter.
- * Die BOM-Liste gibt es nur auf der Stufe BOM der festen Bereiche Mekanik /
- * Elektrik — ein eigener Bereich einer Vorlage (28.09.2026) hat keine.
+ *
+ * Stufe BOM (02.10.2026: «BOM stage page should be like the other stage pages
+ * with tasks, files etc. buttons … only add a new button BOM»): dieselben
+ * Plättchen wie jede Stufe, darunter «BOM» — es öffnet die BOM-Fläche im
+ * Fenster, für den Bereich: Mekanik, Elektrik oder eine eigene Kategorie.
+ * Ein Verweis mit `bom`/`bv` in der Adresse (Glocke einer Revision) öffnet es gleich.
  */
 export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, names, isAdmin, meId, staff, staffLoading, focusSubtaskId = null }: Props) => {
+    const [params, setParams] = useSearchParams();
     const plan = handle.data?.plan ?? null;
     const workStage = isWorkStage(stage.id) ? section.stages.find((entry) => entry.key === stage.id) ?? null : null;
     const tasks = workStage && handle.data
@@ -100,37 +107,18 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
         const name = found ? stageLabel(found) : stageKey || '—';
         return owner && owner.key !== section.key ? `${sectionLabel(owner)} · ${name}` : name;
     };
-    const bomArea = stage.id === 'bom' && isBuiltInArea(section.key) ? section.key : null;
-    /* Stufe BOM (27.09.2026, Samet: «görevler artık bir buton halinde bulunsun,
-       BOM liste diyor ya orada … aynı yerde ileri geri»): keine Glaskarte —
-       die Karte der Stufe steht hinter einem Knopf der BOM-Liste. */
-    const bomTasks: BomTasksBundle | null = bomArea && workStage && plan && tasks.length > 0
-        ? {
-            count: tasks.length,
-            mine: meId ? tasks.filter((task) => task.assigneeIds.includes(meId)).length : 0,
-            card: (
-                <StageCard
-                    area={section.key}
-                    stage={workStage}
-                    number={stageNumber(stages, workStage.key)}
-                    tasks={tasks}
-                    share={section.share}
-                    names={names}
-                    mode="device"
-                    editable={isAdmin}
-                    staff={staff}
-                    staffLoading={staffLoading}
-                    meId={meId}
-                    busyTaskId={handle.busyTaskId}
-                    onStatus={onStatus}
-                    onSubtaskStatus={onSubtaskStatus}
-                    onAssignSubtask={onAssignSubtask}
-                    canSetStatus={canSetStatus}
-                    subtaskActions={subtaskActions}
-                />
-            ),
-        }
+    // Die BOM gehört zum Bereich, wenn er eine BOM-Kategorie ist (fest oder eigene).
+    const bomArea: BomArea | null = stage.id === 'bom' && (isBuiltInArea(section.key) || isCustomBomCategory(section.key))
+        ? section.key as BomArea
         : null;
+    const [bomOpen, setBomOpen] = useState(() => Boolean(bomArea && (params.has('bom') || params.has('bv'))));
+    const closeBom = () => {
+        setBomOpen(false);
+        // Die Ansicht der BOM steht in der Adresse (bv/bom/rev) — sie geht mit dem Fenster.
+        const next = new URLSearchParams(params);
+        ['bv', 'bom', 'rev'].forEach((key) => next.delete(key));
+        if (next.toString() !== params.toString()) setParams(next, { replace: true });
+    };
 
     return (
         <section
@@ -151,10 +139,7 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
                     meId={meId}
                 />
             )}
-            {/* BOM (27.09.2026): die BOM-Liste des Geräts im Bereich — ein
-                Navigationsstapel unter der Glaskarte der Aufgaben. */}
-            {bomArea && <DeviceBomArea key={`${deviceId}:${bomArea}`} deviceId={deviceId} area={bomArea} tasks={bomTasks} />}
-            {workStage && plan && tasks.length > 0 && !bomArea && (
+            {workStage && plan && (tasks.length > 0 || bomArea) && (
                 <StageTasksFloat
                     focusSubtaskId={focusSubtaskId}
                     deviceId={deviceId}
@@ -176,6 +161,17 @@ export const DeviceStagePanel = ({ deviceId, stage, stages, section, handle, nam
                     onAssignSubtask={onAssignSubtask}
                     canSetStatus={canSetStatus}
                     subtaskActions={subtaskActions}
+                    onOpenBom={bomArea ? () => setBomOpen(true) : undefined}
+                />
+            )}
+            {bomArea && (
+                <BomWindow
+                    open={bomOpen}
+                    deviceId={deviceId}
+                    deviceName={handle.data?.device.name ?? ''}
+                    area={bomArea}
+                    areaLabel={sectionLabel(section)}
+                    onClose={closeBom}
                 />
             )}
         </section>

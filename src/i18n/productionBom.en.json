@@ -35,6 +35,32 @@
       "MACHINE": "Machine",
       "ELECTRICAL": "Electrical"
     },
+    "categories": {
+      "title": "Categories",
+      "hint": "Mechanical (MEK) and Electrical (ELK) always exist. A category's code numbers its main BOMs (HYD → BOM-HYD-00001); its sub BOM codes are set on the BOM page.",
+      "add": "Add category",
+      "edit": "Edit {{name}}",
+      "builtIn": "Built-in",
+      "custom": "Custom",
+      "newTitle": "New category",
+      "editTitle": "Edit category",
+      "dialogSub": "Categories group BOM templates and a device's BOMs, like Mechanical and Electrical.",
+      "name": "Name",
+      "namePlaceholder": "e.g. Hydraulics",
+      "code": "Code",
+      "codeHint": "2–8 letters or digits",
+      "preview": "Main BOMs will be numbered {{number}}",
+      "codeBuiltIn": "{{code}} belongs to a built-in category.",
+      "create": "Create",
+      "created": "Category «{{name}}» created",
+      "saved": "Category «{{name}}» saved",
+      "deleted": "Category «{{name}}» deleted",
+      "deleteConfirm": "Delete category",
+      "deleteText": "Delete «{{name}}»? This is only possible while no BOM or template uses it.",
+      "menu": "Categories",
+      "menuSub": "Codes of the categories",
+      "link": "Categories"
+    },
     "status": {
       "DRAFT": "Draft",
       "APPROVED": "Approved",
@@ -541,7 +567,14 @@
       "BOM_NOT_APPROVED": "BOM {{bom}} is not approved yet — price requests and orders only come from an approved BOM. Approve it first.",
       "ERP_CODE_MISSING": "{{count}} lines have no ERP code on their depot card ({{names}}) — the BOM cannot be approved. Give the cards a material group.",
       "REVISION_NEEDS_ADMIN": "Only an admin can approve a revision — submit it with «Submit for approval».",
-      "REVISION_NOT_SUBMITTED": "The revision has not been submitted yet."
+      "REVISION_NOT_SUBMITTED": "The revision has not been submitted yet.",
+      "CATEGORY_NOT_FOUND": "This BOM category no longer exists.",
+      "CATEGORY_NAME_REQUIRED": "The category needs a name.",
+      "CATEGORY_NAME_TAKEN": "A category named «{{name}}» already exists.",
+      "CATEGORY_CODE_INVALID": "Code: 2–8 letters or digits (e.g. HYD).",
+      "CATEGORY_CODE_TAKEN": "The code {{code}} is already in use.",
+      "CATEGORY_IN_USE": "BOMs or templates already use this category.",
+      "CATEGORY_LIMIT": "At most {{max}} custom categories."
     },
     "tasks": {
       "title": "Tasks",
@@ -1419,6 +1452,9 @@
       "checkFailed": "Inbox could not be read: {{error}}",
       "checkNone": "No mailbox with an inbox is set up.",
       "readOnly": "Only administrators can change the mailboxes."
+    },
+    "window": {
+      "title": "BOM · {{area}}"
     }
   },
   "notify": {

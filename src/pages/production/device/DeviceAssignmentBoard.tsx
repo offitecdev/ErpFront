@@ -24,6 +24,7 @@ import {
     stageTaskWeight,
     TASK_LIMITS,
     tasksByStage,
+    isBomTask,
 } from '../tasks/taskModel';
 import { stageNumber, type DeviceStage } from './deviceStages';
 import { TemplateLoadDialog } from './TemplateLoadDialog';
@@ -91,6 +92,16 @@ export const DeviceAssignmentBoard = ({
         void saveTasks(tasksNow.filter((entry) => entry.id !== taskEdit.task.id)).then((ok) => { if (ok) setTaskEdit(null); });
     };
     /* Das Gewicht einer Stufe (30.09.2026) — geht mit allen Aufgaben an den Server, in einem Vorgang. */
+    /** Sieht der Kunde die Stufe (02.10.2026)? Gespeichert wie das Gewicht — mit den Bereichen. */
+    const saveStageVisibility = (area: string, stageKey: string, visible: boolean) => {
+        if (!plan) return;
+        const sections = plan.sections.map((entry) => (entry.key !== area ? entry : {
+            ...entry,
+            stages: entry.stages.map((stage) => (stage.key === stageKey ? { ...stage, customerVisible: visible } : stage)),
+        }));
+        void saveTasks(tasksNow, sections);
+    };
+
     const saveStageWeight = (area: string, stageKey: string, weight: number) => {
         if (!plan) return;
         const sections = plan.sections.map((entry) => (entry.key !== area ? entry : {
@@ -309,10 +320,14 @@ export const DeviceAssignmentBoard = ({
                                 onAssignSubtask={(task, subtask, ids) => void assignSubtask(task, subtask, ids, known(ids))}
                                 // Den Stand setzt man auf den Stufen selbst, nicht hier beim Anpassen.
                                 onOpenTask={(task) => setTaskEdit({ task, isNew: false })}
-                                onAddTask={(area, stageKey) => setTaskEdit({ task: newTask(area, stageKey), isNew: true })}
+                                // Eine BOM-Stufe mit ihrer Aufgabe «BOM» bekommt keine weitere (02.10.2026).
+                                onAddTask={(groups.get(stage.key) ?? []).some(isBomTask)
+                                    ? undefined
+                                    : (area, stageKey) => setTaskEdit({ task: newTask(area, stageKey), isNew: true })}
                                 // Die Aufgaben einer Stufe ergeben 100 % der STUFE (30.09.2026) — voll, keine weitere.
                                 addDisabledReason={stageTaskWeight(tasksNow, section.key, stage.key) >= 100 - 0.01 ? t('productionTasks.stage.full') : undefined}
                                 onStageWeight={(weight) => saveStageWeight(section.key, stage.key, weight)}
+                                onCustomerVisible={(visible) => saveStageVisibility(section.key, stage.key, visible)}
                             />
                         ))}
                         {/* Neue Stufe am Gerät (28.09.2026) — wie in der Vorlage, nur solange der

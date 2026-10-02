@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, Clock3, FileText, Lock, Paperclip, Play, Plus, ShieldCheck, Square, Trash2, X } from 'lucide-react';
+import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, Clock3, Eye, EyeOff, FileText, Lock, Paperclip, Play, Plus, ShieldCheck, Square, Trash2, X } from 'lucide-react';
 
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { t } from '@/i18n/translate';
@@ -7,10 +7,12 @@ import type { StaffDirectoryRow } from '@/lib/api/directory';
 import type { ProductionTask, TaskArea, TaskSectionStage, TaskStage, TaskStatus, TaskSubtask } from '@/types/productionTasks';
 
 import { FlagGlyph } from '../device/deviceGlyphs';
+import { taskMissingToday } from '../device/stageFileModel';
 import { CompleteSubtaskDialog } from './CompleteSubtaskDialog';
 import { SubmitSubtaskDialog } from './SubmitSubtaskDialog';
 import { NameInput } from './InlineName';
 import { UnlockRequestDialog } from './UnlockRequestDialog';
+import { WorkTimeCell } from './WorkTime';
 import { PeopleCell, type PersonNames } from './PeopleCell';
 import { SubtaskDetail } from './SubtaskFiles';
 import { latestFiles, type SubtaskActions } from './subtaskFileModel';
@@ -31,6 +33,7 @@ import {
     TASK_STATUSES,
     taskProgress,
     taskSectionWeight,
+    localToday,
 } from './taskModel';
 
 type Mode = 'template' | 'device';
@@ -57,7 +60,8 @@ export interface StageTools {
     /** Die Stufen stehen untereinander — verschoben wird nach oben und unten. */
     onMoveUp?: () => void;
     onMoveDown?: () => void;
-    onRemove: () => void;
+    /** Fehlt bei der BOM-Stufe — jeder Bereich behält sie (02.10.2026). */
+    onRemove?: () => void;
 }
 
 /**
@@ -269,6 +273,7 @@ export const StageCard = ({
     onClose,
     showStageWeight = false,
     onStageWeight,
+    onCustomerVisible,
     hidePending = false,
     hideStageDone = false,
     focusSubtaskId = null,
@@ -320,6 +325,8 @@ export const StageCard = ({
     showStageWeight?: boolean;
     /** Das Gewicht der Stufe im Bereich ändern (30.09.2026) — Vorlage und Tafel der Zuweisungen. */
     onStageWeight?: (weight: number) => void;
+    /** Sieht der Kunde die Stufe (02.10.2026)? Ohne: nur die Anzeige, kein Schalter. */
+    onCustomerVisible?: (visible: boolean) => void;
     /** Ohne das Zeichen «wartet auf Freigabe» (30.09.2026, «Görevlerim»: das gehört zu den Anfragen). */
     hidePending?: boolean;
     /** Ohne den grünen Haken vor dem Namen einer erledigten Stufe (30.09.2026, Startseite) — die Nummer bleibt. */
@@ -356,6 +363,7 @@ export const StageCard = ({
     const [completing, setCompleting] = useState<{ taskId: string; subtaskId: string } | null>(null);
     // «Görevi tamamla» mit Fotos und kurzer Notiz (02.10.2026) — nur «Fotoğraf yeterli».
     const [submitting, setSubmitting] = useState<{ taskId: string; subtaskId: string } | null>(null);
+    const today = localToday();
     const toggleTask = (taskId: string) => setExpanded((current) => {
         const next = new Set(current);
         if (next.has(taskId)) next.delete(taskId);
@@ -390,6 +398,23 @@ export const StageCard = ({
                 ) : (
                     <h3 className="ofi-ptk-card__title">{stageName}</h3>
                 )}
+                {/* Sichtbar für den Kunden (02.10.2026): ein Schalter für die Verwaltung, sonst nur das Zeichen. */}
+                {onCustomerVisible ? (
+                    <button
+                        type="button"
+                        className={`ofi-ptk-customerbtn ofi-nosize ${stage.customerVisible ? 'is-on' : ''}`}
+                        aria-pressed={Boolean(stage.customerVisible)}
+                        title={t(stage.customerVisible ? 'productionTasks.customer.stageOn' : 'productionTasks.customer.stageOff')}
+                        aria-label={t(stage.customerVisible ? 'productionTasks.customer.stageOn' : 'productionTasks.customer.stageOff')}
+                        onClick={() => onCustomerVisible(!stage.customerVisible)}
+                    >
+                        {stage.customerVisible ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
+                    </button>
+                ) : stage.customerVisible ? (
+                    <span className="ofi-ptk-customermark" title={t('productionTasks.customer.visible')}>
+                        <Eye aria-label={t('productionTasks.customer.visible')} />
+                    </span>
+                ) : null}
                 {pending > 0 && (
                     <span className="ofi-ptk-pendingtag" title={t('productionTasks.stage.pendingHint', { count: pending })}>
                         <Clock3 aria-hidden />
@@ -418,15 +443,17 @@ export const StageCard = ({
                         >
                             <ChevronDown aria-hidden />
                         </button>
-                        <button
-                            type="button"
-                            className="ofi-ptk-toolbtn is-danger ofi-nosize"
-                            title={t('productionTasks.template.removeStage')}
-                            aria-label={t('productionTasks.template.removeStage')}
-                            onClick={tools.onRemove}
-                        >
-                            <Trash2 aria-hidden />
-                        </button>
+                        {tools.onRemove && (
+                            <button
+                                type="button"
+                                className="ofi-ptk-toolbtn is-danger ofi-nosize"
+                                title={t('productionTasks.template.removeStage')}
+                                aria-label={t('productionTasks.template.removeStage')}
+                                onClick={tools.onRemove}
+                            >
+                                <Trash2 aria-hidden />
+                            </button>
+                        )}
                     </span>
                 )}
                 {/* Gewicht und Beitrag der Stufe ganz rechts am Rand der Karte. Auf den Arbeitsstufen
@@ -480,6 +507,8 @@ export const StageCard = ({
                                     <span role="columnheader">{t('productionTasks.table.created')}</span>
                                     <span role="columnheader">{t('productionTasks.table.start')}</span>
                                     <span role="columnheader">{t('productionTasks.table.due')}</span>
+                                    {/* Die gearbeitete Zeit (02.10.2026), gleich neben dem Termin. */}
+                                    <span role="columnheader">{t('productionTasks.table.totalTime')}</span>
                                 </>
                             )}
                             <span role="columnheader">{t('productionTasks.table.weight')}</span>
@@ -544,12 +573,29 @@ export const StageCard = ({
                                                 <span className="ofi-ptk-task__name" title={task.name}>{task.name}</span>
                                             )}
                                             {mine && <span className="ofi-ptk-mine" title={t('productionTasks.people.mine')}>{t('productionTasks.people.meShort')}</span>}
+                                            {task.customerVisible && (
+                                                <span className="ofi-ptk-customermark" title={t('productionTasks.customer.visible')}>
+                                                    <Eye aria-label={t('productionTasks.customer.visible')} />
+                                                </span>
+                                            )}
+                                            {/* Heute noch keine Datei an dieser Aufgabe (02.10.2026) — der Text im Tipp. */}
+                                            {onDevice && taskMissingToday(task, today) && (
+                                                <span
+                                                    className="ofi-ptk-warnmark"
+                                                    role="img"
+                                                    title={t('productionTasks.stageFiles.missingTask')}
+                                                    aria-label={t('productionTasks.stageFiles.missingTask')}
+                                                >
+                                                    !
+                                                </span>
+                                            )}
                                         </span>
                                         {onDevice && (
                                             <>
                                                 <span role="cell"><DayCell day={task.createdAt} /></span>
                                                 <span role="cell"><DayCell day={task.startDate} /></span>
                                                 <span role="cell"><DayCell day={task.dueDate} /></span>
+                                                <span role="cell"><WorkTimeCell clocks={task.subtasks} /></span>
                                             </>
                                         )}
                                         <span
@@ -688,12 +734,18 @@ export const StageCard = ({
                                                 ) : (
                                                     <span className="ofi-ptk-task__name" title={subtask.name}>{subtask.name}</span>
                                                 )}
+                                                {subtask.customerVisible && (
+                                                    <span className="ofi-ptk-customermark" title={t('productionTasks.customer.visible')}>
+                                                        <Eye aria-label={t('productionTasks.customer.visible')} />
+                                                    </span>
+                                                )}
                                             </span>
                                             {onDevice && (
                                                 <>
                                                     <span role="cell"><DayCell day={subtask.createdAt} /></span>
                                                     <span role="cell"><DayCell day={subtask.startDate} /></span>
                                                     <span role="cell"><DayCell day={subtask.dueDate} /></span>
+                                                    <span role="cell"><WorkTimeCell clocks={[subtask]} /></span>
                                                 </>
                                             )}
                                             {/* Anteil an der Aufgabe; der Beitrag rechnet über das Gewicht der Aufgabe. */}

@@ -23,7 +23,7 @@ import { t } from '@/i18n/translate';
 import { productionBomApi, productionBomErrorText } from '@/lib/api/productionBom';
 import { useAuthStore } from '@/store/authStore';
 import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
-import type { Bom, BomLine, BomProcurementKind, BomProduct, BomTemplate, BomUnit } from '@/types/productionBom';
+import { isCustomBomCategory, type Bom, type BomLine, type BomProcurementKind, type BomProduct, type BomTemplate, type BomUnit } from '@/types/productionBom';
 
 import { BomLinesTable, type BomTableMode, type BomTableRow } from '../BomLinesTable';
 import { fmtQty, parseQuantityText, quantityToText, shortDate, unitLabel } from '../bomFormat';
@@ -345,7 +345,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                             <>
                                 <b>{t('productionBom.device.title')}</b>
                                 <span className="ofi-bom-dot">·</span>
-                                {t(`productionBom.area.${bom.area}`)}
+                                {context.areaLabel}
                                 <span className="ofi-bom-dot">·</span>
                                 <CalendarClock aria-hidden />
                                 {delivery ? t('productionBom.device.delivery', { date: shortDate(delivery) }) : t('productionBom.device.noDelivery')}
@@ -643,7 +643,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                     {editable && (
                                         <div className="ofi-bom-linesbar is-tools">
                                             <div className="ofi-bom-linesbar__tools">
-                                                <ProductSearch area={bom.area} onPick={pick} placeholder={t('productionBom.search.short')} />
+                                                <ProductSearch area={isCustomBomCategory(bom.area) ? undefined : bom.area} onPick={pick} placeholder={t('productionBom.search.short')} />
                                                 <button type="button" className="ofi-bom-btn is-quiet ofi-nosize" onClick={() => setInserting(true)}>
                                                     <LayoutTemplate />
                                                     {t('productionBom.insert.button')}
@@ -667,7 +667,7 @@ export const BomDetailView = ({ context, bom }: { context: BomViewContext; bom: 
                                         footer={editable ? (
                                             <ProductSearch
                                                 variant="row"
-                                                area={bom.area}
+                                                area={isCustomBomCategory(bom.area) ? undefined : bom.area}
                                                 onPick={pick}
                                                 placeholder={t('productionBom.detail.addRowPlaceholder')}
                                                 trailing={(

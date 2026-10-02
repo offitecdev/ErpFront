@@ -1,11 +1,12 @@
-import { useRef, useState, type ChangeEvent } from 'react';
-import { Loader2, ScrollText, Upload, X } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { BookmarkPlus, Loader2, ScrollText, Trash2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
+import { SelectMenu } from '@/components/ui-shared/SelectMenu';
 import { t } from '@/i18n/translate';
 import { productionTaskErrorText, productionTasksApi } from '@/lib/api/productionTasks';
-import type { TaskStandardsFile } from '@/types/productionTasks';
+import type { TaskStandardsFile, TaskStandardsTemplate } from '@/types/productionTasks';
 
 import { openBlob } from '../bom/device/bomFiles';
 import { FileGlyph } from './SubtaskFiles';
@@ -45,6 +46,53 @@ export const DocumentStandardsDialog = ({
     const [file, setFile] = useState<TaskStandardsFile | null>(initialFile);
     const [uploading, setUploading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    /* Vorlagen (02.10.2026: «the admin should be able to add a template for standard and
+       select a standard with a combobox»): wählen füllt Text und PDF, «Als Vorlage
+       speichern» legt das Jetzige unter einem Namen ab. */
+    const [templates, setTemplates] = useState<TaskStandardsTemplate[]>([]);
+    const [templateId, setTemplateId] = useState('');
+    const [naming, setNaming] = useState<string | null>(null);
+    const [savingTemplate, setSavingTemplate] = useState(false);
+    useEffect(() => {
+        let alive = true;
+        void productionTasksApi.standardsTemplates().then((value) => { if (alive) setTemplates(value.items); }, () => undefined);
+        return () => { alive = false; };
+    }, []);
+    const applyTemplate = (id: string) => {
+        setTemplateId(id);
+        const chosen = templates.find((entry) => entry.id === id);
+        if (!chosen) return;
+        setText(chosen.text ?? '');
+        setFile(chosen.file);
+    };
+    const saveTemplate = async () => {
+        const name = (naming ?? '').replace(/\s+/g, ' ').trim();
+        if (!name || savingTemplate) return;
+        setSavingTemplate(true);
+        try {
+            const { template } = await productionTasksApi.createStandardsTemplate({ name, text: text.trim() || null, file });
+            setTemplates((current) => [...current, template].sort((a, b) => a.name.localeCompare(b.name, 'tr')));
+            setTemplateId(template.id);
+            setNaming(null);
+            toast.success(t('productionTasks.standardsTemplates.saved', { name }));
+        } catch (error) {
+            toast.error(productionTaskErrorText(error));
+        } finally {
+            setSavingTemplate(false);
+        }
+    };
+    const removeTemplate = async () => {
+        const chosen = templates.find((entry) => entry.id === templateId);
+        if (!chosen) return;
+        try {
+            await productionTasksApi.removeStandardsTemplate(chosen.id);
+            setTemplates((current) => current.filter((entry) => entry.id !== chosen.id));
+            setTemplateId('');
+            toast.success(t('productionTasks.standardsTemplates.removed', { name: chosen.name }));
+        } catch (error) {
+            toast.error(productionTaskErrorText(error));
+        }
+    };
 
     const onPick = async (event: ChangeEvent<HTMLInputElement>) => {
         const picked = event.target.files?.[0];
@@ -87,6 +135,63 @@ export const DocumentStandardsDialog = ({
             )}
         >
             <div className="ofi-ptk-pop ofi-ptk-form">
+                {/* Eine Vorlage wählen oder das Jetzige als Vorlage ablegen (02.10.2026). */}
+                <div className="ofi-ptk-field">
+                    <span className="ofi-ptk-field__label">{t('productionTasks.standardsTemplates.label')}</span>
+                    <div className="ofi-ptk-stdtemplates">
+                        <SelectMenu
+                            className="ofi-ptk-stdtemplates__select"
+                            value={templateId}
+                            placeholder={templates.length ? t('productionTasks.standardsTemplates.choose') : t('productionTasks.standardsTemplates.none')}
+                            disabled={!templates.length}
+                            ariaLabel={t('productionTasks.standardsTemplates.label')}
+                            options={templates.map((entry) => ({ value: entry.id, label: entry.name, hint: entry.file ? 'PDF' : undefined }))}
+                            onChange={applyTemplate}
+                        />
+                        {templateId && (
+                            <button
+                                type="button"
+                                className="ofi-ptk-toolbtn is-danger ofi-nosize"
+                                title={t('productionTasks.standardsTemplates.remove')}
+                                aria-label={t('productionTasks.standardsTemplates.remove')}
+                                onClick={() => void removeTemplate()}
+                            >
+                                <Trash2 aria-hidden />
+                            </button>
+                        )}
+                        {naming === null ? (
+                            <button
+                                type="button"
+                                className="ofi-ptk-files__add ofi-nosize"
+                                disabled={!text.trim() && !file}
+                                title={!text.trim() && !file ? t('productionTasks.standardsTemplates.emptyHint') : undefined}
+                                onClick={() => setNaming('')}
+                            >
+                                <BookmarkPlus aria-hidden />
+                                {t('productionTasks.standardsTemplates.saveAs')}
+                            </button>
+                        ) : (
+                            <span className="ofi-ptk-stdtemplates__name">
+                                <input
+                                    className="ofi-ptk-input"
+                                    value={naming}
+                                    maxLength={120}
+                                    autoFocus
+                                    placeholder={t('productionTasks.standardsTemplates.namePlaceholder')}
+                                    aria-label={t('productionTasks.standardsTemplates.namePlaceholder')}
+                                    onChange={(event) => setNaming(event.target.value)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter') { event.preventDefault(); void saveTemplate(); }
+                                        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setNaming(null); }
+                                    }}
+                                />
+                                <button type="button" className="ofi-ptk-btn is-small ofi-nosize" disabled={!naming.trim() || savingTemplate} onClick={() => void saveTemplate()}>
+                                    {savingTemplate ? <Loader2 className="is-spinning" aria-hidden /> : t('productionTasks.actions.apply')}
+                                </button>
+                            </span>
+                        )}
+                    </div>
+                </div>
                 {/* Das PDF der Standards (01.10.2026) — die KI liest es mit. */}
                 <div className="ofi-ptk-field">
                     <span className="ofi-ptk-field__label">{t('productionTasks.subtask.standardsPdf')}</span>

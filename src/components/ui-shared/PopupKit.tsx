@@ -86,6 +86,11 @@ export type PopupDialogProps = {
     /* Hide the X — for a state that must not be dismissed (auto-save). */
     hideClose?: boolean;
     bodyClassName?: string;
+    /** Where the window is mounted (default `document.body`). A window whose content is styled
+        under `#root` (the BOM screen) mounts inside `#root` instead. */
+    container?: Element | null;
+    /** Fill the whole screen (no margin, no rounded edge) — the BOM window. */
+    fullScreen?: boolean;
     /* Optional: a confirmation whose subtitle says it all has no body. */
     children?: ReactNode;
 };
@@ -106,6 +111,8 @@ export const PopupDialog = ({
     closeOnEscape = true,
     hideClose = false,
     bodyClassName,
+    container,
+    fullScreen = false,
     children,
 }: PopupDialogProps) => {
     useEffect(() => {
@@ -126,7 +133,7 @@ export const PopupDialog = ({
     return createPortal(
         // `data-cal-stacked` — a floating card underneath leaves Escape alone
         // while this dialog is open (FloatingCard reads it).
-        <section data-cal-stacked="1" className="ofi-tp-scrim" style={{ zIndex: z }}>
+        <section data-cal-stacked="1" className={`ofi-tp-scrim${fullScreen ? ' is-fullscreen' : ''}`} style={{ zIndex: z }}>
             <div
                 className="ofi-tp-scrim__hit"
                 onMouseDown={(event) => { if (closeOnBackdrop && event.target === event.currentTarget) onClose(); }}
@@ -135,8 +142,8 @@ export const PopupDialog = ({
                 role="dialog"
                 aria-modal="true"
                 aria-label={typeof title === 'string' ? title : undefined}
-                className="ofi-tp-dialog"
-                style={{ maxWidth: width }}
+                className={`ofi-tp-dialog${fullScreen ? ' is-fullscreen' : ''}`}
+                style={fullScreen ? undefined : { maxWidth: width }}
             >
                 <header className={`ofi-tp-dialog__head ${icon ? 'has-icon' : ''}`}>
                     {icon && <span className={`ofi-tp-iconbadge is-${tone}`}>{icon}</span>}
@@ -162,7 +169,7 @@ export const PopupDialog = ({
                 {footer && <div className="ofi-tp-dialog__foot">{footer}</div>}
             </section>
         </section>,
-        document.body,
+        container ?? document.body,
     );
 };
 

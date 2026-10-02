@@ -59,6 +59,33 @@ export const dutyChecker = (tasks: readonly ProductionTask[]) => {
         (windows.get(personId) ?? []).some(({ start, end }) => (!start || day >= start) && (!end || day <= end));
 };
 
+/**
+ * Wer heute in dieser Stufe hochladen müsste und es noch nicht getan hat
+ * (02.10.2026: «if the employee doesn't upload a file that day show a text on
+ * the files button and file history button»). Dieselbe Pflicht wie in der
+ * Historie (`dutyChecker`: der Tag liegt im Zeitraum seiner Aufgabe) — nur
+ * ohne erledigte Aufgaben.
+ */
+export const missingUploadsToday = (tasks: readonly ProductionTask[], today: string): string[] => {
+    const open = tasks.filter((task) => task.status !== 'DONE');
+    const isDutyDay = dutyChecker(open);
+    const uploaded = new Set(stageFilesOf(tasks).filter((entry) => entry.day === today).map((entry) => entry.file.uploadedById));
+    return [...new Set(open.flatMap((task) => task.assigneeIds))].filter((id) => isDutyDay(id, today) && !uploaded.has(id));
+};
+
+/**
+ * Eine Aufgabe, an der heute noch keine Datei hängt, obwohl heute ihr Tag ist
+ * (02.10.2026: «show red ! on the tasks if no document is uploaded that day»):
+ * nicht erledigt, mit Personen und Unteraufgaben (an ihnen hängen die Dateien),
+ * heute in ihrem Zeitraum — dieselbe Pflicht wie in der Historie.
+ */
+export const taskMissingToday = (task: ProductionTask, today: string): boolean => {
+    if (task.status === 'DONE' || !task.assigneeIds.length || !task.subtasks.length) return false;
+    const { start, end } = taskWindow(task);
+    if ((start && today < start) || (end && today > end)) return false;
+    return !task.subtasks.some((subtask) => subtask.files.some((file) => dayOf(file.uploadedAt) === today));
+};
+
 /** Der späteste Termin der Aufgaben der Stufe — bis dahin reicht die Historie. */
 export const lastTaskDue = (tasks: readonly ProductionTask[]): string | null =>
     tasks.reduce<string | null>((last, task) => (task.dueDate && (!last || task.dueDate > last) ? task.dueDate : last), null);

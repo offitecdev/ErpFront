@@ -13,7 +13,10 @@ import {
     readTaskTemplates,
     refreshTaskTemplates,
 } from '@/lib/api/productionTasks';
+import { readBomSettings } from '@/lib/api/productionBom';
+import { bomCategoryOptions } from '@/pages/production/bom/bomCategoryOptions';
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
+import type { BomSettings } from '@/types/productionBom';
 import { useStaffDirectory } from '@/pages/crm/hooks/useStaffDirectory';
 import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
 import { useAuthStore } from '@/store/authStore';
@@ -60,6 +63,10 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
     useLanguageTick();
     const [params, setParams] = useSearchParams();
     const canEdit = useAuthStore((state) => state.isSystemAdmin);
+    // Die Bereiche einer Vorlage entstehen aus den BOM-Kategorien (02.10.2026).
+    const [bomSettings, setBomSettings] = useState<Pick<BomSettings, 'categories'> | null>(null);
+    useEffect(() => readBomSettings((value) => setBomSettings(value), () => setBomSettings({ categories: [] })), []);
+    const categories = useMemo(() => bomCategoryOptions(bomSettings), [bomSettings]);
     // Das Verzeichnis braucht nur, wer Personen auswählt (die Namen der
     // gespeicherten Vorlage liefert der Server mit).
     const { staff, loading: staffLoading } = useStaffDirectory(canEdit);
@@ -357,6 +364,7 @@ export const TaskTemplatesPage = ({ tabs }: { tabs?: ReactNode } = {}) => {
                                 onOpenTask={openTask}
                                 onAddTask={addTask}
                                 isNameTaken={isNameTaken}
+                                categories={categories}
                             />
                         ) : templateError ? (
                             <div className="ofi-ptk-state is-error">
